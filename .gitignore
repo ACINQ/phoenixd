@@ -1,0 +1,46 @@
+.gradle
+build/
+.cxx
+
+# this file is local to the dev environment and must not be pushed!
+local.properties
+
+# Ignore specific Mac files
+.DS_Store
+# Non relevant Xcode files
+xcuserdata/
+# HPROF
+*.hprof
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
+# Cache of project
+.gradletasknamecache
+
+*.class
+*.log
+
+# sbt specific
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+.idea
+*.iml
+target/
+project/target
+DeleteMe*.scala

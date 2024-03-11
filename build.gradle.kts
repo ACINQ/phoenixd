@@ -65,7 +65,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp:1.6.2-FEECREDIT-SNAPSHOT")
+                implementation("fr.acinq.lightning:lightning-kmp:1.6.2-FEECREDIT-1")
                 // ktor serialization
                 implementation(ktor("serialization-kotlinx-json"))
                 // ktor server

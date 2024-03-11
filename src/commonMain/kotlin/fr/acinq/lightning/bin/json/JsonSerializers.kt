@@ -17,6 +17,8 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
+import fr.acinq.lightning.MilliSatoshi
+import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.LightningOutgoingPayment
@@ -89,4 +91,37 @@ sealed class ApiType {
         constructor(event: fr.acinq.lightning.io.PaymentNotSent) : this(event.request.paymentHash, event.reason.reason.toString())
     }
 
+    @Serializable
+    @SerialName("incoming_payment")
+    data class IncomingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val completedAt: Long?, val createdAt: Long) {
+        constructor(payment: fr.acinq.lightning.db.IncomingPayment, metadata: PaymentMetadata?) : this (
+            paymentHash = payment.paymentHash,
+            preimage = payment.preimage,
+            externalId = metadata?.externalId,
+            description = when (val or = payment.origin) {
+                is fr.acinq.lightning.db.IncomingPayment.Origin.Invoice -> or.paymentRequest.description
+                else -> null
+            },
+            isPaid = payment.completedAt != null,
+            receivedSat = payment.amount.truncateToSatoshi(),
+            fees = payment.fees,
+            completedAt = payment.completedAt,
+            createdAt = payment.createdAt,
+        )
+    }
+
+    @Serializable
+    @SerialName("outgoing_payment")
+    data class OutgoingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
+        constructor(payment: LightningOutgoingPayment) : this (
+            paymentHash = payment.paymentHash,
+            preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
+            invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
+            isPaid = payment.completedAt != null,
+            sent = payment.amount.truncateToSatoshi(),
+            fees = payment.fees,
+            completedAt = payment.completedAt,
+            createdAt = payment.createdAt,
+        )
+    }
 }

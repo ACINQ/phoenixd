@@ -24,15 +24,16 @@ import fr.acinq.bitcoin.TxId
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.bin.db.payments.LinkTxToPaymentQueries
+import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
 import fr.acinq.lightning.channel.ChannelException
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.logging.LoggerFactory
+import fr.acinq.lightning.logging.info
 import fr.acinq.lightning.payment.FinalFailure
 import fr.acinq.lightning.utils.*
 import fr.acinq.lightning.wire.FailureMessage
 import fr.acinq.phoenix.db.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 class SqlitePaymentsDb(
@@ -67,13 +68,14 @@ class SqlitePaymentsDb(
         )
     )
 
-    internal val inQueries = IncomingQueries(database)
-    internal val outQueries = OutgoingQueries(database)
+    private val inQueries = IncomingQueries(database)
+    private val outQueries = OutgoingQueries(database)
     private val spliceOutQueries = SpliceOutgoingQueries(database)
     private val channelCloseQueries = ChannelCloseOutgoingQueries(database)
     private val cpfpQueries = SpliceCpfpOutgoingQueries(database)
     private val linkTxToPaymentQueries = LinkTxToPaymentQueries(database)
     private val inboundLiquidityQueries = InboundLiquidityQueries(database)
+    val metadataQueries = PaymentsMetadataQueries(database)
 
     override suspend fun addOutgoingLightningParts(
         parentId: UUID,
@@ -161,7 +163,7 @@ class SqlitePaymentsDb(
     }
 
     override suspend fun getLightningOutgoingPayment(id: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
-        outQueries.getPaymentStrict(id)
+        outQueries.getPayment(id)
     }
 
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {

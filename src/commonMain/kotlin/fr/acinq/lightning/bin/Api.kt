@@ -8,6 +8,8 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.bin.db.SqlitePaymentsDb
+import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
@@ -17,10 +19,7 @@ import fr.acinq.lightning.channel.states.ClosingFeerates
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
-import fr.acinq.lightning.utils.sat
-import fr.acinq.lightning.utils.sum
-import fr.acinq.lightning.utils.toByteVector
-import fr.acinq.lightning.utils.toMilliSatoshi
+import fr.acinq.lightning.utils.*
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -101,6 +100,20 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val invoice = peer.createInvoice(randomBytes32(), amount.toMilliSatoshi(), Either.Left(description))
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+                get("payments/incoming/{paymentHash}") {
+                    val paymentHash = call.parameters.getByteVector32("paymentHash")
+                    println("fetching details for payment=$paymentHash")
+                    paymentDb.getIncomingPayment(paymentHash)?.let {
+                        val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(paymentHash))
+                        call.respond(IncomingPayment(it, metadata))
+                    } ?: call.respond(HttpStatusCode.NotFound)
+                }
+                get("payments/outgoing/{uuid}") {
+                    val uuid = call.parameters.getUUID("uuid")
+                    paymentDb.getLightningOutgoingPayment(uuid)?.let {
+                        call.respond(OutgoingPayment(it))
+                    } ?: call.respond(HttpStatusCode.NotFound)
+                }
                 post("payinvoice") {
                     val formParameters = call.receiveParameters()
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
@@ -166,6 +179,8 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
         }
     }
 
+    private val paymentDb: SqlitePaymentsDb by lazy { peer.db.payments as SqlitePaymentsDb }
+
     private fun missing(argName: String): Nothing = throw MissingRequestParameterException(argName)
 
     private fun invalidType(argName: String, typeName: String): Nothing = throw ParameterConversionException(argName, typeName)
@@ -173,6 +188,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 
     private fun Parameters.getByteVector32(argName: String): ByteVector32 = getString(argName).let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
+    private fun Parameters.getUUID(argName: String): UUID = getString(argName).let { uuid -> kotlin.runCatching { UUID.fromString(uuid) }.getOrNull() ?: invalidType(argName, "uuid") }
 
     private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: error("invalid address")).toByteVector()
 

@@ -23,7 +23,6 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.ShortChannelId
 import fr.acinq.lightning.channel.ChannelException
-import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.db.HopDesc
 import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.db.OutgoingPayment
@@ -150,18 +149,10 @@ class OutgoingQueries(val database: PaymentsDatabase) {
         }
     }
 
-    fun getPaymentWithoutParts(id: UUID): LightningOutgoingPayment? {
-        return queries.getPaymentWithoutParts(
-            id = id.toString(),
-            mapper = Companion::mapLightningOutgoingPaymentWithoutParts
-        ).executeAsOneOrNull()
-    }
-
     /**
-     * Returns a [LightningOutgoingPayment] for this id - if instead we find legacy converted to a new type (such as
-     * [ChannelCloseOutgoingPayment], this payment is ignored and we return null instead.
+     * Returns a [LightningOutgoingPayment] for this id.
      */
-    fun getPaymentStrict(id: UUID): LightningOutgoingPayment? = queries.getPayment(
+    fun getPayment(id: UUID): LightningOutgoingPayment? = queries.getPayment(
         id = id.toString(),
         mapper = Companion::mapLightningOutgoingPayment
     ).executeAsList().let { parts ->
@@ -171,27 +162,6 @@ class OutgoingQueries(val database: PaymentsDatabase) {
         }?.let {
             filterUselessParts(it)
         }
-    }
-
-    /**
-     * May return a [ChannelCloseOutgoingPayment] instead of the expected [LightningOutgoingPayment]. That's because
-     * channel closing used to be stored as [LightningOutgoingPayment] with special closing parts. We convert those to
-     * the propert object type.
-     */
-    fun getPaymentRelaxed(id: UUID): OutgoingPayment? = queries.getPayment(
-        id = id.toString(),
-        mapper = Companion::mapLightningOutgoingPayment
-    ).executeAsList().let { parts ->
-        // this payment may be a legacy channel closing - otherwise, only take regular LN payment parts, and group them
-        parts.firstOrNull { it is ChannelCloseOutgoingPayment } ?: parts.filterIsInstance<LightningOutgoingPayment>().let {
-            groupByRawLightningOutgoing(it).firstOrNull()
-        }?.let {
-            filterUselessParts(it)
-        }
-    }
-
-    fun getOldestCompletedDate(): Long? {
-        return queries.getOldestCompletedDate().executeAsOneOrNull()
     }
 
     fun listLightningOutgoingPayments(paymentHash: ByteVector32): List<LightningOutgoingPayment> {

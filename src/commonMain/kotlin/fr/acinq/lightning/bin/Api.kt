@@ -147,7 +147,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
         }
 
         webhookUrl?.let { url ->
-            val client = HttpClient(io.ktor.client.engine.cio.CIO) {
+            val client = HttpClient {
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
                     json(json = Json {
                         prettyPrint = true

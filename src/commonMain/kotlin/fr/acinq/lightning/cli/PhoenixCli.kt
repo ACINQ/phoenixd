@@ -16,7 +16,6 @@ import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.homeDirectory
 import fr.acinq.lightning.payment.Bolt11Invoice
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -60,7 +59,7 @@ class PhoenixCli : CliktCommand() {
                     port = httpBindPort
                 }
             ),
-            httpClient = HttpClient(CIO) {
+            httpClient = HttpClient {
                 install(ContentNegotiation) {
                     json(json = Json {
                         prettyPrint = true

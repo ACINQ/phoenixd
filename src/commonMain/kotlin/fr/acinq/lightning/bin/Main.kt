@@ -202,18 +202,10 @@ class Phoenixd : CliktCommand() {
         )
         val keyManager = LocalKeyManager(seed, chain, lsp.swapInXpub)
         val nodeParams = NodeParams(chain, loggerFactory, keyManager)
-            .run {
-                copy(
-                    zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),
-                    liquidityPolicy = MutableStateFlow(liquidityPolicy),
-                    features = features.copy(
-                        activated = buildMap {
-                            putAll(features.activated)
-                            put(Feature.FeeCredit, FeatureSupport.Optional)
-                        }
-                    )
-                )
-            }
+            .copy(
+                zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),
+                liquidityPolicy = MutableStateFlow(liquidityPolicy),
+            )
         echo(cyan("nodeid: ${nodeParams.nodeId}"))
 
         val electrum = ElectrumClient(scope, loggerFactory)

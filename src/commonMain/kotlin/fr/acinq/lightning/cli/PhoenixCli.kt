@@ -15,6 +15,7 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.homeDirectory
 import fr.acinq.lightning.payment.Bolt11Invoice
+import fr.acinq.lightning.utils.UUID
 import io.ktor.client.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
@@ -30,7 +31,7 @@ import kotlinx.serialization.json.Json
 
 fun main(args: Array<String>) =
     PhoenixCli()
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -114,16 +115,61 @@ class ListChannels : CliktCommand(name = "listchannels", help = "List all channe
     }
 }
 
+class GetOutgoingPayment : CliktCommand(name = "getoutgoingpayment", help = "Get outgoing payment") {
+    private val commonOptions by requireObject<HttpConf>()
+    private val uuid by option("--uuid").convert { UUID.fromString(it) }.required()
+    override fun run() {
+        runBlocking {
+            val res = commonOptions.httpClient.get(
+                url = commonOptions.baseUrl / "payments/outgoing/$uuid"
+            )
+            echo(res.bodyAsText())
+        }
+    }
+}
+
+class GetIncomingPayment : CliktCommand(name = "getincomingpayment", help = "Get incoming payment") {
+    private val commonOptions by requireObject<HttpConf>()
+    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
+    override fun run() {
+        runBlocking {
+            val res = commonOptions.httpClient.get(
+                url = commonOptions.baseUrl / "payments/incoming/$paymentHash"
+            )
+            echo(res.bodyAsText())
+        }
+    }
+}
+
+class ListIncomingPayments : CliktCommand(name = "listincomingpayments", help = "List incoming payments matching the given externalId") {
+    private val commonOptions by requireObject<HttpConf>()
+    private val externalId by option("--externalId", "--eid").required()
+    override fun run() {
+        runBlocking {
+            val res = commonOptions.httpClient.get(
+                url = commonOptions.baseUrl / "payments/incoming",
+            ) {
+                url {
+                    parameters.append("externalId", externalId)
+                }
+            }
+            echo(res.bodyAsText())
+        }
+    }
+}
+
 class CreateInvoice : CliktCommand(name = "createinvoice", help = "Create a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val commonOptions by requireObject<HttpConf>()
     private val amountSat by option("--amountSat").long()
     private val description by option("--description", "--desc").required()
+    private val externalId by option("--externalId")
     override fun run() {
         runBlocking {
             val res = commonOptions.httpClient.submitForm(
                 url = (commonOptions.baseUrl / "createinvoice").toString(),
                 formParameters = parameters {
-                    amountSat?.let { append("amountSat", amountSat.toString()) }
+                    amountSat?.let { append("amountSat", it.toString()) }
+                    externalId?.let { append("externalId", it) }
                     append("description", description)
                 }
             )
@@ -170,7 +216,7 @@ class SendToAddress : CliktCommand(name = "sendtoaddress", help = "Send to a Bit
     }
 }
 
-class CloseChannel : CliktCommand(name = "closechannel", help = "Close all channels", printHelpOnEmptyArgs = true) {
+class CloseChannel : CliktCommand(name = "closechannel", help = "Close channel", printHelpOnEmptyArgs = true) {
     private val commonOptions by requireObject<HttpConf>()
     private val channelId by option("--channelId").convert { ByteVector32.fromValidHex(it) }.required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }

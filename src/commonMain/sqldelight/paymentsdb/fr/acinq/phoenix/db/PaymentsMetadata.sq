@@ -10,11 +10,9 @@ CREATE TABLE IF NOT EXISTS payments_metadata (
     PRIMARY KEY (type, id)
 );
 
--- queries for payments_metadata tablexxxx`
+CREATE INDEX IF NOT EXISTS payments_metadata_external_id ON payments_metadata(external_id);
 
-count:
-SELECT COUNT(*) FROM payments_metadata
-WHERE type = ? AND id = ?;
+-- queries for payments_metadata table
 
 insert:
 INSERT INTO payments_metadata (
@@ -25,5 +23,9 @@ INSERT INTO payments_metadata (
 ) VALUES (?, ?, ?, ?);
 
 get:
-SELECT * FROM payments_metadata
+SELECT external_id, created_at FROM payments_metadata
 WHERE type = ? AND id = ?;
+
+getByExternalId:
+SELECT type, id, external_id, created_at FROM payments_metadata
+WHERE external_id = ?;

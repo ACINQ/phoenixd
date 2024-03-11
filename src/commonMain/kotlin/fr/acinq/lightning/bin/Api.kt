@@ -98,15 +98,31 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val amount = formParameters.getLong("amountSat").sat
                     val description = formParameters.getString("description")
                     val invoice = peer.createInvoice(randomBytes32(), amount.toMilliSatoshi(), Either.Left(description))
+                    formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
+                        paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
+                    }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
-                    println("fetching details for payment=$paymentHash")
                     paymentDb.getIncomingPayment(paymentHash)?.let {
                         val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(paymentHash))
                         call.respond(IncomingPayment(it, metadata))
                     } ?: call.respond(HttpStatusCode.NotFound)
+                }
+                get("payments/incoming") {
+                    val externalId = call.parameters.getString("externalId")
+                    val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
+                    metadataList.mapNotNull { (paymentId, metadata) ->
+                        when (paymentId) {
+                            is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
+                                IncomingPayment(it, metadata)
+                            }
+                            else -> null
+                        }
+                    }.let { payments ->
+                        call.respond(payments)
+                    }
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")
@@ -188,6 +204,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 
     private fun Parameters.getByteVector32(argName: String): ByteVector32 = getString(argName).let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
+
     private fun Parameters.getUUID(argName: String): UUID = getString(argName).let { uuid -> kotlin.runCatching { UUID.fromString(uuid) }.getOrNull() ?: invalidType(argName, "uuid") }
 
     private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: error("invalid address")).toByteVector()

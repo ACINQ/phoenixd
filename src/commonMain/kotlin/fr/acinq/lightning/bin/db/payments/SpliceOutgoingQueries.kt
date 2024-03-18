@@ -21,9 +21,9 @@ import fr.acinq.lightning.db.SpliceOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 
-class SpliceOutgoingQueries(val database: PaymentsDatabase) {
+class SpliceOutgoingQueries(val database: PhoenixDatabase) {
     private val spliceOutQueries = database.spliceOutgoingPaymentsQueries
 
     fun addSpliceOutgoingPayment(payment: SpliceOutgoingPayment) {

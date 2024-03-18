@@ -21,10 +21,10 @@ import fr.acinq.lightning.db.InboundLiquidityOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 
-class InboundLiquidityQueries(val database: PaymentsDatabase) {
-    private val queries = database.inboundLiquidityOutgoingQueries
+class InboundLiquidityQueries(val database: PhoenixDatabase) {
+    private val queries = database.inboundLiquidityOutgoingPaymentsQueries
 
     fun add(payment: InboundLiquidityOutgoingPayment) {
         database.transaction {

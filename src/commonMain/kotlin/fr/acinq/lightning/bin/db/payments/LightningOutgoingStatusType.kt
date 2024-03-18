@@ -22,7 +22,6 @@
 package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.bitcoin.Satoshi
 import fr.acinq.lightning.bin.db.payments.DbTypesHelper.decodeBlob
 import fr.acinq.lightning.bin.db.serializers.v1.ByteVector32Serializer
 import fr.acinq.lightning.bin.db.serializers.v1.SatoshiSerializer
@@ -32,54 +31,35 @@ import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-enum class OutgoingStatusTypeVersion {
+enum class LightningOutgoingStatusTypeVersion {
     SUCCEEDED_OFFCHAIN_V0,
     FAILED_V0,
 }
 
-sealed class OutgoingStatusData {
+sealed class LightningOutgoingStatusData {
 
-    sealed class SucceededOffChain : OutgoingStatusData() {
+    sealed class SucceededOffChain : LightningOutgoingStatusData() {
         @Serializable
         data class V0(@Serializable val preimage: ByteVector32) : SucceededOffChain()
     }
 
-    sealed class SucceededOnChain : OutgoingStatusData() {
-        @Serializable
-        data class V0(
-            val txIds: List<@Serializable ByteVector32>,
-            @Serializable val claimed: Satoshi,
-            val closingType: String
-        ) : SucceededOnChain()
-
-        @Serializable
-        object V1 : SucceededOnChain()
-    }
-
-    sealed class Failed : OutgoingStatusData() {
+    sealed class Failed : LightningOutgoingStatusData() {
         @Serializable
         data class V0(val reason: String) : Failed()
     }
 
     companion object {
 
-        /** Extract valuable data from old outgoing payments status that represent closing transactions. */
-        fun deserializeLegacyClosingStatus(blob: ByteArray): SucceededOnChain.V0 = decodeBlob(blob) { json, format ->
-            val data = format.decodeFromString<SucceededOnChain.V0>(json)
-            data
-        }
-
-        fun deserialize(typeVersion: OutgoingStatusTypeVersion, blob: ByteArray, completedAt: Long): LightningOutgoingPayment.Status = decodeBlob(blob) { json, format ->
+        fun deserialize(typeVersion: LightningOutgoingStatusTypeVersion, blob: ByteArray, completedAt: Long): LightningOutgoingPayment.Status = decodeBlob(blob) { json, format ->
             @Suppress("DEPRECATION")
             when (typeVersion) {
-                OutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 -> format.decodeFromString<SucceededOffChain.V0>(json).let {
+                LightningOutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 -> format.decodeFromString<SucceededOffChain.V0>(json).let {
                     LightningOutgoingPayment.Status.Completed.Succeeded.OffChain(it.preimage, completedAt)
                 }
-                OutgoingStatusTypeVersion.FAILED_V0 -> format.decodeFromString<Failed.V0>(json).let {
+                LightningOutgoingStatusTypeVersion.FAILED_V0 -> format.decodeFromString<Failed.V0>(json).let {
                     LightningOutgoingPayment.Status.Completed.Failed(deserializeFinalFailure(it.reason), completedAt)
                 }
             }
@@ -101,10 +81,9 @@ sealed class OutgoingStatusData {
     }
 }
 
-fun LightningOutgoingPayment.Status.Completed.mapToDb(): Pair<OutgoingStatusTypeVersion, ByteArray> = when (this) {
-    is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain -> OutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 to
-            Json.encodeToString(OutgoingStatusData.SucceededOffChain.V0(preimage)).toByteArray(Charsets.UTF_8)
-    is LightningOutgoingPayment.Status.Completed.Failed -> OutgoingStatusTypeVersion.FAILED_V0 to
-            Json.encodeToString(OutgoingStatusData.Failed.V0(OutgoingStatusData.serializeFinalFailure(reason))).toByteArray(Charsets.UTF_8)
+fun LightningOutgoingPayment.Status.Completed.mapToDb(): Pair<LightningOutgoingStatusTypeVersion, ByteArray> = when (this) {
+    is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain -> LightningOutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 to
+            Json.encodeToString(LightningOutgoingStatusData.SucceededOffChain.V0(preimage)).toByteArray(Charsets.UTF_8)
+    is LightningOutgoingPayment.Status.Completed.Failed -> LightningOutgoingStatusTypeVersion.FAILED_V0 to
+            Json.encodeToString(LightningOutgoingStatusData.Failed.V0(LightningOutgoingStatusData.serializeFinalFailure(reason))).toByteArray(Charsets.UTF_8)
 }
-

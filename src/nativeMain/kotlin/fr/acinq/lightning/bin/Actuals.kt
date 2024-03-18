@@ -2,8 +2,7 @@ package fr.acinq.lightning.bin
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
-import fr.acinq.phoenix.db.ChannelsDatabase
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import okio.Path
@@ -15,13 +14,7 @@ import platform.posix.setenv
 actual val homeDirectory: Path = setenv("KTOR_LOG_LEVEL", "WARN", 1).let { getenv("HOME")?.toKString()!!.toPath() }
 
 actual fun createAppDbDriver(dir: Path): SqlDriver {
-    return NativeSqliteDriver(ChannelsDatabase.Schema, "phoenix.db",
-        onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) }
-    )
-}
-
-actual fun createPaymentsDbDriver(dir: Path): SqlDriver {
-    return NativeSqliteDriver(PaymentsDatabase.Schema, "payments.db",
+    return NativeSqliteDriver(PhoenixDatabase.Schema, "phoenix.db",
         onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) }
     )
 }

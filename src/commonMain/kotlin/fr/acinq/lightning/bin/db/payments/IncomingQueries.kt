@@ -21,13 +21,12 @@ import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.byteVector32
 import fr.acinq.lightning.db.IncomingPayment
-import fr.acinq.lightning.utils.msat
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 
-class IncomingQueries(private val database: PaymentsDatabase) {
+class IncomingQueries(private val database: PhoenixDatabase) {
 
     private val queries = database.incomingPaymentsQueries
 

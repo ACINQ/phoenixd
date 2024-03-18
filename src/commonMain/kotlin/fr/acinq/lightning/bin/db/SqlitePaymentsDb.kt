@@ -16,8 +16,6 @@
 
 package fr.acinq.lightning.bin.db
 
-import app.cash.sqldelight.EnumColumnAdapter
-import app.cash.sqldelight.db.SqlDriver
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.TxId
@@ -27,8 +25,6 @@ import fr.acinq.lightning.bin.db.payments.LinkTxToPaymentQueries
 import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
 import fr.acinq.lightning.channel.ChannelException
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.logging.LoggerFactory
-import fr.acinq.lightning.logging.info
 import fr.acinq.lightning.payment.FinalFailure
 import fr.acinq.lightning.utils.*
 import fr.acinq.lightning.wire.FailureMessage
@@ -36,40 +32,10 @@ import fr.acinq.phoenix.db.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SqlitePaymentsDb(
-    loggerFactory: LoggerFactory,
-    private val driver: SqlDriver,
-) : PaymentsDb {
-
-    private val log = loggerFactory.newLogger(this::class)
-
-    private val database = PaymentsDatabase(
-        driver = driver,
-        outgoing_payment_partsAdapter = Outgoing_payment_parts.Adapter(
-            part_routeAdapter = OutgoingQueries.hopDescAdapter,
-            part_status_typeAdapter = EnumColumnAdapter()
-        ),
-        outgoing_paymentsAdapter = Outgoing_payments.Adapter(
-            status_typeAdapter = EnumColumnAdapter(),
-            details_typeAdapter = EnumColumnAdapter()
-        ),
-        incoming_paymentsAdapter = Incoming_payments.Adapter(
-            origin_typeAdapter = EnumColumnAdapter(),
-            received_with_typeAdapter = EnumColumnAdapter()
-        ),
-        outgoing_payment_closing_tx_partsAdapter = Outgoing_payment_closing_tx_parts.Adapter(
-            part_closing_info_typeAdapter = EnumColumnAdapter()
-        ),
-        channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
-            closing_info_typeAdapter = EnumColumnAdapter()
-        ),
-        inbound_liquidity_outgoing_paymentsAdapter = Inbound_liquidity_outgoing_payments.Adapter(
-            lease_typeAdapter = EnumColumnAdapter()
-        )
-    )
+class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     private val inQueries = IncomingQueries(database)
-    private val outQueries = OutgoingQueries(database)
+    private val lightningOutgoingQueries = LightningOutgoingQueries(database)
     private val spliceOutQueries = SpliceOutgoingQueries(database)
     private val channelCloseQueries = ChannelCloseOutgoingQueries(database)
     private val cpfpQueries = SpliceCpfpOutgoingQueries(database)
@@ -82,7 +48,7 @@ class SqlitePaymentsDb(
         parts: List<LightningOutgoingPayment.Part>
     ) {
         withContext(Dispatchers.Default) {
-            outQueries.addLightningParts(parentId, parts)
+            lightningOutgoingQueries.addLightningParts(parentId, parts)
         }
     }
 
@@ -93,7 +59,7 @@ class SqlitePaymentsDb(
             database.transaction {
                 when (outgoingPayment) {
                     is LightningOutgoingPayment -> {
-                        outQueries.addLightningOutgoingPayment(outgoingPayment)
+                        lightningOutgoingQueries.addLightningOutgoingPayment(outgoingPayment)
                     }
                     is SpliceOutgoingPayment -> {
                         spliceOutQueries.addSpliceOutgoingPayment(outgoingPayment)
@@ -128,7 +94,7 @@ class SqlitePaymentsDb(
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {
-            outQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Succeeded.OffChain(preimage, completedAt))
+            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Succeeded.OffChain(preimage, completedAt))
         }
     }
 
@@ -138,7 +104,7 @@ class SqlitePaymentsDb(
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {
-            outQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Failed(finalFailure, completedAt))
+            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Failed(finalFailure, completedAt))
         }
     }
 
@@ -148,7 +114,7 @@ class SqlitePaymentsDb(
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {
-            outQueries.updateLightningPart(partId, preimage, completedAt)
+            lightningOutgoingQueries.updateLightningPart(partId, preimage, completedAt)
         }
     }
 
@@ -158,16 +124,16 @@ class SqlitePaymentsDb(
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {
-            outQueries.updateLightningPart(partId, failure, completedAt)
+            lightningOutgoingQueries.updateLightningPart(partId, failure, completedAt)
         }
     }
 
     override suspend fun getLightningOutgoingPayment(id: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
-        outQueries.getPayment(id)
+        lightningOutgoingQueries.getPayment(id)
     }
 
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
-        outQueries.getPaymentFromPartId(partId)
+        lightningOutgoingQueries.getPaymentFromPartId(partId)
     }
 
     // ---- list outgoing
@@ -175,7 +141,7 @@ class SqlitePaymentsDb(
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
     ): List<LightningOutgoingPayment> = withContext(Dispatchers.Default) {
-        outQueries.listLightningOutgoingPayments(paymentHash)
+        lightningOutgoingQueries.listLightningOutgoingPayments(paymentHash)
     }
 
     // ---- incoming payments

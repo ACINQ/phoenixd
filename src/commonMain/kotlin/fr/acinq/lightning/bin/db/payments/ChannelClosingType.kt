@@ -25,24 +25,24 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-enum class OutgoingPartClosingInfoTypeVersion {
+enum class ClosingInfoTypeVersion {
     // basic type, containing only a [ChannelClosingType] field
     CLOSING_INFO_V0,
 }
 
-sealed class OutgoingPartClosingInfoData {
+sealed class ClosingInfoData {
 
     @Serializable
     data class V0(val closingType: ChannelClosingType)
 
     companion object {
-        fun deserialize(typeVersion: OutgoingPartClosingInfoTypeVersion, blob: ByteArray): ChannelClosingType = DbTypesHelper.decodeBlob(blob) { json, format ->
+        fun deserialize(typeVersion: ClosingInfoTypeVersion, blob: ByteArray): ChannelClosingType = DbTypesHelper.decodeBlob(blob) { json, format ->
             when (typeVersion) {
-                OutgoingPartClosingInfoTypeVersion.CLOSING_INFO_V0 -> format.decodeFromString<V0>(json).closingType
+                ClosingInfoTypeVersion.CLOSING_INFO_V0 -> format.decodeFromString<V0>(json).closingType
             }
         }
     }
 }
 
-fun ChannelCloseOutgoingPayment.mapClosingTypeToDb() = OutgoingPartClosingInfoTypeVersion.CLOSING_INFO_V0 to
-        Json.encodeToString(OutgoingPartClosingInfoData.V0(this.closingType)).toByteArray(Charsets.UTF_8)
+fun ChannelCloseOutgoingPayment.mapClosingTypeToDb() = ClosingInfoTypeVersion.CLOSING_INFO_V0 to
+        Json.encodeToString(ClosingInfoData.V0(this.closingType)).toByteArray(Charsets.UTF_8)

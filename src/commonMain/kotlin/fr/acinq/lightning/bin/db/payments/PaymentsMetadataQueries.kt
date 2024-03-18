@@ -3,9 +3,9 @@ package fr.acinq.lightning.bin.db.payments
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.utils.currentTimestampMillis
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 
-class PaymentsMetadataQueries(private val database: PaymentsDatabase) {
+class PaymentsMetadataQueries(private val database: PhoenixDatabase) {
 
     private val queries = database.paymentsMetadataQueries
 

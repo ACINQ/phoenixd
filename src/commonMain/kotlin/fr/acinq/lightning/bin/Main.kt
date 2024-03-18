@@ -1,5 +1,6 @@
 package fr.acinq.lightning.bin
 
+import app.cash.sqldelight.EnumColumnAdapter
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
@@ -27,6 +28,7 @@ import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
+import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
 import fr.acinq.lightning.blockchain.electrum.ElectrumClient
@@ -44,6 +46,7 @@ import fr.acinq.lightning.utils.Connection
 import fr.acinq.lightning.utils.ServerAddress
 import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
+import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -210,14 +213,34 @@ class Phoenixd : CliktCommand() {
             )
         echo(cyan("nodeid: ${nodeParams.nodeId}"))
 
+        val driver = createAppDbDriver(datadir)
+        val database = PhoenixDatabase(
+            driver = driver,
+            lightning_outgoing_payment_partsAdapter = Lightning_outgoing_payment_parts.Adapter(
+                part_routeAdapter = LightningOutgoingQueries.hopDescAdapter,
+                part_status_typeAdapter = EnumColumnAdapter()
+            ),
+            lightning_outgoing_paymentsAdapter = Lightning_outgoing_payments.Adapter(
+                status_typeAdapter = EnumColumnAdapter(),
+                details_typeAdapter = EnumColumnAdapter()
+            ),
+            incoming_paymentsAdapter = Incoming_payments.Adapter(
+                origin_typeAdapter = EnumColumnAdapter(),
+                received_with_typeAdapter = EnumColumnAdapter()
+            ),
+            channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
+                closing_info_typeAdapter = EnumColumnAdapter()
+            ),
+            inbound_liquidity_outgoing_paymentsAdapter = Inbound_liquidity_outgoing_payments.Adapter(
+                lease_typeAdapter = EnumColumnAdapter()
+            )
+        )
+
         val electrum = ElectrumClient(scope, loggerFactory)
-        val paymentsDb = SqlitePaymentsDb(loggerFactory, createPaymentsDbDriver(datadir))
         val peer = Peer(
             nodeParams = nodeParams, walletParams = lsp.walletParams, watcher = ElectrumWatcher(electrum, scope, loggerFactory), db = object : Databases {
-                override val channels: ChannelsDb
-                    get() = SqliteChannelsDb(createAppDbDriver(datadir))
-                override val payments: PaymentsDb
-                    get() = paymentsDb
+                override val channels: ChannelsDb get() = SqliteChannelsDb(driver, database)
+                override val payments: PaymentsDb get() = SqlitePaymentsDb(database)
             }, socketBuilder = TcpSocket.Builder(), scope
         )
 

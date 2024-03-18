@@ -1,4 +1,4 @@
-import fr.acinq.lightning.bin.db.payments.OutgoingPartClosingInfoTypeVersion;
+import fr.acinq.lightning.bin.db.payments.ClosingInfoTypeVersion;
 
 -- Store in a flat row outgoing payments standing for channel-closing.
 -- There are no complex json columns like in the outgoing_payments table.
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS channel_close_outgoing_payments (
     confirmed_at INTEGER DEFAULT NULL,
     locked_at INTEGER DEFAULT NULL,
     channel_id BLOB NOT NULL,
-    closing_info_type TEXT AS OutgoingPartClosingInfoTypeVersion NOT NULL,
+    closing_info_type TEXT AS ClosingInfoTypeVersion NOT NULL,
     closing_info_blob BLOB NOT NULL
 );
 

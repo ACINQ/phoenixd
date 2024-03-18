@@ -35,46 +35,46 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-enum class OutgoingDetailsTypeVersion {
+enum class LightningOutgoingDetailsTypeVersion {
     NORMAL_V0,
     KEYSEND_V0,
     SWAPOUT_V0,
 }
 
-sealed class OutgoingDetailsData {
+sealed class LightningOutgoingDetailsData {
 
-    sealed class Normal : OutgoingDetailsData() {
+    sealed class Normal : LightningOutgoingDetailsData() {
         @Serializable
         data class V0(val paymentRequest: String) : Normal()
     }
 
-    sealed class KeySend : OutgoingDetailsData() {
+    sealed class KeySend : LightningOutgoingDetailsData() {
         @Serializable
         data class V0(@Serializable val preimage: ByteVector32) : KeySend()
     }
 
-    sealed class SwapOut : OutgoingDetailsData() {
+    sealed class SwapOut : LightningOutgoingDetailsData() {
         @Serializable
         data class V0(val address: String, val paymentRequest: String, @Serializable val swapOutFee: Satoshi) : SwapOut()
     }
 
     companion object {
         /** Deserialize the details of an outgoing payment. Return null if the details is for a legacy channel closing payment (see [deserializeLegacyClosingDetails]). */
-        fun deserialize(typeVersion: OutgoingDetailsTypeVersion, blob: ByteArray): LightningOutgoingPayment.Details? = DbTypesHelper.decodeBlob(blob) { json, format ->
+        fun deserialize(typeVersion: LightningOutgoingDetailsTypeVersion, blob: ByteArray): LightningOutgoingPayment.Details = DbTypesHelper.decodeBlob(blob) { json, format ->
             when (typeVersion) {
-                OutgoingDetailsTypeVersion.NORMAL_V0 -> format.decodeFromString<Normal.V0>(json).let { LightningOutgoingPayment.Details.Normal(Bolt11Invoice.read(it.paymentRequest).get()) }
-                OutgoingDetailsTypeVersion.KEYSEND_V0 -> format.decodeFromString<KeySend.V0>(json).let { LightningOutgoingPayment.Details.KeySend(it.preimage) }
-                OutgoingDetailsTypeVersion.SWAPOUT_V0 -> format.decodeFromString<SwapOut.V0>(json).let { LightningOutgoingPayment.Details.SwapOut(it.address, Bolt11Invoice.read(it.paymentRequest).get(), it.swapOutFee) }
+                LightningOutgoingDetailsTypeVersion.NORMAL_V0 -> format.decodeFromString<Normal.V0>(json).let { LightningOutgoingPayment.Details.Normal(Bolt11Invoice.read(it.paymentRequest).get()) }
+                LightningOutgoingDetailsTypeVersion.KEYSEND_V0 -> format.decodeFromString<KeySend.V0>(json).let { LightningOutgoingPayment.Details.KeySend(it.preimage) }
+                LightningOutgoingDetailsTypeVersion.SWAPOUT_V0 -> format.decodeFromString<SwapOut.V0>(json).let { LightningOutgoingPayment.Details.SwapOut(it.address, Bolt11Invoice.read(it.paymentRequest).get(), it.swapOutFee) }
             }
         }
     }
 }
 
-fun LightningOutgoingPayment.Details.mapToDb(): Pair<OutgoingDetailsTypeVersion, ByteArray> = when (this) {
-    is LightningOutgoingPayment.Details.Normal -> OutgoingDetailsTypeVersion.NORMAL_V0 to
-            Json.encodeToString(OutgoingDetailsData.Normal.V0(paymentRequest.write())).toByteArray(Charsets.UTF_8)
-    is LightningOutgoingPayment.Details.KeySend -> OutgoingDetailsTypeVersion.KEYSEND_V0 to
-            Json.encodeToString(OutgoingDetailsData.KeySend.V0(preimage)).toByteArray(Charsets.UTF_8)
-    is LightningOutgoingPayment.Details.SwapOut -> OutgoingDetailsTypeVersion.SWAPOUT_V0 to
-            Json.encodeToString(OutgoingDetailsData.SwapOut.V0(address, paymentRequest.write(), swapOutFee)).toByteArray(Charsets.UTF_8)
+fun LightningOutgoingPayment.Details.mapToDb(): Pair<LightningOutgoingDetailsTypeVersion, ByteArray> = when (this) {
+    is LightningOutgoingPayment.Details.Normal -> LightningOutgoingDetailsTypeVersion.NORMAL_V0 to
+            Json.encodeToString(LightningOutgoingDetailsData.Normal.V0(paymentRequest.write())).toByteArray(Charsets.UTF_8)
+    is LightningOutgoingPayment.Details.KeySend -> LightningOutgoingDetailsTypeVersion.KEYSEND_V0 to
+            Json.encodeToString(LightningOutgoingDetailsData.KeySend.V0(preimage)).toByteArray(Charsets.UTF_8)
+    is LightningOutgoingPayment.Details.SwapOut -> LightningOutgoingDetailsTypeVersion.SWAPOUT_V0 to
+            Json.encodeToString(LightningOutgoingDetailsData.SwapOut.V0(address, paymentRequest.write(), swapOutFee)).toByteArray(Charsets.UTF_8)
 }

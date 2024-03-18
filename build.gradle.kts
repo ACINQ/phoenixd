@@ -107,13 +107,9 @@ tasks.withType<JavaExec> {
 
 sqldelight {
     databases {
-        create("ChannelsDatabase") {
+        create("PhoenixDatabase") {
             packageName.set("fr.acinq.phoenix.db")
-            srcDirs.from("src/commonMain/sqldelight/channelsdb")
-        }
-        create("PaymentsDatabase") {
-            packageName.set("fr.acinq.phoenix.db")
-            srcDirs.from("src/commonMain/sqldelight/paymentsdb")
+            srcDirs.from("src/commonMain/sqldelight/phoenixdb")
         }
     }
 }

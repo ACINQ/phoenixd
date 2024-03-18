@@ -21,9 +21,9 @@ import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 
-class ChannelCloseOutgoingQueries(val database: PaymentsDatabase) {
+class ChannelCloseOutgoingQueries(val database: PhoenixDatabase) {
     private val channelCloseQueries = database.channelCloseOutgoingPaymentsQueries
 
     fun getChannelCloseOutgoingPayment(id: UUID): ChannelCloseOutgoingPayment? {
@@ -74,7 +74,7 @@ class ChannelCloseOutgoingQueries(val database: PaymentsDatabase) {
             confirmed_at: Long?,
             locked_at: Long?,
             channel_id: ByteArray,
-            closing_info_type: OutgoingPartClosingInfoTypeVersion,
+            closing_info_type: ClosingInfoTypeVersion,
             closing_info_blob: ByteArray
         ): ChannelCloseOutgoingPayment {
             return ChannelCloseOutgoingPayment(
@@ -88,7 +88,7 @@ class ChannelCloseOutgoingQueries(val database: PaymentsDatabase) {
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at,
                 channelId = channel_id.toByteVector32(),
-                closingType = OutgoingPartClosingInfoData.deserialize(closing_info_type, closing_info_blob),
+                closingType = ClosingInfoData.deserialize(closing_info_type, closing_info_blob),
             )
         }
     }

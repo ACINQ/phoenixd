@@ -20,12 +20,12 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.WalletPaymentId
-import fr.acinq.phoenix.db.PaymentsDatabase
+import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
 
-class LinkTxToPaymentQueries(val database: PaymentsDatabase) {
+class LinkTxToPaymentQueries(val database: PhoenixDatabase) {
     private val linkTxQueries = database.linkTxToPaymentQueries
 
     fun listUnconfirmedTxs(): Flow<List<ByteArray>> {

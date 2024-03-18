@@ -9,6 +9,7 @@
     JsonSerializers.ByteVector32Serializer::class,
     JsonSerializers.PublicKeySerializer::class,
     JsonSerializers.TxIdSerializer::class,
+    JsonSerializers.UUIDSerializer::class
 )
 
 package fr.acinq.lightning.bin.json
@@ -23,6 +24,7 @@ import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.json.JsonSerializers
+import fr.acinq.lightning.utils.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -76,10 +78,11 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("payment_sent")
-    data class PaymentSent(@SerialName("recipientAmountSat") val recipientAmount: Satoshi, @SerialName("routingFeeSat") val routingFee: Satoshi, val paymentHash: ByteVector32, val paymentPreimage: ByteVector32) : ApiEvent() {
+    data class PaymentSent(@SerialName("recipientAmountSat") val recipientAmount: Satoshi, @SerialName("routingFeeSat") val routingFee: Satoshi, @SerialName("localId") val uuid: UUID, val paymentHash: ByteVector32, val paymentPreimage: ByteVector32) : ApiEvent() {
         constructor(event: fr.acinq.lightning.io.PaymentSent) : this(
             event.payment.recipientAmount.truncateToSatoshi(),
             event.payment.routingFee.truncateToSatoshi(),
+            event.request.paymentId,
             event.payment.paymentHash,
             (event.payment.status as LightningOutgoingPayment.Status.Completed.Succeeded.OffChain).preimage
         )

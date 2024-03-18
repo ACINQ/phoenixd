@@ -79,161 +79,116 @@ class PhoenixCli : CliktCommand() {
     }
 }
 
-class GetInfo : CliktCommand(name = "getinfo", help = "Show basic info about your node") {
-    private val commonOptions by requireObject<HttpConf>()
+abstract class PhoenixCliCommand(val name: String, val help: String, printHelpOnEmptyArgs: Boolean = false) : CliktCommand(name = name, help = help, printHelpOnEmptyArgs = printHelpOnEmptyArgs) {
+    internal val commonOptions by requireObject<HttpConf>()
+    abstract suspend fun httpRequest(): HttpResponse
     override fun run() {
         runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "getinfo"
-            )
-            echo(res.bodyAsText())
-        }
-    }
-}
-
-class GetBalance : CliktCommand(name = "getbalance", help = "Returns your current balance") {
-    private val commonOptions by requireObject<HttpConf>()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "getbalance"
-            )
-            echo(res.bodyAsText())
-        }
-    }
-}
-
-class ListChannels : CliktCommand(name = "listchannels", help = "List all channels") {
-    private val commonOptions by requireObject<HttpConf>()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "listchannels"
-            )
-            echo(res.bodyAsText())
-        }
-    }
-}
-
-class GetOutgoingPayment : CliktCommand(name = "getoutgoingpayment", help = "Get outgoing payment") {
-    private val commonOptions by requireObject<HttpConf>()
-    private val uuid by option("--uuid").convert { UUID.fromString(it) }.required()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "payments/outgoing/$uuid"
-            )
-            echo(res.bodyAsText())
-        }
-    }
-}
-
-class GetIncomingPayment : CliktCommand(name = "getincomingpayment", help = "Get incoming payment") {
-    private val commonOptions by requireObject<HttpConf>()
-    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "payments/incoming/$paymentHash"
-            )
-            echo(res.bodyAsText())
-        }
-    }
-}
-
-class ListIncomingPayments : CliktCommand(name = "listincomingpayments", help = "List incoming payments matching the given externalId") {
-    private val commonOptions by requireObject<HttpConf>()
-    private val externalId by option("--externalId", "--eid").required()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.get(
-                url = commonOptions.baseUrl / "payments/incoming",
-            ) {
-                url {
-                    parameters.append("externalId", externalId)
-                }
+            try {
+                val res = httpRequest()
+                echo(res.bodyAsText())
+            } catch (e: Exception) {
+                echo("[${this@PhoenixCliCommand.name}] error: ${e.message}")
             }
-            echo(res.bodyAsText())
         }
     }
 }
 
-class CreateInvoice : CliktCommand(name = "createinvoice", help = "Create a Lightning invoice", printHelpOnEmptyArgs = true) {
-    private val commonOptions by requireObject<HttpConf>()
+class GetInfo : PhoenixCliCommand(name = "getinfo", help = "Show basic info about your node") {
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "getinfo"
+    )
+}
+
+class GetBalance : PhoenixCliCommand(name = "getbalance", help = "Returns your current balance") {
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "getbalance"
+    )
+}
+
+class ListChannels : PhoenixCliCommand(name = "listchannels", help = "List all channels") {
+    override suspend fun httpRequest() =  commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "listchannels"
+    )
+}
+
+class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help = "Get outgoing payment") {
+    private val uuid by option("--uuid").convert { UUID.fromString(it) }.required()
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "payments/outgoing/$uuid"
+    )
+}
+
+class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help = "Get incoming payment") {
+    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "payments/incoming/$paymentHash"
+    )
+}
+
+class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments matching the given externalId") {
+    private val externalId by option("--externalId", "--eid").required()
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
+        url = commonOptions.baseUrl / "payments/incoming",
+    ) {
+        url {
+            parameters.append("externalId", externalId)
+        }
+    }
+}
+
+class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
     private val description by option("--description", "--desc").required()
     private val externalId by option("--externalId")
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.submitForm(
-                url = (commonOptions.baseUrl / "createinvoice").toString(),
-                formParameters = parameters {
-                    amountSat?.let { append("amountSat", it.toString()) }
-                    externalId?.let { append("externalId", it) }
-                    append("description", description)
-                }
-            )
-            echo(res.bodyAsText())
+    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
+        url = (commonOptions.baseUrl / "createinvoice").toString(),
+        formParameters = parameters {
+            amountSat?.let { append("amountSat", it.toString()) }
+            externalId?.let { append("externalId", it) }
+            append("description", description)
         }
-    }
+    )
 }
 
-class PayInvoice : CliktCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
-    private val commonOptions by requireObject<HttpConf>()
+class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.submitForm(
-                url = (commonOptions.baseUrl / "payinvoice").toString(),
-                formParameters = parameters {
-                    amountSat?.let { append("amountSat", amountSat.toString()) }
-                    append("invoice", invoice)
-                }
-            )
-            echo(res.bodyAsText())
+    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
+        url = (commonOptions.baseUrl / "payinvoice").toString(),
+        formParameters = parameters {
+            amountSat?.let { append("amountSat", amountSat.toString()) }
+            append("invoice", invoice)
         }
-    }
+    )
 }
 
-class SendToAddress : CliktCommand(name = "sendtoaddress", help = "Send to a Bitcoin address", printHelpOnEmptyArgs = true) {
-    private val commonOptions by requireObject<HttpConf>()
+class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to a Bitcoin address", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long().required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerateSatByte by option("--feerateSatByte").int().required()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.submitForm(
-                url = (commonOptions.baseUrl / "sendtoaddress").toString(),
-                formParameters = parameters {
-                    append("amountSat", amountSat.toString())
-                    append("address", address)
-                    append("feerateSatByte", feerateSatByte.toString())
-                }
-            )
-            echo(res.bodyAsText())
+    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
+        url = (commonOptions.baseUrl / "sendtoaddress").toString(),
+        formParameters = parameters {
+            append("amountSat", amountSat.toString())
+            append("address", address)
+            append("feerateSatByte", feerateSatByte.toString())
         }
-    }
+    )
 }
 
-class CloseChannel : CliktCommand(name = "closechannel", help = "Close channel", printHelpOnEmptyArgs = true) {
-    private val commonOptions by requireObject<HttpConf>()
+class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close channel", printHelpOnEmptyArgs = true) {
     private val channelId by option("--channelId").convert { ByteVector32.fromValidHex(it) }.required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerateSatByte by option("--feerateSatByte").int().required()
-    override fun run() {
-        runBlocking {
-            val res = commonOptions.httpClient.submitForm(
-                url = (commonOptions.baseUrl / "closechannel").toString(),
-                formParameters = parameters {
-                    append("channelId", channelId.toHex())
-                    append("address", address)
-                    append("feerateSatByte", feerateSatByte.toString())
-                }
-            )
-            echo(res.bodyAsText())
+    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
+        url = (commonOptions.baseUrl / "closechannel").toString(),
+        formParameters = parameters {
+            append("channelId", channelId.toHex())
+            append("address", address)
+            append("feerateSatByte", feerateSatByte.toString())
         }
-    }
+    )
 }
 
 operator fun Url.div(path: String) = Url(URLBuilder(this).appendPathSegments(path))

@@ -88,7 +88,7 @@ abstract class PhoenixCliCommand(val name: String, val help: String, printHelpOn
                 val res = httpRequest()
                 echo(res.bodyAsText())
             } catch (e: Exception) {
-                echo("[${this@PhoenixCliCommand.name}] error: ${e.message}")
+                echo("[${this@PhoenixCliCommand.name}] error: ${e.message}", err = true)
             }
         }
     }

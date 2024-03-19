@@ -28,6 +28,7 @@ import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
+import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
@@ -235,12 +236,14 @@ class Phoenixd : CliktCommand() {
                 lease_typeAdapter = EnumColumnAdapter()
             )
         )
+        val channelsDb = SqliteChannelsDb(driver, database)
+        val paymentsDb = SqlitePaymentsDb(database)
 
         val electrum = ElectrumClient(scope, loggerFactory)
         val peer = Peer(
             nodeParams = nodeParams, walletParams = lsp.walletParams, watcher = ElectrumWatcher(electrum, scope, loggerFactory), db = object : Databases {
-                override val channels: ChannelsDb get() = SqliteChannelsDb(driver, database)
-                override val payments: PaymentsDb get() = SqlitePaymentsDb(database)
+                override val channels: ChannelsDb get() = channelsDb
+                override val payments: PaymentsDb get() = paymentsDb
             }, socketBuilder = TcpSocket.Builder(), scope
         )
 
@@ -250,16 +253,10 @@ class Phoenixd : CliktCommand() {
                     nodeParams.nodeEvents
                         .collect {
                             when {
-                                it is PaymentEvents.PaymentReceived && it.amount > 0.msat -> emit(ApiType.PaymentReceived(it))
-                                else -> {}
-                            }
-                        }
-                }
-                launch {
-                    peer.eventsFlow
-                        .collect {
-                            when {
-                                it is fr.acinq.lightning.io.PaymentSent -> emit(ApiType.PaymentSent(it))
+                                it is PaymentEvents.PaymentReceived && it.amount > 0.msat -> {
+                                    val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(it.paymentHash))
+                                    emit(ApiType.PaymentReceived(it, metadata))
+                                }
                                 else -> {}
                             }
                         }

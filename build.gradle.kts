@@ -97,6 +97,11 @@ kotlin {
                 implementation("app.cash.sqldelight:native-driver:2.0.1")
             }
         }
+        macosMain {
+            dependencies {
+                implementation(ktor("client-darwin"))
+            }
+        }
     }
 }
 

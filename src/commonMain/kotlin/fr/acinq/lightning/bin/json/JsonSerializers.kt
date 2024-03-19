@@ -78,7 +78,7 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("payment_sent")
-    data class PaymentSent(@SerialName("recipientAmountSat") val recipientAmount: Satoshi, @SerialName("routingFeeSat") val routingFee: Satoshi, @SerialName("localId") val uuid: UUID, val paymentHash: ByteVector32, val paymentPreimage: ByteVector32) : ApiEvent() {
+    data class PaymentSent(@SerialName("recipientAmountSat") val recipientAmount: Satoshi, @SerialName("routingFeeSat") val routingFee: Satoshi, @SerialName("paymentId") val uuid: UUID, val paymentHash: ByteVector32, val paymentPreimage: ByteVector32) : ApiEvent() {
         constructor(event: fr.acinq.lightning.io.PaymentSent) : this(
             event.payment.recipientAmount.truncateToSatoshi(),
             event.payment.routingFee.truncateToSatoshi(),

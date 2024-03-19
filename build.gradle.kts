@@ -65,7 +65,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp:1.6.2-FEECREDIT-1")
+                implementation("fr.acinq.lightning:lightning-kmp:1.6.2-FEECREDIT-2-SNAPSHOT")
                 // ktor serialization
                 implementation(ktor("serialization-kotlinx-json"))
                 // ktor server
@@ -78,7 +78,6 @@ kotlin {
                 // ktor client (needed for webhook)
                 implementation(ktor("client-core"))
                 implementation(ktor("client-content-negotiation"))
-                implementation(ktor("client-cio"))
                 implementation(ktor("client-auth"))
                 implementation(ktor("client-json"))
 
@@ -90,11 +89,17 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation("app.cash.sqldelight:sqlite-driver:2.0.1")
+                implementation(ktor("client-okhttp"))
             }
         }
         nativeMain {
             dependencies {
                 implementation("app.cash.sqldelight:native-driver:2.0.1")
+            }
+        }
+        linuxMain {
+            dependencies {
+                implementation(ktor("client-curl"))
             }
         }
         macosMain {

@@ -32,9 +32,8 @@ import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
-import fr.acinq.lightning.blockchain.electrum.ElectrumClient
-import fr.acinq.lightning.blockchain.electrum.ElectrumConnectionStatus
-import fr.acinq.lightning.blockchain.electrum.ElectrumWatcher
+import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
+import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.ChannelsDb
 import fr.acinq.lightning.db.Databases
@@ -44,7 +43,6 @@ import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.Connection
-import fr.acinq.lightning.utils.ServerAddress
 import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
 import fr.acinq.phoenix.db.*
@@ -92,8 +90,7 @@ class Phoenixd : CliktCommand() {
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Testnet, defaultForHelp = "testnet")
-    private val customElectrumServer by option("--electrum-server", "-e", help = "Custom Electrum server")
-        .convert { it.split(":").run { ServerAddress(first(), last().toInt(), TcpSocket.TLS.DISABLED) } }
+    private val customMempoolSpaceHost by option("--mempool-space", "-e", help = "Custom mempool.space instance")
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
     private val httpPassword by option("--http-password", help = "Password for the http api").defaultLazy {
@@ -194,9 +191,9 @@ class Phoenixd : CliktCommand() {
                 if (verbose) add(CommonWriter())
             })
         )
-        val electrumServer = customElectrumServer ?: when (chain) {
-            Chain.Mainnet -> ServerAddress("electrum.acinq.co", 50001, TcpSocket.TLS.DISABLED)
-            Chain.Testnet -> ServerAddress("testnet1.electrum.acinq.co", 51001, TcpSocket.TLS.DISABLED)
+        val mempoolSpaceHost = customMempoolSpaceHost ?: when (chain) {
+            Chain.Mainnet -> "mempool.space"
+            Chain.Testnet -> "mempool.space/testnet"
             else -> error("unsupported chain")
         }
         val lsp = LSP.from(chain)
@@ -239,9 +236,10 @@ class Phoenixd : CliktCommand() {
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)
 
-        val electrum = ElectrumClient(scope, loggerFactory)
+        val mempoolSpace = MempoolSpaceClient(mempoolSpaceHost, loggerFactory)
+        val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory)
         val peer = Peer(
-            nodeParams = nodeParams, walletParams = lsp.walletParams, watcher = ElectrumWatcher(electrum, scope, loggerFactory), db = object : Databases {
+            nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = watcher, db = object : Databases {
                 override val channels: ChannelsDb get() = channelsDb
                 override val payments: PaymentsDb get() = paymentsDb
             }, socketBuilder = TcpSocket.Builder(), scope
@@ -266,16 +264,6 @@ class Phoenixd : CliktCommand() {
         }
 
         val listeners = scope.launch {
-            launch {
-                // drop initial CLOSED event
-                electrum.connectionStatus.dropWhile { it is ElectrumConnectionStatus.Closed }.collect {
-                    when (it) {
-                        is ElectrumConnectionStatus.Connecting -> echo(yellow("connecting to electrum server..."))
-                        is ElectrumConnectionStatus.Connected -> echo(yellow("connected to electrum server"))
-                        is ElectrumConnectionStatus.Closed -> echo(yellow("disconnected from electrum server"))
-                    }
-                }
-            }
             launch {
                 // drop initial CLOSED event
                 peer.connectionState.dropWhile { it is Connection.CLOSED }.collect {
@@ -308,9 +296,15 @@ class Phoenixd : CliktCommand() {
             }
         }
 
+        val peerConnectionLoop = scope.launch {
+            while (true) {
+                peer.connect(connectTimeout = 10.seconds, handshakeTimeout = 10.seconds)
+                peer.connectionState.first { it is Connection.CLOSED }
+                delay(3.seconds)
+            }
+        }
+
         runBlocking {
-            electrum.connect(electrumServer, TcpSocket.Builder())
-            peer.connect(connectTimeout = 10.seconds, handshakeTimeout = 10.seconds)
             peer.connectionState.first { it == Connection.ESTABLISHED }
             peer.registerFcmToken("super-${randomBytes32().toHex()}")
             peer.setAutoLiquidityParams(liquidityOptions.autoLiquidity)
@@ -339,10 +333,10 @@ class Phoenixd : CliktCommand() {
         }
         server.environment.monitor.subscribe(ApplicationStopPreparing) {
             echo(brightYellow("shutting down..."))
-            electrum.stop()
+            listeners.cancel()
+            peerConnectionLoop.cancel()
             peer.disconnect()
             server.stop()
-            listeners.cancel()
             exitProcess(0)
         }
         server.environment.monitor.subscribe(ApplicationStopped) { echo(brightYellow("http server stopped")) }

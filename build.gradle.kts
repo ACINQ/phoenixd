@@ -144,6 +144,35 @@ kotlin {
             }
         }
     }
+
+    fun Zip.configureZip(dir: String, classifier: String) {
+        group = "package"
+        description = "build and package $dir release executables"
+        archiveBaseName = "phoenix"
+        archiveClassifier = classifier
+
+        from("$projectDir/build/bin/$dir/phoenixdDebugExecutable") {
+            rename("phoenixd.kexe", "phoenixd")
+        }
+        from("$projectDir/build/bin/$dir/phoenix-cliDebugExecutable") {
+            rename("phoenix-cli.kexe", "phoenix-cli")
+        }
+        into("${archiveBaseName.get()}-${archiveVersion.get()}-${archiveClassifier.get()}")
+    }
+
+    if (currentOs.isLinux) {
+        val packageLinuxX64 by tasks.register("packageLinuxX64", Zip::class) {
+            dependsOn(":linuxX64Binaries")
+            configureZip("linuxX64", "linux-x64")
+        }
+    }
+
+    if (currentOs.isMacOsX) {
+        val packageMacosX64 by tasks.register("packageMacosX64", Zip::class) {
+            dependsOn(":macosX64Binaries")
+            configureZip("macosX64", "maxos-x64")
+        }
+    }
 }
 
 // forward std input when app is run via gradle (otherwise keyboard input will return EOF)

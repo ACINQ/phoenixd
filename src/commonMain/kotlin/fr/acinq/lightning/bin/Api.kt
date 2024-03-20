@@ -169,7 +169,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     try {
                         eventsFlow.collect { sendSerialized(it) }
                     } catch (e: Throwable) {
-                        println("onError ${closeReason.await()}")
+                        println("onError ${closeReason.await()?.message}")
                     }
                 }
             }

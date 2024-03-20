@@ -9,6 +9,8 @@ import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.output.MordantHelpFormatter
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
+import com.github.ajalt.clikt.parameters.groups.default
+import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
@@ -32,6 +34,8 @@ import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
+import fr.acinq.lightning.bin.logs.TimestampFormatter
+import fr.acinq.lightning.bin.logs.stringTimestamp
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
@@ -83,6 +87,12 @@ class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
         .default(100_000.sat)
 }
 
+sealed class Verbosity {
+    data object Default : Verbosity()
+    data object Silent : Verbosity()
+    data object Verbose : Verbosity()
+}
+
 class Phoenixd : CliktCommand() {
     //private val datadir by option("--datadir", help = "Data directory").convert { it.toPath() }.default(homeDirectory / ".phoenix", defaultForHelp = "~/.phoenix")
     private val datadir = homeDirectory / ".phoenix"
@@ -90,7 +100,7 @@ class Phoenixd : CliktCommand() {
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Testnet, defaultForHelp = "testnet")
-    private val customMempoolSpaceHost by option("--mempool-space", "-e", help = "Custom mempool.space instance")
+    private val customMempoolSpaceHost by option("--mempool-space", help = "Custom mempool.space instance")
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
     private val httpPassword by option("--http-password", help = "Password for the http api").defaultLazy {
@@ -108,13 +118,23 @@ class Phoenixd : CliktCommand() {
 
     private val liquidityOptions by LiquidityOptions()
 
-    private val verbose: Boolean by option("--verbose", help = "Verbose mode").flag(default = false)
-    private val silent: Boolean by option("--silent", "-s", help = "Silent mode").flag(default = false)
+    private val verbosity by option(help = "Verbosity level").switch(
+        "--silent" to Verbosity.Silent,
+        "--verbose" to Verbosity.Verbose
+    ).default(Verbosity.Default, defaultForHelp = "prints high-level info to the console")
 
     init {
         context {
             valueSource = MapValueSource(readConfFile(confFile))
             helpFormatter = { MordantHelpFormatter(it, showDefaultValues = true) }
+        }
+    }
+
+    private fun consoleLog(msg: Any, err: Boolean = false) {
+        if (verbosity == Verbosity.Default) { // in verbose mode we print logs instead
+            terminal.print(gray(stringTimestamp()), stderr = err)
+            terminal.print(" ")
+            terminal.println(msg, stderr = err)
         }
     }
 
@@ -178,9 +198,9 @@ class Phoenixd : CliktCommand() {
 
             }
         }
-        echo(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
-        echo(cyan("chain: $chain"))
-        echo(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))
+        consoleLog(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
+        consoleLog(cyan("chain: $chain"))
+        consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))
 
         val scope = GlobalScope
         val loggerFactory = LoggerFactory(
@@ -188,7 +208,7 @@ class Phoenixd : CliktCommand() {
                 // always log to file
                 add(FileLogWriter(datadir / "phoenix.log", scope))
                 // only log to console if verbose mode is enabled
-                if (verbose) add(CommonWriter())
+                if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })
         )
         val mempoolSpaceHost = customMempoolSpaceHost ?: when (chain) {
@@ -209,7 +229,7 @@ class Phoenixd : CliktCommand() {
                 zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),
                 liquidityPolicy = MutableStateFlow(liquidityPolicy),
             )
-        echo(cyan("nodeid: ${nodeParams.nodeId}"))
+        consoleLog(cyan("nodeid: ${nodeParams.nodeId}"))
 
         val driver = createAppDbDriver(datadir)
         val database = PhoenixDatabase(
@@ -268,9 +288,9 @@ class Phoenixd : CliktCommand() {
                 // drop initial CLOSED event
                 peer.connectionState.dropWhile { it is Connection.CLOSED }.collect {
                     when (it) {
-                        Connection.ESTABLISHING -> echo(yellow("connecting to lightning peer..."))
-                        Connection.ESTABLISHED -> echo(yellow("connected to lightning peer"))
-                        is Connection.CLOSED -> echo(yellow("disconnected from lightning peer"))
+                        Connection.ESTABLISHING -> consoleLog(yellow("connecting to lightning peer..."))
+                        Connection.ESTABLISHED -> consoleLog(yellow("connected to lightning peer"))
+                        is Connection.CLOSED -> consoleLog(yellow("disconnected from lightning peer"))
                     }
                 }
             }
@@ -279,20 +299,20 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<PaymentEvents.PaymentReceived>()
                     .filter { it.amount > 0.msat }
                     .collect {
-                        echo("received lightning payment: ${it.amount.truncateToSatoshi()} (${it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }})")
+                        consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} (${it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }})")
                     }
             }
             launch {
                 nodeParams.nodeEvents
                     .filterIsInstance<LiquidityEvents.Decision.Rejected>()
                     .collect {
-                        echo(yellow("lightning payment rejected: amount=${it.amount.truncateToSatoshi()} fee=${it.fee.truncateToSatoshi()} maxFee=${liquidityPolicy.maxAbsoluteFee}"))
+                        consoleLog(yellow("lightning payment rejected: amount=${it.amount.truncateToSatoshi()} fee=${it.fee.truncateToSatoshi()} maxFee=${liquidityPolicy.maxAbsoluteFee}"))
                     }
             }
             launch {
                 nodeParams.feeCredit
                     .drop(1) // we drop the initial value which is 0 sat
-                    .collect { feeCredit -> echo("fee credit: $feeCredit") }
+                    .collect { feeCredit -> consoleLog("fee credit: $feeCredit") }
             }
         }
 
@@ -323,23 +343,23 @@ class Phoenixd : CliktCommand() {
                 server.start(wait = true)
             } catch (t: Throwable) {
                 if (t.cause?.message?.contains("Address already in use") == true) {
-                    echo(t.cause?.message, err = true)
+                    consoleLog(t.cause?.message.toString(), err = true)
                 } else throw t
             }
         }
 
         server.environment.monitor.subscribe(ServerReady) {
-            echo("listening on http://$httpBindIp:$httpBindPort")
+            consoleLog("listening on http://$httpBindIp:$httpBindPort")
         }
         server.environment.monitor.subscribe(ApplicationStopPreparing) {
-            echo(brightYellow("shutting down..."))
+            consoleLog(brightYellow("shutting down..."))
             listeners.cancel()
             peerConnectionLoop.cancel()
             peer.disconnect()
             server.stop()
             exitProcess(0)
         }
-        server.environment.monitor.subscribe(ApplicationStopped) { echo(brightYellow("http server stopped")) }
+        server.environment.monitor.subscribe(ApplicationStopped) { consoleLog(brightYellow("http server stopped")) }
 
         runBlocking { serverJob.join() }
     }

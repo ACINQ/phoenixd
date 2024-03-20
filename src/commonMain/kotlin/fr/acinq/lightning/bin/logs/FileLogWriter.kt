@@ -9,7 +9,7 @@ import okio.FileSystem
 import okio.Path
 import okio.buffer
 
-class FileLogWriter(private val logFile: Path, scope: CoroutineScope, private val messageStringFormatter: MessageStringFormatter = DefaultFormatter) : LogWriter() {
+class FileLogWriter(private val logFile: Path, scope: CoroutineScope, private val messageStringFormatter: MessageStringFormatter = TimestampFormatter) : LogWriter() {
     private val mailbox: Channel<String> = Channel(Channel.BUFFERED)
 
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {

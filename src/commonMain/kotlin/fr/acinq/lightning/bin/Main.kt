@@ -102,7 +102,7 @@ class Phoenixd : CliktCommand() {
     private val confFile = datadir / "phoenix.conf"
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
-    ).default(Chain.Testnet, defaultForHelp = "testnet")
+    ).default(Chain.Mainnet, defaultForHelp = "mainnet")
     private val customMempoolSpaceHost by option("--mempool-space", help = "Custom mempool.space instance")
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)

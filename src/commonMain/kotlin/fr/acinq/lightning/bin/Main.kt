@@ -184,8 +184,8 @@ class Phoenixd : CliktCommand() {
                 terminal.println()
             }
         }
-        consoleLog(cyan("version: ${BuildVersions.phoenixdVersion}"))
-        consoleLog(cyan("lightning-kmp: ${BuildVersions.lightningKmpVersion}"))
+        consoleLog(gray("version: ${BuildVersions.phoenixdVersion}"))
+        consoleLog(gray("lightning-kmp: ${BuildVersions.lightningKmpVersion}"))
         consoleLog(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
         consoleLog(cyan("chain: $chain"))
         consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))

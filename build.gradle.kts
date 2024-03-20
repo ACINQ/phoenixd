@@ -1,8 +1,10 @@
+import Versions.ktor
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import java.io.ByteArrayOutputStream
 
 buildscript {
     dependencies {
-        classpath("app.cash.sqldelight:gradle-plugin:2.0.1")
+        classpath("app.cash.sqldelight:gradle-plugin:${Versions.sqlDelight}")
     }
     repositories {
         google()
@@ -11,9 +13,9 @@ buildscript {
 }
 
 plugins {
-    kotlin("multiplatform") version "1.9.23"
-    kotlin("plugin.serialization") version "1.9.23"
-    id("app.cash.sqldelight") version "2.0.1"
+    kotlin("multiplatform") version Versions.kotlin
+    kotlin("plugin.serialization") version Versions.kotlin
+    id("app.cash.sqldelight") version Versions.sqlDelight
 }
 
 allprojects {
@@ -28,6 +30,42 @@ allprojects {
         mavenCentral()
         google()
     }
+}
+
+/** Get the current git commit hash. */
+fun gitCommitHash(): String {
+    val stream = ByteArrayOutputStream()
+    project.exec {
+        commandLine = "git rev-parse --verify --long HEAD".split(" ")
+        standardOutput = stream
+    }
+    return String(stream.toByteArray()).split("\n").first()
+}
+
+/**
+ * Generates a `BuildVersions` file in build/generated-src containing the current git commit and the lightning-kmp version.
+ * See https://stackoverflow.com/a/74771876 for details.
+ */
+val buildVersionsTask by tasks.registering(Sync::class) {
+    group = "build"
+    from(
+        resources.text.fromString(
+            """
+            |package fr.acinq.lightning
+            |
+            |object BuildVersions {
+            |    const val phoenixdCommit = "${gitCommitHash()}"
+            |    const val phoenixdVersion = "${project.version}-${gitCommitHash().take(7)}"
+            |    const val lightningKmpVersion = "${Versions.lightningKmp}"
+            |}
+            |
+            """.trimMargin()
+        )
+    ) {
+        rename { "BuildVersions.kt" }
+        into("fr/acinq/lightning")
+    }
+    into(layout.buildDirectory.dir("generated/kotlin/"))
 }
 
 kotlin {
@@ -59,13 +97,11 @@ kotlin {
         }
     }
 
-    val ktorVersion = "2.3.8"
-    fun ktor(module: String) = "io.ktor:ktor-$module:$ktorVersion"
-
     sourceSets {
         commonMain {
+            kotlin.srcDir(buildVersionsTask.map { it.destinationDir })
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp:1.6.2-FEECREDIT-2-SNAPSHOT")
+                implementation("fr.acinq.lightning:lightning-kmp:${Versions.lightningKmp}")
                 // ktor serialization
                 implementation(ktor("serialization-kotlinx-json"))
                 // ktor server
@@ -81,20 +117,20 @@ kotlin {
                 implementation(ktor("client-auth"))
                 implementation(ktor("client-json"))
 
-                implementation("com.squareup.okio:okio:3.8.0")
-                implementation("com.github.ajalt.clikt:clikt:4.2.2")
-                implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
+                implementation("com.squareup.okio:okio:${Versions.okio}")
+                implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
+                implementation("app.cash.sqldelight:coroutines-extensions:${Versions.sqlDelight}")
             }
         }
         jvmMain {
             dependencies {
-                implementation("app.cash.sqldelight:sqlite-driver:2.0.1")
+                implementation("app.cash.sqldelight:sqlite-driver:${Versions.sqlDelight}")
                 implementation(ktor("client-okhttp"))
             }
         }
         nativeMain {
             dependencies {
-                implementation("app.cash.sqldelight:native-driver:2.0.1")
+                implementation("app.cash.sqldelight:native-driver:${Versions.sqlDelight}")
             }
         }
         linuxMain {
@@ -123,3 +159,4 @@ sqldelight {
         }
     }
 }
+

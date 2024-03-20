@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.sources.MapValueSource
 import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.homeDirectory
 import fr.acinq.lightning.payment.Bolt11Invoice
@@ -26,11 +27,13 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
+import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 fun main(args: Array<String>) =
     PhoenixCli()
+        .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
         .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
         .main(args)
 

@@ -6,6 +6,7 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Script
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.toEither
+import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
@@ -78,6 +79,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
             authenticate {
                 get("getinfo") {
                     val info = NodeInfo(
+                        version = BuildVersions.phoenixdVersion,
                         nodeId = nodeParams.nodeId,
                         channels = peer.channels.values.map { Channel.from(it) }
                     )

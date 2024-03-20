@@ -21,6 +21,7 @@ import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
 import com.github.ajalt.mordant.rendering.TextStyles.underline
 import fr.acinq.bitcoin.Chain
+import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.LiquidityEvents
 import fr.acinq.lightning.NodeParams
@@ -64,7 +65,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 
-fun main(args: Array<String>) = Phoenixd().main(args)
+fun main(args: Array<String>) = Phoenixd()
+    .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
+    .main(args)
 
 class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
     val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
@@ -198,6 +201,8 @@ class Phoenixd : CliktCommand() {
 
             }
         }
+        consoleLog(cyan("version: ${BuildVersions.phoenixdVersion}"))
+        consoleLog(cyan("lightning-kmp: ${BuildVersions.lightningKmpVersion}"))
         consoleLog(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
         consoleLog(cyan("chain: $chain"))
         consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))

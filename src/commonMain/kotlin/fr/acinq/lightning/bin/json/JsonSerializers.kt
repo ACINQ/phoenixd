@@ -57,6 +57,7 @@ sealed class ApiType {
 
     @Serializable
     data class NodeInfo(
+        val version: String,
         val nodeId: PublicKey,
         val channels: List<Channel>
     )

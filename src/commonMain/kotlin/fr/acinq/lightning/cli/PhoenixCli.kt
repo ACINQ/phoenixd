@@ -45,7 +45,7 @@ class PhoenixCli : CliktCommand() {
 
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPassword by option("--http-password", help = "Password for the http api").required()
+    private val httpPassword by option("--http-password", help = "Password for the http api (default: reads from $confFile)").required()
 
     init {
         context {

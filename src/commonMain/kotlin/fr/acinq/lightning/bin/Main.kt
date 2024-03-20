@@ -154,51 +154,34 @@ class Phoenixd : CliktCommand() {
                 terminal.println(green("Backup"))
                 terminal.println("This software is self-custodial, you have full control and responsibility over your funds.")
                 terminal.println("Your 12-words seed is located in ${FileSystem.SYSTEM.canonicalize(datadir)}, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
+                terminal.println("Do not share the same seed with other phoenix instances (mobile or server), it will cause issues and channel force closes.")
                 terminal.println()
-                terminal.println(green("How does it work?"))
+                terminal.prompt(
+                    "Please confirm by typing",
+                    choices = listOf("I understand"),
+                    invalidChoiceMessage = "Please type those exact words:"
+                )
+                terminal.println()
+                terminal.println(green("Continuous liquidity"))
                 terminal.println(
                     """
-                    When receiving a Lightning payment that doesn't fit within your existing channel, then:
+                    Liquidity management is fully automated.
+                    When receiving a Lightning payment that doesn't fit in your existing channel:
                     - If the payment amount is large enough to cover mining fees and service fees for automated liquidity, then your channel will be created or enlarged right away.
-                    - If the payment is too small, then the full amount is added to your fee credit. This credit will be used later to pay for future fees. ${bold(red("The fee credit is non-refundable"))}.
+                    - If the payment is too small, then the full amount is added to your fee credit, and will be used later to pay for future fees. ${bold(red("The fee credit is non-refundable"))}.
                     """.trimIndent()
                 )
                 terminal.println()
-                terminal.println(
-                    gray(
-                        """
-                        Examples:
-                        With the default settings, and assuming that current mining fees are 10k sat. The total fee for a
-                        liquidity operation will be 10k sat (mining fee) + 20k sat (service fee for the 2m sat liquidity) = 30k sat.
-                        
-                        ${(underline + gray)("scenario A")}: you receive a continuous stream of tiny 100 sat payments
-                        a) the first 299 incoming payments will be added to your fee credit
-                        b) when receiving the 300th payment, a 2m sat channel will be created, with balance 0 sat on your side
-                        c) the next 20 thousands payments will be received in your channel
-                        d) back to a)
-                        
-                        ${(underline + gray)("scenario B")}: you receive a continuous stream of 50k sat payments
-                        a) when receiving the first payment, a 1M sat channel will be created with balance 50k-30k=20k sat on your side
-                        b) the next next 40 payments will be received in your channel, at that point balance is 2m sat
-                        c) back to a)
-                        
-                        In both scenarios, the total average fee is the same: 30k/2m = 1.5%.
-                        You can reduce this average fee further, by choosing a higher liquidity amount (option ${bold(white("--auto-liquidity"))}),
-                        in exchange for higher upfront costs. The higher the liquidity amount, the less significant the cost of 
-                        mining fee in relative terms.
-                        """.trimIndent()
-                    )
-                )
-                terminal.println()
-                terminal.prompt("Please confirm by typing", choices = listOf("I understand that if I do not make a backup I risk losing my funds"), invalidChoiceMessage = "Please type those exact words:")
                 terminal.prompt(
                     "Please confirm by typing",
-                    choices = listOf("I must not share the same seed with other phoenix instances (mobile or server) or I risk force closing my channels"),
+                    choices = listOf("I understand"),
                     invalidChoiceMessage = "Please type those exact words:"
                 )
-                terminal.prompt("Please confirm by typing", choices = listOf("I accept that the fee credit is non-refundable"), invalidChoiceMessage = "Please type those exact words:")
                 terminal.println()
-
+                terminal.println("Phoenix server is about to start, use ${bold("phoenix-cli")} or the ${bold("http api")} to interact with the daemon. This message will not be displayed next time.")
+                terminal.println("Press any key to continue...")
+                terminal.readLineOrNull(true)
+                terminal.println()
             }
         }
         consoleLog(cyan("version: ${BuildVersions.phoenixdVersion}"))

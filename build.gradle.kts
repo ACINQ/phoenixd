@@ -95,6 +95,9 @@ kotlin {
         macosX64 {
             phoenixBinaries()
         }
+        macosArm64 {
+            phoenixBinaries()
+        }
     }
 
     sourceSets {
@@ -170,7 +173,11 @@ kotlin {
     if (currentOs.isMacOsX) {
         val packageMacosX64 by tasks.register("packageMacosX64", Zip::class) {
             dependsOn(":macosX64Binaries")
-            configureZip("macosX64", "maxos-x64")
+            configureZip("macosX64", "macos-x64")
+        }
+        val packageMacosArm by tasks.register("packageMacosArm64", Zip::class) {
+            dependsOn(":macosArm64Binaries")
+            configureZip("macosArm64", "macos-arm64")
         }
     }
 }

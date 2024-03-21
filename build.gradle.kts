@@ -158,11 +158,11 @@ kotlin {
         archiveBaseName = "phoenix"
         archiveClassifier = classifier
 
-        from("$projectDir/build/bin/$dir/phoenixdDebugExecutable") {
+        from("$projectDir/build/bin/$dir/phoenixdReleaseExecutable") {
             include("*.kexe")
             rename("phoenixd.kexe", "phoenixd")
         }
-        from("$projectDir/build/bin/$dir/phoenix-cliDebugExecutable") {
+        from("$projectDir/build/bin/$dir/phoenix-cliReleaseExecutable") {
             include("*.kexe")
             rename("phoenix-cli.kexe", "phoenix-cli")
         }

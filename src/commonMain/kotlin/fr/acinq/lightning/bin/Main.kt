@@ -69,33 +69,6 @@ fun main(args: Array<String>) = Phoenixd()
     .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
     .main(args)
 
-class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
-    val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
-        "off" to 0.sat,
-        "2m" to 2_000_000.sat,
-        "5m" to 5_000_000.sat,
-        "10m" to 10_000_000.sat,
-    ).default(2_000_000.sat)
-    val maxAbsoluteFee by option("--max-absolute-fee", help = "Max absolute fee for on-chain operations. Includes mining fee and service fee for auto-liquidity.")
-        .int().convert { it.sat }
-        .restrictTo(5_000.sat..100_000.sat)
-        .default(40_000.sat) // with a default auto-liquidity of 2m sat, that's a max total fee of 2%
-    val maxRelativeFeeBasisPoint by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
-        .int()
-        .restrictTo(1..50)
-        .default(30)
-    val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected.", hidden = true)
-        .int().convert { it.sat }
-        .restrictTo(0.sat..100_000.sat)
-        .default(100_000.sat)
-}
-
-sealed class Verbosity {
-    data object Default : Verbosity()
-    data object Silent : Verbosity()
-    data object Verbose : Verbosity()
-}
-
 class Phoenixd : CliktCommand() {
     //private val datadir by option("--datadir", help = "Data directory").convert { it.toPath() }.default(homeDirectory / ".phoenix", defaultForHelp = "~/.phoenix")
     private val datadir = homeDirectory / ".phoenix"
@@ -119,8 +92,33 @@ class Phoenixd : CliktCommand() {
     private val webHookUrl by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
         .convert { Url(it) }
 
+    class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
+        val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
+            "off" to 0.sat,
+            "2m" to 2_000_000.sat,
+            "5m" to 5_000_000.sat,
+            "10m" to 10_000_000.sat,
+        ).default(2_000_000.sat)
+        val maxAbsoluteFee by option("--max-absolute-fee", help = "Max absolute fee for on-chain operations. Includes mining fee and service fee for auto-liquidity.")
+            .int().convert { it.sat }
+            .restrictTo(5_000.sat..100_000.sat)
+            .default(40_000.sat) // with a default auto-liquidity of 2m sat, that's a max total fee of 2%
+        val maxRelativeFeeBasisPoint by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
+            .int()
+            .restrictTo(1..50)
+            .default(30)
+        val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected.", hidden = true)
+            .int().convert { it.sat }
+            .restrictTo(0.sat..100_000.sat)
+            .default(100_000.sat)
+    }
     private val liquidityOptions by LiquidityOptions()
 
+    sealed class Verbosity {
+        data object Default : Verbosity()
+        data object Silent : Verbosity()
+        data object Verbose : Verbosity()
+    }
     private val verbosity by option(help = "Verbosity level").switch(
         "--silent" to Verbosity.Silent,
         "--verbose" to Verbosity.Verbose

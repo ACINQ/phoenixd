@@ -9,8 +9,6 @@ import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.output.MordantHelpFormatter
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
-import com.github.ajalt.clikt.parameters.groups.default
-import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
@@ -19,7 +17,6 @@ import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.github.ajalt.clikt.sources.MapValueSource
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
-import com.github.ajalt.mordant.rendering.TextStyles.underline
 import fr.acinq.bitcoin.Chain
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
@@ -62,6 +59,7 @@ import okio.buffer
 import okio.use
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -77,6 +75,9 @@ class Phoenixd : CliktCommand() {
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
     private val customMempoolSpaceHost by option("--mempool-space", help = "Custom mempool.space instance")
+    private val mempoolPollingInterval by option("--mempool-space-polling-interval-minutes", help = "Polling interval for mempool.space API", hidden = true)
+        .int().convert { it.minutes }
+        .default(10.minutes)
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
     private val httpPassword by option("--http-password", help = "Password for the http api").defaultLazy {
@@ -241,7 +242,7 @@ class Phoenixd : CliktCommand() {
         val paymentsDb = SqlitePaymentsDb(database)
 
         val mempoolSpace = MempoolSpaceClient(mempoolSpaceHost, loggerFactory)
-        val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory)
+        val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
         val peer = Peer(
             nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = watcher, db = object : Databases {
                 override val channels: ChannelsDb get() = channelsDb

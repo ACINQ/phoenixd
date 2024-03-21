@@ -12,11 +12,13 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
-import fr.acinq.lightning.bin.json.ApiType.Channel
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
-import fr.acinq.lightning.channel.states.*
+import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
+import fr.acinq.lightning.channel.states.Closed
+import fr.acinq.lightning.channel.states.Closing
+import fr.acinq.lightning.channel.states.ClosingFeerates
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
@@ -99,9 +101,9 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 }
                 post("createinvoice") {
                     val formParameters = call.receiveParameters()
-                    val amount = formParameters.getLong("amountSat").sat
+                    val amount = formParameters.getOptionalLong("amountSat")?.sat
                     val description = formParameters.getString("description")
-                    val invoice = peer.createInvoice(randomBytes32(), amount.toMilliSatoshi(), Either.Left(description))
+                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Left(description))
                     formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
                         paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
                     }
@@ -216,6 +218,8 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getInvoice(argName: String): Bolt11Invoice = getString(argName).let { invoice -> Bolt11Invoice.read(invoice).getOrElse { invalidType(argName, "bolt11invoice") } }
 
     private fun Parameters.getLong(argName: String): Long = ((this[argName] ?: missing(argName)).toLongOrNull()) ?: invalidType(argName, "integer")
+
+    private fun Parameters.getOptionalLong(argName: String): Long? = this[argName]?.let { it.toLongOrNull() ?: invalidType(argName, "integer") }
 
 }
 

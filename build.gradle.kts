@@ -155,9 +155,11 @@ kotlin {
         archiveClassifier = classifier
 
         from("$projectDir/build/bin/$dir/phoenixdDebugExecutable") {
+            include("*.kexe")
             rename("phoenixd.kexe", "phoenixd")
         }
         from("$projectDir/build/bin/$dir/phoenix-cliDebugExecutable") {
+            include("*.kexe")
             rename("phoenix-cli.kexe", "phoenix-cli")
         }
         into("${archiveBaseName.get()}-${archiveVersion.get()}-${archiveClassifier.get()}")

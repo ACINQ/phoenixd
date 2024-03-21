@@ -136,14 +136,18 @@ kotlin {
                 implementation("app.cash.sqldelight:native-driver:${Versions.sqlDelight}")
             }
         }
-        linuxMain {
-            dependencies {
-                implementation(ktor("client-curl"))
+        if (currentOs.isLinux) {
+            linuxMain {
+                dependencies {
+                    implementation(ktor("client-curl"))
+                }
             }
         }
-        macosMain {
-            dependencies {
-                implementation(ktor("client-darwin"))
+        if (currentOs.isMacOsX) {
+            macosMain {
+                dependencies {
+                    implementation(ktor("client-darwin"))
+                }
             }
         }
     }

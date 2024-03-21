@@ -182,8 +182,6 @@ class Phoenixd : CliktCommand() {
                 terminal.println()
             }
         }
-        consoleLog(gray("version: ${BuildVersions.phoenixdVersion}"))
-        consoleLog(gray("lightning-kmp: ${BuildVersions.lightningKmpVersion}"))
         consoleLog(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
         consoleLog(cyan("chain: $chain"))
         consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))
@@ -217,7 +215,7 @@ class Phoenixd : CliktCommand() {
             )
         consoleLog(cyan("nodeid: ${nodeParams.nodeId}"))
 
-        val driver = createAppDbDriver(datadir)
+        val driver = createAppDbDriver(datadir, chain, nodeParams.nodeId)
         val database = PhoenixDatabase(
             driver = driver,
             lightning_outgoing_payment_partsAdapter = Lightning_outgoing_payment_parts.Adapter(

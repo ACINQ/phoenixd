@@ -12,11 +12,11 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
+import fr.acinq.lightning.bin.json.ApiType.Channel
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
-import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.channel.states.ClosingFeerates
+import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
@@ -79,15 +79,17 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
             authenticate {
                 get("getinfo") {
                     val info = NodeInfo(
-                        version = BuildVersions.phoenixdVersion,
                         nodeId = nodeParams.nodeId,
-                        channels = peer.channels.values.map { Channel.from(it) }
+                        channels = peer.channels.values.map { Channel.from(it) },
+                        chain = nodeParams.chain.name.lowercase(),
+                        version = BuildVersions.phoenixdVersion
                     )
                     call.respond(info)
                 }
                 get("getbalance") {
                     val balance = peer.channels.values
                         .filterIsInstance<ChannelStateWithCommitments>()
+                        .filterNot { it is Closing || it is Closed }
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
                         .sum().truncateToSatoshi()
                     call.respond(Balance(balance, nodeParams.feeCredit.value))

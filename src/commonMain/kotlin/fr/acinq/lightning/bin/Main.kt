@@ -103,16 +103,21 @@ class Phoenixd : CliktCommand() {
         val maxAbsoluteFee by option("--max-absolute-fee", help = "Max absolute fee for on-chain operations. Includes mining fee and service fee for auto-liquidity.")
             .int().convert { it.sat }
             .restrictTo(5_000.sat..100_000.sat)
-            .default(40_000.sat) // with a default auto-liquidity of 2m sat, that's a max total fee of 2%
-        val maxRelativeFeeBasisPoint by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
+            .defaultLazy("2% of auto-liquidity amount") {
+                autoLiquidity * 2 / 100
+            }
+        val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected.").choice(
+            "off" to 0.sat,
+            "50k" to 50_000.sat,
+            "100k" to 100_000.sat,
+        ).default(100_000.sat, "100k")
+        private val maxRelativeFeePct by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
             .int()
             .restrictTo(1..50)
             .default(30)
-        val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected.", hidden = true)
-            .int().convert { it.sat }
-            .restrictTo(0.sat..100_000.sat)
-            .default(100_000.sat)
+        val maxRelativeFeeBasisPoints get() = maxRelativeFeePct * 100
     }
+
     private val liquidityOptions by LiquidityOptions()
 
     sealed class Verbosity {
@@ -120,6 +125,7 @@ class Phoenixd : CliktCommand() {
         data object Silent : Verbosity()
         data object Verbose : Verbosity()
     }
+
     private val verbosity by option(help = "Verbosity level").switch(
         "--silent" to Verbosity.Silent,
         "--verbose" to Verbosity.Verbose
@@ -204,7 +210,7 @@ class Phoenixd : CliktCommand() {
         val lsp = LSP.from(chain)
         val liquidityPolicy = LiquidityPolicy.Auto(
             maxAbsoluteFee = liquidityOptions.maxAbsoluteFee,
-            maxRelativeFeeBasisPoints = liquidityOptions.maxRelativeFeeBasisPoint,
+            maxRelativeFeeBasisPoints = liquidityOptions.maxRelativeFeeBasisPoints,
             skipAbsoluteFeeCheck = false,
             maxAllowedCredit = liquidityOptions.maxFeeCredit
         )

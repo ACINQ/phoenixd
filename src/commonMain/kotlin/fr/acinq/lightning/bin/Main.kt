@@ -300,7 +300,23 @@ class Phoenixd : CliktCommand() {
                 nodeParams.nodeEvents
                     .filterIsInstance<LiquidityEvents.Decision.Rejected>()
                     .collect {
-                        consoleLog(yellow("lightning payment rejected: amount=${it.amount.truncateToSatoshi()} fee=${it.fee.truncateToSatoshi()} maxFee=${liquidityPolicy.maxAbsoluteFee}"))
+                        when (val reason = it.reason) {
+                            is LiquidityEvents.Decision.Rejected.Reason.OverMaxCredit -> {
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit=${reason.maxAllowedCredit}"))
+                            }
+                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverAbsoluteFee -> {
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} > maxFee=${reason.maxAbsoluteFee}"))
+                            }
+                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverRelativeFee -> {
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} more than ${reason.maxRelativeFeeBasisPoints.toDouble() / 100}% of amount"))
+                            }
+                            LiquidityEvents.Decision.Rejected.Reason.ChannelInitializing -> {
+                                consoleLog(yellow("channels are initializing"))
+                            }
+                            LiquidityEvents.Decision.Rejected.Reason.PolicySetToDisabled -> {
+                                consoleLog(yellow("automated liquidity is disabled"))
+                            }
+                        }
                     }
             }
             launch {

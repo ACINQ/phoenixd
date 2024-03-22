@@ -99,7 +99,7 @@ class Phoenixd : CliktCommand() {
             "2m" to 2_000_000.sat,
             "5m" to 5_000_000.sat,
             "10m" to 10_000_000.sat,
-        ).default(2_000_000.sat)
+        ).default(2_000_000.sat, "2m")
         val maxAbsoluteFee by option("--max-absolute-fee", help = "Max absolute fee for on-chain operations. Includes mining fee and service fee for auto-liquidity.")
             .int().convert { it.sat }
             .restrictTo(5_000.sat..100_000.sat)

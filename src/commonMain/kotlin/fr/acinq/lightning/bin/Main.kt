@@ -74,7 +74,15 @@ class Phoenixd : CliktCommand() {
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
-    private val customMempoolSpaceHost by option("--mempool-space", help = "Custom mempool.space instance")
+    private val mempoolSpaceUrl by option("--mempool-space-url", help = "Custom mempool.space instance")
+        .convert { Url(it) }
+        .defaultLazy {
+            when (chain) {
+                Chain.Mainnet -> MempoolSpaceClient.OfficialMempoolMainnet
+                Chain.Testnet -> MempoolSpaceClient.OfficialMempoolTestnet
+                else -> error("unsupported chain")
+            }
+        }
     private val mempoolPollingInterval by option("--mempool-space-polling-interval-minutes", help = "Polling interval for mempool.space API", hidden = true)
         .int().convert { it.minutes }
         .default(10.minutes)
@@ -202,11 +210,6 @@ class Phoenixd : CliktCommand() {
                 if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })
         )
-        val mempoolSpaceHost = customMempoolSpaceHost ?: when (chain) {
-            Chain.Mainnet -> "mempool.space"
-            Chain.Testnet -> "mempool.space/testnet"
-            else -> error("unsupported chain")
-        }
         val lsp = LSP.from(chain)
         val liquidityPolicy = LiquidityPolicy.Auto(
             maxAbsoluteFee = liquidityOptions.maxAbsoluteFee,
@@ -247,7 +250,7 @@ class Phoenixd : CliktCommand() {
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)
 
-        val mempoolSpace = MempoolSpaceClient(mempoolSpaceHost, loggerFactory)
+        val mempoolSpace = MempoolSpaceClient(mempoolSpaceUrl, loggerFactory)
         val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
         val peer = Peer(
             nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = watcher, db = object : Databases {

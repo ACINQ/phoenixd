@@ -68,8 +68,6 @@ fun main(args: Array<String>) = Phoenixd()
     .main(args)
 
 class Phoenixd : CliktCommand() {
-    //private val datadir by option("--datadir", help = "Data directory").convert { it.toPath() }.default(homeDirectory / ".phoenix", defaultForHelp = "~/.phoenix")
-    private val datadir = homeDirectory / ".phoenix"
     private val confFile = datadir / "phoenix.conf"
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet

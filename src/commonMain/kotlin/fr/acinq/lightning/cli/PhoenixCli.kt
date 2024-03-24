@@ -14,7 +14,7 @@ import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.bin.conf.readConfFile
-import fr.acinq.lightning.bin.homeDirectory
+import fr.acinq.lightning.bin.datadir
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
 import io.ktor.client.*
@@ -40,7 +40,6 @@ fun main(args: Array<String>) =
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
 
 class PhoenixCli : CliktCommand() {
-    private val datadir = homeDirectory / ".phoenix"
     private val confFile = datadir / "phoenix.conf"
 
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
@@ -110,7 +109,7 @@ class GetBalance : PhoenixCliCommand(name = "getbalance", help = "Returns your c
 }
 
 class ListChannels : PhoenixCliCommand(name = "listchannels", help = "List all channels") {
-    override suspend fun httpRequest() =  commonOptions.httpClient.get(
+    override suspend fun httpRequest() = commonOptions.httpClient.get(
         url = commonOptions.baseUrl / "listchannels"
     )
 }

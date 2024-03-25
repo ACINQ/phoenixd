@@ -10,18 +10,25 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ## Build
 
-### Linux/WSL
+### Native Linux/WSL
+
+Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.
 
 ```shell
 ./gradlew packageLinuxX64
 ```
 
-### MacOS x64
+### Native MacOS x64
 ```shell
 ./gradlew packageMacOSX64
 ```
 
-### MacOS arm64
+### Native MacOS arm64
 ```shell
 ./gradlew packageMacOSArm64
+```
+
+### JVM
+```shell
+./gradlew distZip
 ```

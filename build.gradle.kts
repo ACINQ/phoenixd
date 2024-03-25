@@ -1,5 +1,6 @@
 import Versions.ktor
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import java.io.ByteArrayOutputStream
 
 buildscript {
@@ -16,6 +17,7 @@ plugins {
     kotlin("multiplatform") version Versions.kotlin
     kotlin("plugin.serialization") version Versions.kotlin
     id("app.cash.sqldelight") version Versions.sqlDelight
+    application
 }
 
 allprojects {
@@ -69,7 +71,9 @@ val buildVersionsTask by tasks.registering(Sync::class) {
 }
 
 kotlin {
-    jvm()
+    jvm {
+        withJava()
+    }
 
     fun KotlinNativeTargetWithHostTests.phoenixBinaries() {
         binaries {
@@ -129,6 +133,7 @@ kotlin {
             dependencies {
                 implementation("app.cash.sqldelight:sqlite-driver:${Versions.sqlDelight}")
                 implementation(ktor("client-okhttp"))
+                implementation("ch.qos.logback:logback-classic:1.2.3")
             }
         }
         nativeMain {
@@ -185,6 +190,17 @@ kotlin {
             dependsOn(":macosArm64Binaries")
             configureZip("macosArm64", "macos-arm64")
         }
+    }
+}
+
+application {
+    mainClass = "fr.acinq.lightning.bin.MainKt"
+}
+
+distributions {
+    main {
+        distributionBaseName = "phoenix"
+        distributionClassifier = "jvm"
     }
 }
 

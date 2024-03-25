@@ -64,6 +64,15 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
             exception<Throwable> { call, cause ->
                 call.respondText(text = cause.message ?: "", status = defaultExceptionStatusCode(cause) ?: HttpStatusCode.InternalServerError)
             }
+            status(HttpStatusCode.Unauthorized) { call, status ->
+                call.respondText(text = "Invalid authentication (use basic auth with the http password set in phoenix.conf)", status = status)
+            }
+            status(HttpStatusCode.MethodNotAllowed) { call, status ->
+                call.respondText(text = "Invalid http method (use the correct GET/POST)", status = status)
+            }
+            status(HttpStatusCode.NotFound) { call, status ->
+                call.respondText(text = "Unknown endpoint (check api doc)", status = status)
+            }
         }
         install(Authentication) {
             basic {

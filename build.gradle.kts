@@ -16,6 +16,7 @@ plugins {
     kotlin("multiplatform") version Versions.kotlin
     kotlin("plugin.serialization") version Versions.kotlin
     id("app.cash.sqldelight") version Versions.sqlDelight
+    application
 }
 
 allprojects {
@@ -68,8 +69,14 @@ val buildVersionsTask by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("generated/kotlin/"))
 }
 
+application {
+    mainClass = "fr.acinq.lightning.bin.MainKt"
+}
+
 kotlin {
-    jvm()
+    jvm {
+        withJava()
+    }
 
     fun KotlinNativeTargetWithHostTests.phoenixBinaries() {
         binaries {

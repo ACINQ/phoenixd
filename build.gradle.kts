@@ -136,6 +136,7 @@ kotlin {
             dependencies {
                 implementation("app.cash.sqldelight:sqlite-driver:${Versions.sqlDelight}")
                 implementation(ktor("client-okhttp"))
+                implementation("ch.qos.logback:logback-classic:1.2.3")
             }
         }
         nativeMain {

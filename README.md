@@ -10,6 +10,17 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ## Build
 
+**phoenixd** is built with [lightning-kmp](https://github.com/ACINQ/lightning-kmp). In order
+to build phoenixd, you need to have lightning-kmp in your local dependencies.
+
+``` shell
+git clone https://github.com/ACINQ/lightning-kmp.git && cd lightning-kmp
+git checkout v1.6.2-FEECREDIT-4
+./gradlew :publishToMavenLocal
+```
+
+Then you can build `phoenixd`
+
 ### Native Linux/WSL
 
 Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.

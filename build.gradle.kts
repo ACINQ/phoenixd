@@ -1,5 +1,6 @@
 import Versions.ktor
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import java.io.ByteArrayOutputStream
 
 buildscript {
@@ -67,10 +68,6 @@ val buildVersionsTask by tasks.registering(Sync::class) {
         into("fr/acinq/lightning")
     }
     into(layout.buildDirectory.dir("generated/kotlin/"))
-}
-
-application {
-    mainClass = "fr.acinq.lightning.bin.MainKt"
 }
 
 kotlin {
@@ -193,6 +190,16 @@ kotlin {
             dependsOn(":macosArm64Binaries")
             configureZip("macosArm64", "macos-arm64")
         }
+    }
+}
+
+application {
+    mainClass = "fr.acinq.lightning.bin.MainKt"
+}
+
+distributions {
+    main {
+        distributionBaseName = "phoenixd-jvm"
     }
 }
 

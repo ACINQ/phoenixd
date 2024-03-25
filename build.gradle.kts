@@ -1,6 +1,5 @@
 import Versions.ktor
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
-import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import java.io.ByteArrayOutputStream
 
 buildscript {
@@ -195,6 +194,17 @@ kotlin {
 
 application {
     mainClass = "fr.acinq.lightning.bin.MainKt"
+}
+
+val cliScripts by tasks.register("cliScripts", CreateStartScripts::class) {
+    mainClass.set("fr.acinq.lightning.cli.PhoenixCliKt")
+    outputDir = tasks.startScripts.get().outputDir
+    classpath = tasks.startScripts.get().classpath
+    applicationName = "phoenix-cli"
+}
+
+tasks.startScripts {
+    dependsOn(cliScripts)
 }
 
 distributions {

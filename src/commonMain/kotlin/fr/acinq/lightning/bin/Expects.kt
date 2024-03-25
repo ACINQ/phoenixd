@@ -5,6 +5,6 @@ import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import okio.Path
 
-expect val homeDirectory: Path
+expect val datadir: Path
 
 expect fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver

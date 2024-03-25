@@ -18,12 +18,15 @@ import com.github.ajalt.clikt.sources.MapValueSource
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
 import fr.acinq.bitcoin.Chain
+import fr.acinq.bitcoin.MnemonicCode
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.LiquidityEvents
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
+import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_SEED
 import fr.acinq.lightning.bin.conf.LSP
+import fr.acinq.lightning.bin.conf.PhoenixSeed
 import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
@@ -47,6 +50,7 @@ import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.Connection
 import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
+import fr.acinq.lightning.utils.toByteVector
 import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -68,9 +72,19 @@ fun main(args: Array<String>) = Phoenixd()
     .main(args)
 
 class Phoenixd : CliktCommand() {
-    //private val datadir by option("--datadir", help = "Data directory").convert { it.toPath() }.default(homeDirectory / ".phoenix", defaultForHelp = "~/.phoenix")
-    private val datadir = homeDirectory / ".phoenix"
     private val confFile = datadir / "phoenix.conf"
+    private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
+        .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false) }
+        .defaultLazy {
+            val value = getOrGenerateSeed(datadir)
+            if (value.isNew) {
+                terminal.print(yellow("Generating new seed..."))
+                runBlocking { delay(500.milliseconds) }
+                terminal.println(white("done"))
+            }
+            value
+        }
+    private val agreeToTermsOfService by option("--agree-to-terms-of-service", hidden = true, help = "Agree to terms of service").flag()
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
@@ -157,13 +171,8 @@ class Phoenixd : CliktCommand() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun run() {
         FileSystem.SYSTEM.createDirectories(datadir)
-        val (seed, new) = getOrGenerateSeed(datadir)
-        if (new) {
+        if (seed.isNew && !agreeToTermsOfService) {
             runBlocking {
-                terminal.print(yellow("Generating new seed..."))
-                delay(500.milliseconds)
-                terminal.println(white("done"))
-                terminal.println()
                 terminal.println(green("Backup"))
                 terminal.println("This software is self-custodial, you have full control and responsibility over your funds.")
                 terminal.println("Your 12-words seed is located in ${FileSystem.SYSTEM.canonicalize(datadir)}, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
@@ -217,7 +226,7 @@ class Phoenixd : CliktCommand() {
             skipAbsoluteFeeCheck = false,
             maxAllowedCredit = liquidityOptions.maxFeeCredit
         )
-        val keyManager = LocalKeyManager(seed, chain, lsp.swapInXpub)
+        val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)
         val nodeParams = NodeParams(chain, loggerFactory, keyManager)
             .copy(
                 zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),

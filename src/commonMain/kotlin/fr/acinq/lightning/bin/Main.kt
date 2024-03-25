@@ -84,6 +84,7 @@ class Phoenixd : CliktCommand() {
             }
             value
         }
+    private val agreeToTermsOfService by option("--agree-to-terms-of-service", hidden = true, help = "Agree to terms of service").flag()
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
@@ -170,7 +171,7 @@ class Phoenixd : CliktCommand() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun run() {
         FileSystem.SYSTEM.createDirectories(datadir)
-        if (seed.isNew) {
+        if (seed.isNew && !agreeToTermsOfService) {
             runBlocking {
                 terminal.println(green("Backup"))
                 terminal.println("This software is self-custodial, you have full control and responsibility over your funds.")

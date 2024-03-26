@@ -18,14 +18,14 @@ ARG LIGHTNING_KMP_COMMIT_HASH
 
 # Build dependencies
 WORKDIR /lightning-kmp
-RUN git clone --recursive --branch ${LIGHTNING_KMP_BRANCH} \
+RUN git clone --recursive --single-branch --branch ${LIGHTNING_KMP_BRANCH} -c advice.detachedHead=false \
     https://github.com/ACINQ/lightning-kmp . \
     && test `git rev-parse HEAD` = ${LIGHTNING_KMP_COMMIT_HASH} || exit 1 \
     && ./gradlew publishToMavenLocal -x dokkaHtml
 
 # Git pull phoenixd source at specified tag/branch and compile phoenixd binary
 WORKDIR /phoenixd
-RUN git clone --recursive --branch ${PHOENIXD_BRANCH} \
+RUN git clone --recursive --single-branch --branch ${PHOENIXD_BRANCH} -c advice.detachedHead=false \
     https://github.com/ACINQ/phoenixd . \
     && test `git rev-parse HEAD` = ${PHOENIXD_COMMIT_HASH} || exit 1 \
     && ./gradlew distTar

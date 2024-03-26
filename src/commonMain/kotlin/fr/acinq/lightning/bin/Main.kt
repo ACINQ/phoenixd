@@ -106,8 +106,6 @@ class Phoenixd : CliktCommand() {
         // the additionalValues map already contains values in phoenix.conf, so if we are here then there are no existing password
         terminal.print(yellow("Generating default api password..."))
         val value = randomBytes32().toHex()
-        val confFile = datadir / "phoenix.conf"
-        FileSystem.SYSTEM.createDirectories(datadir)
         FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password=$value\n") }
         terminal.println(white("done"))
         value
@@ -154,6 +152,7 @@ class Phoenixd : CliktCommand() {
     ).default(Verbosity.Default, defaultForHelp = "prints high-level info to the console")
 
     init {
+        FileSystem.SYSTEM.createDirectories(datadir)
         context {
             valueSource = MapValueSource(readConfFile(confFile))
             helpFormatter = { MordantHelpFormatter(it, showDefaultValues = true) }
@@ -170,7 +169,6 @@ class Phoenixd : CliktCommand() {
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun run() {
-        FileSystem.SYSTEM.createDirectories(datadir)
         if (seed.isNew && !agreeToTermsOfService) {
             runBlocking {
                 terminal.println(green("Backup"))

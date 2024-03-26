@@ -28,8 +28,10 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlin.use
 
 fun main(args: Array<String>) =
     PhoenixCli()
@@ -97,44 +99,44 @@ abstract class PhoenixCliCommand(val name: String, val help: String, printHelpOn
 }
 
 class GetInfo : PhoenixCliCommand(name = "getinfo", help = "Show basic info about your node") {
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "getinfo"
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getinfo")
+    }
 }
 
 class GetBalance : PhoenixCliCommand(name = "getbalance", help = "Returns your current balance") {
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "getbalance"
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getbalance")
+    }
 }
 
 class ListChannels : PhoenixCliCommand(name = "listchannels", help = "List all channels") {
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "listchannels"
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "listchannels")
+    }
 }
 
 class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help = "Get outgoing payment") {
     private val uuid by option("--uuid").convert { UUID.fromString(it) }.required()
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "payments/outgoing/$uuid"
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "payments/outgoing/$uuid")
+    }
 }
 
 class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help = "Get incoming payment") {
     private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "payments/incoming/$paymentHash"
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "payments/incoming/$paymentHash")
+    }
 }
 
 class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments matching the given externalId") {
     private val externalId by option("--externalId", "--eid").required()
-    override suspend fun httpRequest() = commonOptions.httpClient.get(
-        url = commonOptions.baseUrl / "payments/incoming",
-    ) {
-        url {
-            parameters.append("externalId", externalId)
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "payments/incoming") {
+            url {
+                parameters.append("externalId", externalId)
+            }
         }
     }
 }
@@ -143,54 +145,62 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
     private val amountSat by option("--amountSat").long()
     private val description by option("--description", "--desc").required()
     private val externalId by option("--externalId")
-    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
-        url = (commonOptions.baseUrl / "createinvoice").toString(),
-        formParameters = parameters {
-            amountSat?.let { append("amountSat", it.toString()) }
-            externalId?.let { append("externalId", it) }
-            append("description", description)
-        }
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "createinvoice").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", it.toString()) }
+                externalId?.let { append("externalId", it) }
+                append("description", description)
+            }
+        )
+    }
 }
 
 class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
-    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
-        url = (commonOptions.baseUrl / "payinvoice").toString(),
-        formParameters = parameters {
-            amountSat?.let { append("amountSat", amountSat.toString()) }
-            append("invoice", invoice)
-        }
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "payinvoice").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", amountSat.toString()) }
+                append("invoice", invoice)
+            }
+        )
+    }
 }
 
 class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to a Bitcoin address", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long().required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerateSatByte by option("--feerateSatByte").int().required()
-    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
-        url = (commonOptions.baseUrl / "sendtoaddress").toString(),
-        formParameters = parameters {
-            append("amountSat", amountSat.toString())
-            append("address", address)
-            append("feerateSatByte", feerateSatByte.toString())
-        }
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "sendtoaddress").toString(),
+            formParameters = parameters {
+                append("amountSat", amountSat.toString())
+                append("address", address)
+                append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
 }
 
 class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close channel", printHelpOnEmptyArgs = true) {
     private val channelId by option("--channelId").convert { ByteVector32.fromValidHex(it) }.required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerateSatByte by option("--feerateSatByte").int().required()
-    override suspend fun httpRequest() = commonOptions.httpClient.submitForm(
-        url = (commonOptions.baseUrl / "closechannel").toString(),
-        formParameters = parameters {
-            append("channelId", channelId.toHex())
-            append("address", address)
-            append("feerateSatByte", feerateSatByte.toString())
-        }
-    )
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "closechannel").toString(),
+            formParameters = parameters {
+                append("channelId", channelId.toHex())
+                append("address", address)
+                append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
 }
 
 operator fun Url.div(path: String) = Url(URLBuilder(this).appendPathSegments(path))

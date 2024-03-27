@@ -1,9 +1,7 @@
-FROM eclipse-temurin:17-jdk-alpine AS BUILD
+FROM eclipse-temurin:21-jdk-alpine AS BUILD
 
-ARG PHOENIXD_BRANCH=v0.1.2
-ARG PHOENIXD_COMMIT_HASH=414aa56bfa15c0b215ed89d0b96fd6c43cd8c1e3
-ARG LIGHTNING_KMP_BRANCH=v1.6.2-FEECREDIT-4
-ARG LIGHTNING_KMP_COMMIT_HASH=eba5a5bf7d7d77bd59cb8e38ecd20ec72d288672
+ARG PHOENIXD_BRANCH=v0.1.3
+ARG PHOENIXD_COMMIT_HASH=d805f81c2bfb8a09a726bb36278216e607100a16
 
 # Upgrade all packages and install dependencies
 RUN apk update \
@@ -13,15 +11,6 @@ RUN apk add --no-cache bash git
 # Set necessary args and environment variables for building phoenixd
 ARG PHOENIXD_BRANCH
 ARG PHOENIXD_COMMIT_HASH
-ARG LIGHTNING_KMP_BRANCH
-ARG LIGHTNING_KMP_COMMIT_HASH
-
-# Build dependencies
-WORKDIR /lightning-kmp
-RUN git clone --recursive --single-branch --branch ${LIGHTNING_KMP_BRANCH} -c advice.detachedHead=false \
-    https://github.com/ACINQ/lightning-kmp . \
-    && test `git rev-parse HEAD` = ${LIGHTNING_KMP_COMMIT_HASH} || exit 1 \
-    && ./gradlew publishToMavenLocal -x dokkaHtml
 
 # Git pull phoenixd source at specified tag/branch and compile phoenixd binary
 WORKDIR /phoenixd
@@ -30,7 +19,7 @@ RUN git clone --recursive --single-branch --branch ${PHOENIXD_BRANCH} -c advice.
     && test `git rev-parse HEAD` = ${PHOENIXD_COMMIT_HASH} || exit 1 \
     && ./gradlew distTar
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 # Upgrade all packages and install dependencies
 RUN apk update \

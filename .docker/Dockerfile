@@ -1,13 +1,14 @@
-FROM eclipse-temurin:21-jdk-alpine AS BUILD
+FROM eclipse-temurin:21-jdk-jammy AS BUILD
 
 # Set necessary args and environment variables for building phoenixd
 ARG PHOENIXD_BRANCH=v0.1.3
 ARG PHOENIXD_COMMIT_HASH=d805f81c2bfb8a09a726bb36278216e607100a16
 
 # Upgrade all packages and install dependencies
-RUN apk update \
-    && apk upgrade --no-interactive
-RUN apk add --no-cache bash git
+RUN apt-get update \
+    && apt-get upgrade -y
+RUN apt-get install -y --no-install-recommends bash git \
+    && apt clean
 
 # Git pull phoenixd source at specified tag/branch and compile phoenixd
 WORKDIR /phoenixd
@@ -16,17 +17,22 @@ RUN git clone --recursive --single-branch --branch ${PHOENIXD_BRANCH} -c advice.
     && test `git rev-parse HEAD` = ${PHOENIXD_COMMIT_HASH} || exit 1 \
     && ./gradlew distTar
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-jammy
 
 # Upgrade all packages and install dependencies
-RUN apk update \
-    && apk upgrade --no-interactive
-RUN apk add --no-cache bash
+RUN apt-get update \
+    && apt-get upgrade -y
+RUN apt-get install -y --no-install-recommends bash \
+    && apt clean
 
-# Create a phoenix group and user
-RUN addgroup -S phoenix -g 1000 \
-    && adduser -S phoenix -G phoenix -u 1000 -h /phoenix
-USER phoenix
+# Set phoenix user and group with static IDs
+ARG GROUP_ID=1000
+ARG USER_ID=1000
+RUN groupadd -g ${GROUP_ID} phoenix \
+    && useradd -u ${USER_ID} -g phoenix -d /phoenix phoenix \
+    && mkdir -p /phoenix/.phoenix \
+    && chown -R phoenix:phoenix /phoenix
+USER phoenix:phoenix
 
 # Unpack the release
 WORKDIR /phoenix

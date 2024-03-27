@@ -30,7 +30,7 @@ ARG GROUP_ID=1000
 ARG USER_ID=1000
 RUN groupadd -g ${GROUP_ID} phoenix \
     && useradd -u ${USER_ID} -g phoenix -d /phoenix phoenix \
-    && mkdir -p /phoenix/.phoenix \
+    && mkdir /phoenix \
     && chown -R phoenix:phoenix /phoenix
 USER phoenix:phoenix
 

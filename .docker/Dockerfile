@@ -40,7 +40,7 @@ RUN tar --strip-components=1 -xvf phoenix-*-jvm.tar
 EXPOSE 9740
 
 # Expose default data directory as VOLUME
-VOLUME [ "/phoenix/.phoenix" ]
+VOLUME [ "/phoenix" ]
 
 # Run the daemon
 ENTRYPOINT ["/phoenix/bin/phoenixd", "--agree-to-terms-of-service", "--http-bind-ip", "0.0.0.0"]

@@ -88,7 +88,11 @@ kotlin {
     }
 
     val currentOs = org.gradle.internal.os.OperatingSystem.current()
-    if (currentOs.isLinux) {
+    val arch = System.getProperty("os.arch")
+
+    if (currentOs.isLinux && arch != "aarch64") {
+        // there is no kotlin native toolchain for linux arm64 yet, but we can still build for the JVM
+        // see https://youtrack.jetbrains.com/issue/KT-51794/Cant-run-JVM-targets-on-ARM-Linux-when-using-Kotlin-Multiplatform-plugin
         linuxX64 {
             phoenixBinaries()
         }

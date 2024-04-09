@@ -120,13 +120,12 @@ class Phoenixd : CliktCommand() {
             "5m" to 5_000_000.sat,
             "10m" to 10_000_000.sat,
         ).default(2_000_000.sat, "2m")
-        val maxAbsoluteFee by option("--max-absolute-fee", help = "Max absolute fee for on-chain operations. Includes mining fee and service fee for auto-liquidity.")
+        val maxAbsoluteFee by option("--max-absolute-fee", hidden = true).deprecated("--max-absolute-fee is deprecated, use --max-mining-fee instead", error = true)
+        val maxMiningFee by option("--max-mining-fee", help = "Max mining fee for on-chain operations, in satoshis")
             .int().convert { it.sat }
-            .restrictTo(5_000.sat..100_000.sat)
-            .defaultLazy("2% of auto-liquidity amount") {
-                autoLiquidity * 2 / 100
-            }
-        val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected.").choice(
+            .restrictTo(5_000.sat..200_000.sat)
+            .default(40_000.sat)
+        val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected").choice(
             "off" to 0.sat,
             "50k" to 50_000.sat,
             "100k" to 100_000.sat,
@@ -219,9 +218,9 @@ class Phoenixd : CliktCommand() {
         )
         val lsp = LSP.from(chain)
         val liquidityPolicy = LiquidityPolicy.Auto(
-            maxAbsoluteFee = liquidityOptions.maxAbsoluteFee,
+            maxMiningFee = liquidityOptions.maxMiningFee,
             maxRelativeFeeBasisPoints = liquidityOptions.maxRelativeFeeBasisPoints,
-            skipAbsoluteFeeCheck = false,
+            skipMiningFeeCheck = false,
             maxAllowedCredit = liquidityOptions.maxFeeCredit
         )
         val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)
@@ -309,10 +308,10 @@ class Phoenixd : CliktCommand() {
                     .collect {
                         when (val reason = it.reason) {
                             is LiquidityEvents.Decision.Rejected.Reason.OverMaxCredit -> {
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit=${reason.maxAllowedCredit}"))
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit (max=${reason.maxAllowedCredit})"))
                             }
-                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverAbsoluteFee -> {
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} > maxFee=${reason.maxAbsoluteFee}"))
+                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverMaxMiningFee -> {
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max mining fee (max=${reason.maxMiningFee})"))
                             }
                             is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverRelativeFee -> {
                                 consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} more than ${reason.maxRelativeFeeBasisPoints.toDouble() / 100}% of amount"))

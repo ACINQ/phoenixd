@@ -124,7 +124,9 @@ class Phoenixd : CliktCommand() {
         val maxMiningFee by option("--max-mining-fee", help = "Max mining fee for on-chain operations, in satoshis")
             .int().convert { it.sat }
             .restrictTo(5_000.sat..200_000.sat)
-            .default(40_000.sat)
+            .defaultLazy("1% of auto-liquidity amount") {
+                autoLiquidity * 1 / 100
+            }
         val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected").choice(
             "off" to 0.sat,
             "50k" to 50_000.sat,

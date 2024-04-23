@@ -102,16 +102,26 @@ class Phoenixd : CliktCommand() {
         .default(10.minutes)
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPassword by option("--http-password", help = "Password for the http api").defaultLazy {
-        // the additionalValues map already contains values in phoenix.conf, so if we are here then there are no existing password
-        terminal.print(yellow("Generating default api password..."))
-        val value = randomBytes32().toHex()
-        FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password=$value\n") }
-        terminal.println(white("done"))
-        value
-    }
+    private val httpPassword by option("--http-password", help = "Password for the http api")
+        .defaultLazy {
+            // if we are here then no value is defined in phoenix.conf
+            terminal.print(yellow("Generating default api password..."))
+            val value = randomBytes32().toHex()
+            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password=$value") }
+            terminal.println(white("done"))
+            value
+        }
     private val webHookUrl by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
         .convert { Url(it) }
+    private val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
+        .defaultLazy {
+            // if we are here then no value is defined in phoenix.conf
+            terminal.print(yellow("Generating webhook secret..."))
+            val value = randomBytes32().toHex()
+            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nwebhook-secret=$value") }
+            terminal.println(white("done"))
+            value
+        }
 
     class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
         val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
@@ -353,7 +363,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret).run { module() }
             }
         )
         val serverJob = scope.launch {

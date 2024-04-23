@@ -26,6 +26,7 @@ import fr.acinq.lightning.utils.*
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -41,8 +42,9 @@ import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import okio.ByteString.Companion.encodeUtf8
 
-class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?) {
+class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
     fun Application.module() {
 
@@ -199,6 +201,16 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     })
                 }
             }
+            client.sendPipeline.intercept(HttpSendPipeline.State) {
+                when (val body = context.body) {
+                    is TextContent -> {
+                        val bodyBytes = body.text.encodeUtf8()
+                        val secretBytes = webhookSecret.encodeUtf8()
+                        val sig = bodyBytes.hmacSha256(secretBytes)
+                        context.headers.append("X-Phoenix-Signature", sig.hex())
+                    }
+                }
+            }
             launch {
                 eventsFlow.collect { event ->
                     client.post(url) {
@@ -231,5 +243,3 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getOptionalLong(argName: String): Long? = this[argName]?.let { it.toLongOrNull() ?: invalidType(argName, "integer") }
 
 }
-
-

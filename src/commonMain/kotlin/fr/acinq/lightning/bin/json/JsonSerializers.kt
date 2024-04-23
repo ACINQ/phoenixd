@@ -25,6 +25,7 @@ import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.utils.UUID
+import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -70,7 +71,9 @@ sealed class ApiType {
     data class GeneratedInvoice(@SerialName("amountSat") val amount: Satoshi?, val paymentHash: ByteVector32, val serialized: String) : ApiType()
 
     @Serializable
-    sealed class ApiEvent : ApiType()
+    sealed class ApiEvent : ApiType() {
+        val timestamp: Long = Clock.System.now().toEpochMilliseconds()
+    }
 
     @Serializable
     @SerialName("payment_received")

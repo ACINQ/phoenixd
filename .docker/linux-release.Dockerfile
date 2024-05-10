@@ -30,9 +30,18 @@ WORKDIR /phoenixd
 COPY . .
 
 # Build
-RUN ./gradlew packageLinuxX64
+RUN \
+    --mount=type=cache,target=/phoenixd/build \
+    --mount=type=cache,target=/root/.m2 \
+    --mount=type=cache,target=/phoenixd/.gradle \
+    --mount=type=cache,target=/root/.gradle \
+    --mount=type=cache,target=/root/.konan \
+    ./gradlew --build-cache packageLinuxX64 && \
+    mkdir /phoenixd/build-distributions && \
+    cp -R /phoenixd/build/distributions/* /phoenixd/build-distributions/ && \
+    ./gradlew --stop
 
 # Copy the build to host machine
 FROM ubuntu:18.04 as final
-COPY --from=BUILD /phoenixd/build/distributions/* .
+COPY --from=BUILD /phoenixd/build-distributions/* .
 

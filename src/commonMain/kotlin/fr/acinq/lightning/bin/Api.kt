@@ -113,8 +113,16 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 post("createinvoice") {
                     val formParameters = call.receiveParameters()
                     val amount = formParameters.getOptionalLong("amountSat")?.sat
-                    val description = formParameters.getString("description")
-                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Left(description))
+                    var invoice : Bolt11Invoice
+
+                    if ((formParameters["descriptionHash"]?.isNotBlank()) ?: false) {
+                        val hash = formParameters.getByteVector32("descriptionHash")
+                        invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Right(hash))
+                    } else {
+                        val description = formParameters.getString("description")
+                        invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Left(description))
+                    }
+
                     formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
                         paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
                     }

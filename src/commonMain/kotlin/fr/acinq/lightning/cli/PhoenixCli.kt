@@ -5,6 +5,9 @@ import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.MordantHelpFormatter
+import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
+import com.github.ajalt.clikt.parameters.groups.required
+import com.github.ajalt.clikt.parameters.groups.single
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
@@ -12,6 +15,7 @@ import com.github.ajalt.clikt.sources.MapValueSource
 import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.datadir
@@ -124,7 +128,7 @@ class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help =
 }
 
 class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help = "Get incoming payment") {
-    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
+    private val paymentHash by option("--paymentHash", "--h").convert { it.toByteVector32() }.required()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "payments/incoming/$paymentHash")
     }
@@ -143,7 +147,11 @@ class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", he
 
 class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
-    private val description by option("--description", "--desc").required()
+    private val description by mutuallyExclusiveOptions(
+        option("--description", "--desc").convert { Either.Left(it) },
+        option("--descriptionHash", "--desc-hash").convert { Either.Right(it.toByteVector32()) }
+    ).single().required()
+
     private val externalId by option("--externalId")
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
@@ -151,7 +159,10 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
             formParameters = parameters {
                 amountSat?.let { append("amountSat", it.toString()) }
                 externalId?.let { append("externalId", it) }
-                append("description", description)
+                when(val d = description) {
+                    is Either.Left -> append("description", d.value)
+                    is Either.Right -> append("descriptionHash", d.value.toHex())
+                }
             }
         )
     }
@@ -188,7 +199,7 @@ class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to 
 }
 
 class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close channel", printHelpOnEmptyArgs = true) {
-    private val channelId by option("--channelId").convert { ByteVector32.fromValidHex(it) }.required()
+    private val channelId by option("--channelId").convert { it.toByteVector32() }.required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerateSatByte by option("--feerateSatByte").int().required()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
@@ -204,3 +215,5 @@ class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close chan
 }
 
 operator fun Url.div(path: String) = Url(URLBuilder(this).appendPathSegments(path))
+
+fun String.toByteVector32(): ByteVector32 = kotlin.runCatching { ByteVector32.fromValidHex(this) }.recover { error("'$this' is not a valid 32-bytes hex string") }.getOrThrow()

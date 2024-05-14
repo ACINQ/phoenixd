@@ -120,6 +120,26 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+
+                delete("payments/incoming/{paymentHash}") {
+                    val paymentHash = call.parameters.getByteVector32("paymentHash")
+                    val success = paymentDb.removeIncomingPayment(paymentHash)
+                    if (success) {
+                        call.respondText("Payment successfully deleted", status = HttpStatusCode.OK)
+                    } else {
+                        call.respondText("Payment not found or failed to delete", status = HttpStatusCode.NotFound)
+                    }
+                }
+
+                //List expired
+                get("payments/expired") {
+                    val fromCreatedAt = call.request.queryParameters["from"]?.toLongOrNull() ?: 0L
+                    val toCreatedAt = call.request.queryParameters["to"]?.toLongOrNull() ?: System.currentTimeMillis()
+
+                    val expiredPayments = paymentDb.listExpiredPayments(fromCreatedAt, toCreatedAt)
+                    call.respond(expiredPayments.map { IncomingPayment(it, null) })  // Assuming you have a way to handle or display payments without metadata
+                }
+                
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
                     paymentDb.getIncomingPayment(paymentHash)?.let {
@@ -127,6 +147,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         call.respond(IncomingPayment(it, metadata))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
+                
                 get("payments/incoming") {
                     val externalId = call.parameters.getString("externalId")
                     val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)

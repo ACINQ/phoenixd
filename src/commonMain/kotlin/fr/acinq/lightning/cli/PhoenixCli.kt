@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.required
 import com.github.ajalt.clikt.parameters.groups.single
 import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.sources.MapValueSource
@@ -31,16 +32,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
-import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import kotlin.use
 
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -127,6 +126,25 @@ class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help =
     }
 }
 
+class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", help = "List outgoing payments matching the given parameters. By default, return the last pending or successfully sent payments.") {
+    private val all by option("--all").boolean().default(false).help { "if true, list all outgoing payments, including failed ones" }
+    private val from by option("--from").long().help { "timestamp in millis since epoch" }
+    private val to by option("--to").long().help { "timestamp in millis since epoch" }
+    private val limit by option("--limit", "-l").long().help { "number of payments in the page, default 20" }
+    private val offset by option("--offset", "-o").long().help { "page offset, default 0 (i.e. the first page)" }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "payments/outgoing") {
+            url {
+                parameters.append("all", all.toString())
+                from?.let { parameters.append("from", it.toString()) }
+                to?.let { parameters.append("to", it.toString()) }
+                limit?.let { parameters.append("limit", it.toString()) }
+                offset?.let { parameters.append("offset", it.toString()) }
+            }
+        }
+    }
+}
+
 class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help = "Get incoming payment") {
     private val paymentHash by option("--paymentHash", "--h").convert { it.toByteVector32() }.required()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
@@ -134,12 +152,22 @@ class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help =
     }
 }
 
-class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments matching the given externalId") {
-    private val externalId by option("--externalId", "--eid").required()
+class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments matching the given parameters. By default, return the last received payments.") {
+    private val all by option("--all").boolean().default(false).help { "if true, list all incoming payments, including those that have not been received" }
+    private val externalId by option("--externalId", "--eid").help { "optional external id tied to the payments" }
+    private val from by option("--from").long().help { "timestamp in millis since epoch" }
+    private val to by option("--to").long().help { "timestamp in millis since epoch" }
+    private val limit by option("--limit", "-l").long().help { "number of payments in the page, default 20" }
+    private val offset by option("--offset", "-o").long().help { "page offset, default 0 (i.e. the first page)" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "payments/incoming") {
             url {
-                parameters.append("externalId", externalId)
+                parameters.append("all", all.toString())
+                externalId?.let { parameters.append("externalId", it) }
+                from?.let { parameters.append("from", it.toString()) }
+                to?.let { parameters.append("to", it.toString()) }
+                limit?.let { parameters.append("limit", it.toString()) }
+                offset?.let { parameters.append("offset", it.toString()) }
             }
         }
     }

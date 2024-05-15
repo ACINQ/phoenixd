@@ -124,7 +124,7 @@ sealed class ApiType {
             paymentHash = payment.paymentHash,
             preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
             invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
-            isPaid = payment.completedAt != null,
+            isPaid = payment.status is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain,
             sent = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             completedAt = payment.completedAt,

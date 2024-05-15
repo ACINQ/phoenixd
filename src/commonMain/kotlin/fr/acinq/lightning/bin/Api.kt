@@ -41,17 +41,20 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
 
 class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
 
         val json = Json {
             prettyPrint = true
             isLenient = true
             serializersModule = fr.acinq.lightning.json.JsonSerializers.json.serializersModule
+            explicitNulls = false
         }
 
         install(ContentNegotiation) {
@@ -128,18 +131,39 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
                 get("payments/incoming") {
-                    val externalId = call.parameters.getString("externalId")
-                    val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
-                    metadataList.mapNotNull { (paymentId, metadata) ->
-                        when (paymentId) {
-                            is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
-                                IncomingPayment(it, metadata)
-                            }
-                            else -> null
+                    val externalId = call.parameters["externalId"]
+                    if (externalId.isNullOrBlank()) {
+                        val from = call.parameters.getOptionalLong("from") ?: 0L
+                        val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                        val received = paymentDb.listReceivedFromTo(from, to).map { (payment, metadata) ->
+                            IncomingPayment(payment, metadata)
                         }
-                    }.let { payments ->
-                        call.respond(payments)
+                        call.respond(received)
+                    } else {
+                        val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
+                        metadataList.mapNotNull { (paymentId, metadata) ->
+                            when (paymentId) {
+                                is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
+                                    IncomingPayment(it, metadata)
+                                }
+                                else -> null
+                            }
+                        }.let { payments ->
+                            call.respond(payments)
+                        }
                     }
+                }
+                get("test123") {
+
+                }
+                get("payments/outgoing") {
+                    val sentOnly = call.parameters["sentOnly"]?.toBoolean() ?: false
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val limit = call.parameters.getOptionalLong("limit") ?: 20
+                    val offset = call.parameters.getOptionalLong("offset") ?: 0
+                    val payments = paymentDb.listOutgoingFromTo(from, to, limit, offset, sentOnly = sentOnly).map { OutgoingPayment(it)}
+                    call.respond(payments)
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")

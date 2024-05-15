@@ -1,0 +1,106 @@
+-- queries fetching an aggregation of payments, fetched from the various
+-- payment tables (ln-outgoing, splice-out, closing, incoming...)
+
+-- returns SENT wallet-payment-ids between startDate and endDate, ordered by completion date/creation date
+listSentWithin:
+SELECT
+    combined_payments.type         AS type,
+    combined_payments.id           AS id
+FROM (
+    SELECT
+        2            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        completed_at AS completed_at
+    FROM lightning_outgoing_payments
+    WHERE lightning_outgoing_payments.status_type LIKE 'SUCCEEDED_%'
+    AND   completed_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        3            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM splice_outgoing_payments
+    WHERE splice_outgoing_payments.confirmed_at IS NOT NULL
+    AND   splice_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        4            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM channel_close_outgoing_payments
+    WHERE channel_close_outgoing_payments.confirmed_at IS NOT NULL
+    AND   channel_close_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        5            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM splice_cpfp_outgoing_payments
+    WHERE splice_cpfp_outgoing_payments.confirmed_at IS NOT NULL
+    AND   splice_cpfp_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        6            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        locked_at    AS completed_at
+    FROM inbound_liquidity_outgoing_payments
+    WHERE inbound_liquidity_outgoing_payments.locked_at IS NOT NULL
+    AND   inbound_liquidity_outgoing_payments.locked_at BETWEEN :startDate AND :endDate
+) combined_payments
+ORDER BY COALESCE(combined_payments.completed_at, combined_payments.created_at) DESC
+LIMIT :limit OFFSET :offset;
+
+-- returns outgoing wallet-payment-ids created between startDate and endDate, ordered by completion date/creation date,
+-- regardless of their status (sent, failed, pending).
+listOutgoingWithin:
+SELECT
+    combined_payments.type         AS type,
+    combined_payments.id           AS id
+FROM (
+    SELECT
+        2            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        completed_at AS completed_at
+    FROM lightning_outgoing_payments
+    WHERE created_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        3            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM splice_outgoing_payments
+    WHERE splice_outgoing_payments.created_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        4            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM channel_close_outgoing_payments
+    WHERE channel_close_outgoing_payments.created_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        5            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        confirmed_at AS completed_at
+    FROM splice_cpfp_outgoing_payments
+    WHERE splice_cpfp_outgoing_payments.created_at BETWEEN :startDate AND :endDate
+UNION ALL
+    SELECT
+        6            AS type,
+        id           AS id,
+        created_at   AS created_at,
+        locked_at    AS completed_at
+    FROM inbound_liquidity_outgoing_payments
+    WHERE inbound_liquidity_outgoing_payments.locked_at BETWEEN :startDate AND :endDate
+) combined_payments
+ORDER BY COALESCE(combined_payments.completed_at, combined_payments.created_at) DESC
+LIMIT :limit OFFSET :offset;

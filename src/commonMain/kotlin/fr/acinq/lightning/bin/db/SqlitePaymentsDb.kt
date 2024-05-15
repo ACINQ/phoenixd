@@ -41,6 +41,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     private val cpfpQueries = SpliceCpfpOutgoingQueries(database)
     private val linkTxToPaymentQueries = LinkTxToPaymentQueries(database)
     private val inboundLiquidityQueries = InboundLiquidityQueries(database)
+    private val aggregatedQueries = AggregatedQueries(database)
     val metadataQueries = PaymentsMetadataQueries(database)
 
     override suspend fun addOutgoingLightningParts(
@@ -135,8 +136,6 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
         lightningOutgoingQueries.getPaymentFromPartId(partId)
     }
-
-    // ---- list outgoing
 
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
@@ -254,4 +253,51 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         inQueries.deleteIncomingPayment(paymentHash)
     }
 
+    // ---- list payments with filter
+
+    suspend fun listReceivedFromTo(from: Long, to: Long): List<Pair<IncomingPayment, PaymentMetadata?>> {
+        return withContext(Dispatchers.Default) {
+            inQueries.listReceivedFromTo(from, to).map { payment ->
+                val metadata = metadataQueries.get(payment.walletPaymentId())
+                payment to metadata
+            }
+        }
+    }
+
+    suspend fun listOutgoingFromTo(from: Long, to: Long, limit: Long, offset: Long): List<Pair<OutgoingPayment, PaymentMetadata?>> {
+        return withContext(Dispatchers.Default) {
+            aggregatedQueries.listOutgoingFromTo(from, to, limit, offset).mapNotNull {  id ->
+                when (id) {
+                    is WalletPaymentId.IncomingPaymentId -> throw RuntimeException("unhandled")
+                    is WalletPaymentId.LightningOutgoingPaymentId -> lightningOutgoingQueries.getPayment(id.id)
+                    is WalletPaymentId.SpliceOutgoingPaymentId -> spliceOutQueries.getSpliceOutPayment(id.id)
+                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> channelCloseQueries.getChannelCloseOutgoingPayment(id.id)
+                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> inboundLiquidityQueries.get(id.id)
+                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> cpfpQueries.getCpfp(id.id)
+                }?.let {
+                    it to metadataQueries.get(id)
+                }
+            }
+        }
+    }
+
+    suspend fun listOutgoingFromTo(from: Long, to: Long, limit: Long, offset: Long, sentOnly: Boolean): List<OutgoingPayment> {
+        return withContext(Dispatchers.Default) {
+            val paymentIds = if (sentOnly) {
+                aggregatedQueries.listOutgoingSentFromTo(from, to, limit, offset)
+            } else {
+                aggregatedQueries.listOutgoingFromTo(from, to, limit, offset)
+            }
+            paymentIds.mapNotNull {  id ->
+                when (id) {
+                    is WalletPaymentId.IncomingPaymentId -> null
+                    is WalletPaymentId.LightningOutgoingPaymentId -> lightningOutgoingQueries.getPayment(id.id)
+                    is WalletPaymentId.SpliceOutgoingPaymentId -> spliceOutQueries.getSpliceOutPayment(id.id)
+                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> channelCloseQueries.getChannelCloseOutgoingPayment(id.id)
+                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> inboundLiquidityQueries.get(id.id)
+                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> cpfpQueries.getCpfp(id.id)
+                }
+            }
+        }
+    }
 }

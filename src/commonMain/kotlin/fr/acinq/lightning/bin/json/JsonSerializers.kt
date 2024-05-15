@@ -22,7 +22,7 @@ import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.utils.UUID
 import kotlinx.datetime.Clock
@@ -118,14 +118,55 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: LightningOutgoingPayment) : this (
-            paymentHash = payment.paymentHash,
-            preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
-            invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
-            isPaid = payment.completedAt != null,
+    data class OutgoingPayment(
+        val type: String,
+        @SerialName("paymentId") val id: String,
+        @SerialName("sentSat") val sent: Satoshi,
+        @SerialName("routingFeeSat") val routingFee: MilliSatoshi,
+        @SerialName("miningFeeSat") val miningFee: Satoshi?,
+        @SerialName("serviceFeeSat") val serviceFee: Satoshi?,
+        val paymentHash: ByteVector32?,
+        val invoice: String?,
+        @SerialName("status") val status: String?,
+        val preimage: ByteVector32?,
+        @SerialName("failureMessage") val failure: String?,
+        val address: String?,
+        val txId: String?,
+        val channelId: ByteVector32?,
+        val completedAt: Long?,
+        val createdAt: Long
+    ) {
+        constructor(payment: fr.acinq.lightning.db.OutgoingPayment) : this(
+            type = when (payment) {
+                is LightningOutgoingPayment -> "lightning-outgoing"
+                is SpliceOutgoingPayment -> "splice-out"
+                is ChannelCloseOutgoingPayment -> "channel-closing"
+                is SpliceCpfpOutgoingPayment -> "cpfp"
+                is InboundLiquidityOutgoingPayment -> "liquidity"
+            },
+            id = payment.id.toString(),
             sent = payment.amount.truncateToSatoshi(),
-            fees = payment.fees,
+            routingFee = payment.fees,
+            miningFee = (payment as? OnChainOutgoingPayment)?.miningFees,
+            serviceFee = (payment as? InboundLiquidityOutgoingPayment)?.lease?.fees?.serviceFee,
+            paymentHash = (payment as? LightningOutgoingPayment)?.paymentHash,
+            invoice = ((payment as? LightningOutgoingPayment)?.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
+            status = (payment as? LightningOutgoingPayment)?.status?.let {
+                when (it) {
+                    is LightningOutgoingPayment.Status.Pending -> "pending"
+                    is LightningOutgoingPayment.Status.Completed.Succeeded -> "success"
+                    is LightningOutgoingPayment.Status.Completed.Failed -> "failed"
+                }
+            },
+            preimage = ((payment as? LightningOutgoingPayment)?.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
+            failure = ((payment as? LightningOutgoingPayment)?.status as? LightningOutgoingPayment.Status.Completed.Failed)?.reason?.toString(),
+            address = when (payment) {
+                is SpliceOutgoingPayment -> payment.address
+                is ChannelCloseOutgoingPayment -> payment.address
+                else -> null
+            },
+            txId = (payment as? OnChainOutgoingPayment)?.txId?.toString(),
+            channelId = (payment as? OnChainOutgoingPayment)?.channelId,
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )

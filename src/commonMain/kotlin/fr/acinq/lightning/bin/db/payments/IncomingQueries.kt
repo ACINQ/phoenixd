@@ -21,6 +21,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.byteVector32
 import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -130,9 +131,14 @@ class IncomingQueries(private val database: PhoenixDatabase) {
         return queries.listAllNotConfirmed(Companion::mapIncomingPayment).asFlow().mapToList(Dispatchers.IO)
     }
 
+    fun listReceivedFromTo(from: Long, to: Long): List<IncomingPayment> {
+        return queries.listReceivedWithin(from = from, to = to, ::mapIncomingPayment).executeAsList()
+    }
+
     fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<IncomingPayment> {
-        return queries.listAllWithin(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
-            it.received == null
+        return queries.listCreatedWithin(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
+            val origin = it.origin
+            it.received == null && origin is IncomingPayment.Origin.Invoice && origin.paymentRequest.isExpired()
         }
     }
 
@@ -185,13 +191,6 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                 }
                 else -> throw UnreadableIncomingReceivedWith(received_at, received_with_type, received_with_blob)
             }
-        }
-
-        private fun mapTxIdPaymentHash(
-            tx_id: ByteArray,
-            payment_hash: ByteArray
-        ): Pair<ByteVector32, ByteVector32> {
-            return tx_id.byteVector32() to payment_hash.byteVector32()
         }
     }
 }

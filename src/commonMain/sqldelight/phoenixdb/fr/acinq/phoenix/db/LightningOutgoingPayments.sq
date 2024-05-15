@@ -175,6 +175,57 @@ FROM lightning_outgoing_payments AS parent
 LEFT OUTER JOIN lightning_outgoing_payment_parts AS lightning_parts ON lightning_parts.part_parent_id = parent.id
 WHERE payment_hash=?;
 
+listPaymentsWithin:
+SELECT parent.id,
+       parent.recipient_amount_msat,
+       parent.recipient_node_id,
+       parent.payment_hash,
+       parent.details_type,
+       parent.details_blob,
+       parent.created_at,
+       parent.completed_at,
+       parent.status_type,
+       parent.status_blob,
+       -- lightning parts
+       lightning_parts.part_id AS lightning_part_id,
+       lightning_parts.part_amount_msat AS lightning_part_amount_msat,
+       lightning_parts.part_route AS lightning_part_route,
+       lightning_parts.part_created_at AS lightning_part_created_at,
+       lightning_parts.part_completed_at AS lightning_part_completed_at,
+       lightning_parts.part_status_type AS lightning_part_status_type,
+       lightning_parts.part_status_blob AS lightning_part_status_blob
+FROM lightning_outgoing_payments AS parent
+LEFT OUTER JOIN lightning_outgoing_payment_parts AS lightning_parts ON lightning_parts.part_parent_id = parent.id
+WHERE created_at BETWEEN :startDate AND :endDate
+ORDER BY coalesce(parent.completed_at, parent.created_at) DESC
+LIMIT :limit OFFSET :offset;
+
+listPaymentsSentWithin:
+SELECT parent.id,
+       parent.recipient_amount_msat,
+       parent.recipient_node_id,
+       parent.payment_hash,
+       parent.details_type,
+       parent.details_blob,
+       parent.created_at,
+       parent.completed_at,
+       parent.status_type,
+       parent.status_blob,
+       -- lightning parts
+       lightning_parts.part_id AS lightning_part_id,
+       lightning_parts.part_amount_msat AS lightning_part_amount_msat,
+       lightning_parts.part_route AS lightning_part_route,
+       lightning_parts.part_created_at AS lightning_part_created_at,
+       lightning_parts.part_completed_at AS lightning_part_completed_at,
+       lightning_parts.part_status_type AS lightning_part_status_type,
+       lightning_parts.part_status_blob AS lightning_part_status_blob
+FROM lightning_outgoing_payments AS parent
+LEFT OUTER JOIN lightning_outgoing_payment_parts AS lightning_parts ON lightning_parts.part_parent_id = parent.id
+WHERE completed_at IS NOT NULL
+AND   created_at BETWEEN :startDate AND :endDate
+ORDER BY coalesce(parent.completed_at, parent.created_at) DESC
+LIMIT :limit OFFSET :offset;
+
 -- use this in a `transaction` block to know how many rows were changed after an UPDATE
 changes:
 SELECT changes();

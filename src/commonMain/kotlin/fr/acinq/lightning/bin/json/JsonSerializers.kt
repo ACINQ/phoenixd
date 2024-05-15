@@ -22,7 +22,7 @@ import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.utils.UUID
 import kotlinx.datetime.Clock
@@ -118,8 +118,9 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: LightningOutgoingPayment) : this (
+    data class OutgoingPayment(val paymentId: String, val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
+        constructor(payment: LightningOutgoingPayment) : this(
+            paymentId = payment.id.toString(),
             paymentHash = payment.paymentHash,
             preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
             invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),

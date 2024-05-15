@@ -12,6 +12,8 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
+import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
+import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -128,6 +130,31 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+                get("payments/incoming") {
+                    val externalId = call.parameters["externalId"]
+                    if (externalId.isNullOrBlank()) {
+                        val from = call.parameters.getOptionalLong("from") ?: 0L
+                        val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                        val limit = call.parameters.getOptionalLong("limit") ?: 20
+                        val offset = call.parameters.getOptionalLong("offset") ?: 0
+                        val received = paymentDb.listReceivedPayments(from, to, limit, offset).map { (payment, metadata) ->
+                            IncomingPayment(payment, metadata)
+                        }
+                        call.respond(received)
+                    } else {
+                        val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
+                        metadataList.mapNotNull { (paymentId, metadata) ->
+                            when (paymentId) {
+                                is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
+                                    IncomingPayment(it, metadata)
+                                }
+                                else -> null
+                            }
+                        }.let { payments ->
+                            call.respond(payments)
+                        }
+                    }
+                }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
                     paymentDb.getIncomingPayment(paymentHash)?.let {
@@ -135,19 +162,16 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         call.respond(IncomingPayment(it, metadata))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
-                get("payments/incoming") {
-                    val externalId = call.parameters.getString("externalId")
-                    val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
-                    metadataList.mapNotNull { (paymentId, metadata) ->
-                        when (paymentId) {
-                            is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
-                                IncomingPayment(it, metadata)
-                            }
-                            else -> null
-                        }
-                    }.let { payments ->
-                        call.respond(payments)
+                get("payments/outgoing") {
+                    val sentOnly = call.parameters["sentOnly"]?.toBoolean() ?: false
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val limit = call.parameters.getOptionalLong("limit") ?: 20
+                    val offset = call.parameters.getOptionalLong("offset") ?: 0
+                    val payments = paymentDb.listLightningOutgoingPayments(from, to, limit, offset, sentOnly).map {
+                        OutgoingPayment(it)
                     }
+                    call.respond(payments)
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")

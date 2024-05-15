@@ -136,12 +136,10 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         lightningOutgoingQueries.getPaymentFromPartId(partId)
     }
 
-    // ---- list outgoing
-
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
     ): List<LightningOutgoingPayment> = withContext(Dispatchers.Default) {
-        lightningOutgoingQueries.listLightningOutgoingPayments(paymentHash)
+        lightningOutgoingQueries.listPaymentsForPaymentHash(paymentHash)
     }
 
     // ---- incoming payments
@@ -254,4 +252,24 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         inQueries.deleteIncomingPayment(paymentHash)
     }
 
+    // ---- list payments with filter
+
+    suspend fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, PaymentMetadata?>> {
+        return withContext(Dispatchers.Default) {
+            inQueries.listReceivedPayments(from, to, limit, offset).map { payment ->
+                val metadata = metadataQueries.get(payment.walletPaymentId())
+                payment to metadata
+            }
+        }
+    }
+
+    suspend fun listLightningOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, sentOnly: Boolean): List<LightningOutgoingPayment> {
+        return withContext(Dispatchers.Default) {
+            if (sentOnly) {
+                lightningOutgoingQueries.listPaymentsSent(from, to, limit, offset)
+            } else {
+                lightningOutgoingQueries.listPayments(from, to, limit, offset)
+            }
+        }
+    }
 }

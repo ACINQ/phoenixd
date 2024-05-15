@@ -65,7 +65,14 @@ WHERE    received_at IS NOT NULL
 ORDER BY r.received_at ASC
 LIMIT 1;
 
-listAllWithin:
+listReceivedWithin:
+SELECT payment_hash, preimage, created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob
+FROM   incoming_payments
+WHERE  received_at IS NOT NULL AND received_at BETWEEN :from AND :to
+ORDER BY received_at DESC
+LIMIT :limit OFFSET :offset;
+
+listCreatedWithin:
 SELECT payment_hash, preimage, created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob
 FROM   incoming_payments
 WHERE  created_at BETWEEN :from AND :to

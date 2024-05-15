@@ -158,7 +158,17 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
         }
     }
 
-    fun listLightningOutgoingPayments(paymentHash: ByteVector32): List<LightningOutgoingPayment> {
+    fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<LightningOutgoingPayment> {
+        return queries.listPaymentsWithin(from, to, limit, offset, Companion::mapLightningOutgoingPayment).executeAsList()
+            .let { groupByRawLightningOutgoing(it) }
+    }
+
+    fun listPaymentsSent(from: Long, to: Long, limit: Long, offset: Long): List<LightningOutgoingPayment> {
+        return queries.listPaymentsSentWithin(from, to, limit, offset, Companion::mapLightningOutgoingPayment).executeAsList()
+            .let { groupByRawLightningOutgoing(it) }
+    }
+
+    fun listPaymentsForPaymentHash(paymentHash: ByteVector32): List<LightningOutgoingPayment> {
         return queries.listPaymentsForPaymentHash(paymentHash.toByteArray(), Companion::mapLightningOutgoingPayment).executeAsList()
             .let { groupByRawLightningOutgoing(it) }
     }
@@ -183,7 +193,7 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
 
     companion object {
         @Suppress("UNUSED_PARAMETER")
-        fun mapLightningOutgoingPaymentWithoutParts(
+        private fun mapLightningOutgoingPaymentWithoutParts(
             id: String,
             recipient_amount_msat: Long,
             recipient_node_id: String,
@@ -207,7 +217,6 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
             )
         }
 
-        @Suppress("UNUSED_PARAMETER")
         fun mapLightningOutgoingPayment(
             id: String,
             recipient_amount_msat: Long,

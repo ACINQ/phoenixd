@@ -102,10 +102,10 @@ sealed class ApiType {
     @Serializable
     @SerialName("incoming_payment")
     data class IncomingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: fr.acinq.lightning.db.IncomingPayment, metadata: PaymentMetadata?) : this (
+        constructor(payment: fr.acinq.lightning.db.IncomingPayment, externalId: String?) : this (
             paymentHash = payment.paymentHash,
             preimage = payment.preimage,
-            externalId = metadata?.externalId,
+            externalId = externalId,
             description = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.description,
             invoice = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,

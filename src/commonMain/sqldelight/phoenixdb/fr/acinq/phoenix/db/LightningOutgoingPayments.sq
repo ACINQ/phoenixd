@@ -200,7 +200,7 @@ WHERE created_at BETWEEN :startDate AND :endDate
 ORDER BY coalesce(parent.completed_at, parent.created_at) DESC
 LIMIT :limit OFFSET :offset;
 
-listPaymentsSentWithin:
+listSuccessfulOrPendingPaymentsWithin:
 SELECT parent.id,
        parent.recipient_amount_msat,
        parent.recipient_node_id,
@@ -221,7 +221,7 @@ SELECT parent.id,
        lightning_parts.part_status_blob AS lightning_part_status_blob
 FROM lightning_outgoing_payments AS parent
 LEFT OUTER JOIN lightning_outgoing_payment_parts AS lightning_parts ON lightning_parts.part_parent_id = parent.id
-WHERE completed_at IS NOT NULL
+WHERE ((completed_at IS NOT NULL AND status_type = 'SUCCEEDED_OFFCHAIN_V0') OR completed_at IS NULL)
 AND   created_at BETWEEN :startDate AND :endDate
 ORDER BY coalesce(parent.completed_at, parent.created_at) DESC
 LIMIT :limit OFFSET :offset;

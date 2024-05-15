@@ -131,44 +131,36 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
                 get("payments/incoming") {
-                    val externalId = call.parameters["externalId"]
-                    if (externalId.isNullOrBlank()) {
-                        val from = call.parameters.getOptionalLong("from") ?: 0L
-                        val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
-                        val limit = call.parameters.getOptionalLong("limit") ?: 20
-                        val offset = call.parameters.getOptionalLong("offset") ?: 0
-                        val received = paymentDb.listReceivedPayments(from, to, limit, offset).map { (payment, metadata) ->
-                            IncomingPayment(payment, metadata)
-                        }
-                        call.respond(received)
+                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
+                    val externalId = call.parameters["externalId"] // may filter incoming payments by an external id
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val limit = call.parameters.getOptionalLong("limit") ?: 20
+                    val offset = call.parameters.getOptionalLong("offset") ?: 0
+
+                    val payments = if (externalId.isNullOrBlank()) {
+                        paymentDb.listIncomingPayments(from, to, limit, offset, listAll)
                     } else {
-                        val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
-                        metadataList.mapNotNull { (paymentId, metadata) ->
-                            when (paymentId) {
-                                is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
-                                    IncomingPayment(it, metadata)
-                                }
-                                else -> null
-                            }
-                        }.let { payments ->
-                            call.respond(payments)
-                        }
+                        paymentDb.listIncomingPaymentsForExternalId(externalId, from, to, limit, offset, listAll)
+                    }.map { (payment, externalId) ->
+                        IncomingPayment(payment, externalId)
                     }
+                    call.respond(payments)
                 }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
                     paymentDb.getIncomingPayment(paymentHash)?.let {
                         val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(paymentHash))
-                        call.respond(IncomingPayment(it, metadata))
+                        call.respond(IncomingPayment(it, metadata?.externalId))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
                 get("payments/outgoing") {
-                    val sentOnly = call.parameters["sentOnly"]?.toBoolean() ?: false
+                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending
                     val from = call.parameters.getOptionalLong("from") ?: 0L
                     val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
                     val limit = call.parameters.getOptionalLong("limit") ?: 20
                     val offset = call.parameters.getOptionalLong("offset") ?: 0
-                    val payments = paymentDb.listLightningOutgoingPayments(from, to, limit, offset, sentOnly).map {
+                    val payments = paymentDb.listLightningOutgoingPayments(from, to, limit, offset, listAll).map {
                         OutgoingPayment(it)
                     }
                     call.respond(payments)

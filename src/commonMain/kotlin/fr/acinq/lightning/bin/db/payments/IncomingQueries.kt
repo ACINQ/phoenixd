@@ -131,12 +131,32 @@ class IncomingQueries(private val database: PhoenixDatabase) {
         return queries.listAllNotConfirmed(Companion::mapIncomingPayment).asFlow().mapToList(Dispatchers.IO)
     }
 
-    fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<IncomingPayment> {
-        return queries.listReceivedWithin(from = from, to = to, limit, offset, ::mapIncomingPayment).executeAsList()
+    fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listReceivedPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
     }
 
     fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<IncomingPayment> {
-        return queries.listCreatedWithin(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
+        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
             val origin = it.origin
             it.received == null && origin is IncomingPayment.Origin.Invoice && origin.paymentRequest.isExpired()
         }

@@ -163,8 +163,8 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
             .let { groupByRawLightningOutgoing(it) }
     }
 
-    fun listPaymentsSent(from: Long, to: Long, limit: Long, offset: Long): List<LightningOutgoingPayment> {
-        return queries.listPaymentsSentWithin(from, to, limit, offset, Companion::mapLightningOutgoingPayment).executeAsList()
+    fun listSuccessfulOrPendingPayments(from: Long, to: Long, limit: Long, offset: Long): List<LightningOutgoingPayment> {
+        return queries.listSuccessfulOrPendingPaymentsWithin(from, to, limit, offset, Companion::mapLightningOutgoingPayment).executeAsList()
             .let { groupByRawLightningOutgoing(it) }
     }
 

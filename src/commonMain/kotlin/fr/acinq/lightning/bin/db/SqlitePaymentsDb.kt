@@ -254,21 +254,32 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     // ---- list payments with filter
 
-    suspend fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, PaymentMetadata?>> {
+    suspend fun listIncomingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<Pair<IncomingPayment, String?>> {
         return withContext(Dispatchers.Default) {
-            inQueries.listReceivedPayments(from, to, limit, offset).map { payment ->
-                val metadata = metadataQueries.get(payment.walletPaymentId())
-                payment to metadata
+            if (listAll) {
+                inQueries.listPayments(from, to, limit, offset)
+            } else {
+                inQueries.listReceivedPayments(from, to, limit, offset)
             }
         }
     }
 
-    suspend fun listLightningOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, sentOnly: Boolean): List<LightningOutgoingPayment> {
+    suspend fun listIncomingPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<Pair<IncomingPayment, String?>> {
         return withContext(Dispatchers.Default) {
-            if (sentOnly) {
-                lightningOutgoingQueries.listPaymentsSent(from, to, limit, offset)
+            if (listAll) {
+                inQueries.listPaymentsForExternalId(externalId, from, to, limit, offset)
             } else {
+                inQueries.listReceivedPaymentsForExternalId(externalId, from, to, limit, offset)
+            }
+        }
+    }
+
+    suspend fun listLightningOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<LightningOutgoingPayment> {
+        return withContext(Dispatchers.Default) {
+            if (listAll) {
                 lightningOutgoingQueries.listPayments(from, to, limit, offset)
+            } else {
+                lightningOutgoingQueries.listSuccessfulOrPendingPayments(from, to, limit, offset)
             }
         }
     }

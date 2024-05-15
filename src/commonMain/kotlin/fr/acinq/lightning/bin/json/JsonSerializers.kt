@@ -96,7 +96,7 @@ sealed class ApiType {
     @Serializable
     @SerialName("payment_failed")
     data class PaymentFailed(val paymentHash: ByteVector32, val reason: String) : ApiType() {
-        constructor(event: fr.acinq.lightning.io.PaymentNotSent) : this(event.request.paymentHash, event.reason.reason.toString())
+        constructor(event: fr.acinq.lightning.io.PaymentNotSent) : this(event.request.paymentHash, event.reason.explain().fold({ "payment failed (${it::class.simpleName})" }, { it.toString() }))
     }
 
     @Serializable

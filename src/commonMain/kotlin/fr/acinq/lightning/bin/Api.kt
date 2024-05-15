@@ -113,8 +113,16 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 post("createinvoice") {
                     val formParameters = call.receiveParameters()
                     val amount = formParameters.getOptionalLong("amountSat")?.sat
-                    val description = formParameters.getString("description")
-                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Left(description))
+                    val maxDescriptionSize = 128
+                    val description = formParameters["description"]
+                        ?.also { if (it.length > maxDescriptionSize) badRequest("Request parameter description is too long (max $maxDescriptionSize characters)") }
+                    val descriptionHash = formParameters.getOptionalByteVector32("descriptionHash")
+                    val eitherDesc = when {
+                        description != null && descriptionHash == null -> Either.Left(description)
+                        description == null && descriptionHash != null -> Either.Right(descriptionHash)
+                        else -> badRequest("Must provide either a description or descriptionHash")
+                    }
+                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), eitherDesc)
                     formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
                         paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
                     }
@@ -228,13 +236,17 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
 
     private fun invalidType(argName: String, typeName: String): Nothing = throw ParameterConversionException(argName, typeName)
 
+    private fun badRequest(message: String): Nothing = throw BadRequestException(message)
+
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 
     private fun Parameters.getByteVector32(argName: String): ByteVector32 = getString(argName).let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
 
+    private fun Parameters.getOptionalByteVector32(argName: String): ByteVector32? = this[argName]?.let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
+
     private fun Parameters.getUUID(argName: String): UUID = getString(argName).let { uuid -> kotlin.runCatching { UUID.fromString(uuid) }.getOrNull() ?: invalidType(argName, "uuid") }
 
-    private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: error("invalid address")).toByteVector()
+    private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: badRequest("Invalid address")).toByteVector()
 
     private fun Parameters.getInvoice(argName: String): Bolt11Invoice = getString(argName).let { invoice -> Bolt11Invoice.read(invoice).getOrElse { invalidType(argName, "bolt11invoice") } }
 

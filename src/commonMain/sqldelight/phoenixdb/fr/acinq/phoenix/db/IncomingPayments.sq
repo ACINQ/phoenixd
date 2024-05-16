@@ -65,7 +65,48 @@ WHERE    received_at IS NOT NULL
 ORDER BY r.received_at ASC
 LIMIT 1;
 
-listAllWithin:
+listReceivedWithin:
+SELECT payment_hash, preimage, payment.created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob, meta.external_id
+FROM   incoming_payments AS payment
+LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+WHERE  received_at IS NOT NULL AND received_at BETWEEN :from AND :to
+ORDER BY
+        coalesce(received_at, payment.created_at) DESC,
+        payment_hash DESC
+LIMIT :limit OFFSET :offset;
+
+listReceivedForExternalIdWithin:
+SELECT payment_hash, preimage, payment.created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob, meta.external_id
+FROM   incoming_payments AS payment
+LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+WHERE  meta.external_id = :externalId AND received_at IS NOT NULL AND received_at BETWEEN :from AND :to
+ORDER BY
+        coalesce(received_at, payment.created_at) DESC,
+        payment_hash DESC
+LIMIT :limit OFFSET :offset;
+
+listCreatedWithin:
+SELECT payment_hash, preimage, payment.created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob, meta.external_id
+FROM   incoming_payments AS payment
+LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+WHERE  payment.created_at BETWEEN :from AND :to
+ORDER BY
+       coalesce(received_at, payment.created_at) DESC,
+       payment_hash DESC
+LIMIT :limit OFFSET :offset;
+
+listCreatedForExternalIdWithin:
+SELECT payment_hash, preimage, payment.created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob, meta.external_id
+FROM   incoming_payments AS payment
+LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+WHERE  meta.external_id = :externalId
+AND    payment.created_at BETWEEN :from AND :to
+ORDER BY
+       coalesce(received_at, payment.created_at) DESC,
+       payment_hash DESC
+LIMIT :limit OFFSET :offset;
+
+listCreatedWithinNoPaging:
 SELECT payment_hash, preimage, created_at, origin_type, origin_blob, received_amount_msat, received_at, received_with_type, received_with_blob
 FROM   incoming_payments
 WHERE  created_at BETWEEN :from AND :to
@@ -80,8 +121,7 @@ LEFT OUTER JOIN link_tx_to_payments
     ON link_tx_to_payments.type = 1
     AND link_tx_to_payments.confirmed_at IS NULL
     AND link_tx_to_payments.id = incoming_payments.payment_hash
-WHERE received_at IS NOT NULL
-;
+WHERE received_at IS NOT NULL;
 
 scanCompleted:
 SELECT payment_hash,

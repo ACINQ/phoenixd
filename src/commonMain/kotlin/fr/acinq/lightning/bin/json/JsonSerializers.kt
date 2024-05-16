@@ -22,7 +22,7 @@ import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.utils.UUID
 import kotlinx.datetime.Clock
@@ -102,10 +102,10 @@ sealed class ApiType {
     @Serializable
     @SerialName("incoming_payment")
     data class IncomingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: fr.acinq.lightning.db.IncomingPayment, metadata: PaymentMetadata?) : this (
+        constructor(payment: fr.acinq.lightning.db.IncomingPayment, externalId: String?) : this (
             paymentHash = payment.paymentHash,
             preimage = payment.preimage,
-            externalId = metadata?.externalId,
+            externalId = externalId,
             description = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.description,
             invoice = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
@@ -118,12 +118,13 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: LightningOutgoingPayment) : this (
+    data class OutgoingPayment(val paymentId: String, val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
+        constructor(payment: LightningOutgoingPayment) : this(
+            paymentId = payment.id.toString(),
             paymentHash = payment.paymentHash,
             preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
             invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
-            isPaid = payment.completedAt != null,
+            isPaid = payment.status is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain,
             sent = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             completedAt = payment.completedAt,

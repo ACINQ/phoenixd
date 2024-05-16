@@ -136,12 +136,10 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         lightningOutgoingQueries.getPaymentFromPartId(partId)
     }
 
-    // ---- list outgoing
-
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
     ): List<LightningOutgoingPayment> = withContext(Dispatchers.Default) {
-        lightningOutgoingQueries.listLightningOutgoingPayments(paymentHash)
+        lightningOutgoingQueries.listPaymentsForPaymentHash(paymentHash)
     }
 
     // ---- incoming payments
@@ -254,4 +252,35 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         inQueries.deleteIncomingPayment(paymentHash)
     }
 
+    // ---- list payments with filter
+
+    suspend fun listIncomingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<Pair<IncomingPayment, String?>> {
+        return withContext(Dispatchers.Default) {
+            if (listAll) {
+                inQueries.listPayments(from, to, limit, offset)
+            } else {
+                inQueries.listReceivedPayments(from, to, limit, offset)
+            }
+        }
+    }
+
+    suspend fun listIncomingPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<Pair<IncomingPayment, String?>> {
+        return withContext(Dispatchers.Default) {
+            if (listAll) {
+                inQueries.listPaymentsForExternalId(externalId, from, to, limit, offset)
+            } else {
+                inQueries.listReceivedPaymentsForExternalId(externalId, from, to, limit, offset)
+            }
+        }
+    }
+
+    suspend fun listLightningOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<LightningOutgoingPayment> {
+        return withContext(Dispatchers.Default) {
+            if (listAll) {
+                lightningOutgoingQueries.listPayments(from, to, limit, offset)
+            } else {
+                lightningOutgoingQueries.listSuccessfulOrPendingPayments(from, to, limit, offset)
+            }
+        }
+    }
 }

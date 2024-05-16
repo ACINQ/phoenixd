@@ -21,6 +21,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.byteVector32
 import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -130,9 +131,34 @@ class IncomingQueries(private val database: PhoenixDatabase) {
         return queries.listAllNotConfirmed(Companion::mapIncomingPayment).asFlow().mapToList(Dispatchers.IO)
     }
 
+    fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
+    fun listReceivedPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
+        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
+            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
+        }
+    }
+
     fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<IncomingPayment> {
-        return queries.listAllWithin(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
-            it.received == null
+        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
+            val origin = it.origin
+            it.received == null && origin is IncomingPayment.Origin.Invoice && origin.paymentRequest.isExpired()
         }
     }
 
@@ -185,13 +211,6 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                 }
                 else -> throw UnreadableIncomingReceivedWith(received_at, received_with_type, received_with_blob)
             }
-        }
-
-        private fun mapTxIdPaymentHash(
-            tx_id: ByteArray,
-            payment_hash: ByteArray
-        ): Pair<ByteVector32, ByteVector32> {
-            return tx_id.byteVector32() to payment_hash.byteVector32()
         }
     }
 }

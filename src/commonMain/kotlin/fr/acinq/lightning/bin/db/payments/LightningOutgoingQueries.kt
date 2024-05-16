@@ -115,11 +115,11 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
 
     fun updateLightningPart(
         partId: UUID,
-        failure: Either<ChannelException, FailureMessage>,
+        failure: LightningOutgoingPayment.Part.Status.Failure,
         completedAt: Long
     ): Boolean {
         var result = true
-        val (statusTypeVersion, statusData) = OutgoingPaymentFailure.convertFailure(failure).mapToDb()
+        val (statusTypeVersion, statusData) = failure.mapToDb()
         database.transaction {
             queries.updateLightningPart(
                 part_id = partId.toString(),

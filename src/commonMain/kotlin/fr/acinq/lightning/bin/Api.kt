@@ -160,9 +160,10 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
                     val invoice = formParameters.getInvoice("invoice")
                     val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
-                    when (val event = peer.sendLightning(amount, invoice)) {
+                    when (val event = peer.payInvoice(amount, invoice)) {
                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                        is fr.acinq.lightning.io.OfferNotPaid -> TODO()
                     }
                 }
                 post("sendtoaddress") {

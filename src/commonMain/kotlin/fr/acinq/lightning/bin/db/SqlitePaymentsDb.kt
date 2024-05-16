@@ -120,7 +120,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     override suspend fun completeOutgoingLightningPart(
         partId: UUID,
-        failure: Either<ChannelException, FailureMessage>,
+        failure: LightningOutgoingPayment.Part.Status.Failure,
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {

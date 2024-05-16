@@ -138,8 +138,8 @@ class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", he
                 parameters.append("all", all.toString())
                 from?.let { parameters.append("from", it.toString()) }
                 to?.let { parameters.append("to", it.toString()) }
-                limit?.let { parameters.append("limit", it.toString()) }
-                offset?.let { parameters.append("offset", it.toString()) }
+                parameters.append("limit", limit.toString())
+                parameters.append("offset", offset.toString())
             }
         }
     }
@@ -166,8 +166,8 @@ class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", he
                 externalId?.let { parameters.append("externalId", it) }
                 from?.let { parameters.append("from", it.toString()) }
                 to?.let { parameters.append("to", it.toString()) }
-                limit?.let { parameters.append("limit", it.toString()) }
-                offset?.let { parameters.append("offset", it.toString()) }
+                parameters.append("limit", limit.toString())
+                parameters.append("offset", offset.toString())
             }
         }
     }

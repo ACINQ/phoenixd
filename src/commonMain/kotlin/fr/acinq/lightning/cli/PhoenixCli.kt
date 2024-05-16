@@ -127,8 +127,8 @@ class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help =
 }
 
 class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", help = "List outgoing payments") {
-    private val from by option("--from").long().help { "timestamp in millis since epoch" }
-    private val to by option("--to").long().help { "timestamp in millis since epoch" }
+    private val from by option("--from").long().help { "start timestamp in millis since epoch" }
+    private val to by option("--to").long().help { "end timestamp in millis since epoch" }
     private val limit by option("--limit").long().default(20).help { "number of payments in the page" }
     private val offset by option("--offset").long().default(0).help { "page offset" }
     private val all by option("--all").boolean().default(false).help { "if true, include failed payments" }
@@ -153,8 +153,8 @@ class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help =
 }
 
 class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments") {
-    private val from by option("--from").long().help { "timestamp in millis since epoch" }
-    private val to by option("--to").long().help { "timestamp in millis since epoch" }
+    private val from by option("--from").long().help { "start timestamp in millis since epoch" }
+    private val to by option("--to").long().help { "end timestamp in millis since epoch" }
     private val limit by option("--limit").long().default(20).help { "number of payments in the page" }
     private val offset by option("--offset").long().default(0).help { "page offset" }
     private val all by option("--all").boolean().default(false).help { "if true, include unpaid invoices" }

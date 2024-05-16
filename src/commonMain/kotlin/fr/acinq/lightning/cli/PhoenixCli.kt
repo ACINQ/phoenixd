@@ -126,12 +126,12 @@ class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help =
     }
 }
 
-class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", help = "List outgoing payments matching the given parameters. By default, return the last pending or successfully sent payments.") {
-    private val all by option("--all").boolean().default(false).help { "if true, list all outgoing payments, including failed ones" }
+class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", help = "List outgoing payments") {
     private val from by option("--from").long().help { "timestamp in millis since epoch" }
     private val to by option("--to").long().help { "timestamp in millis since epoch" }
-    private val limit by option("--limit", "-l").long().help { "number of payments in the page, default 20" }
-    private val offset by option("--offset", "-o").long().help { "page offset, default 0 (i.e. the first page)" }
+    private val limit by option("--limit").long().default(20).help { "number of payments in the page" }
+    private val offset by option("--offset").long().default(0).help { "page offset" }
+    private val all by option("--all").boolean().default(false).help { "if true, include failed payments" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "payments/outgoing") {
             url {
@@ -152,13 +152,13 @@ class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help =
     }
 }
 
-class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments matching the given parameters. By default, return the last received payments.") {
-    private val all by option("--all").boolean().default(false).help { "if true, list all incoming payments, including those that have not been received" }
-    private val externalId by option("--externalId", "--eid").help { "optional external id tied to the payments" }
+class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", help = "List incoming payments") {
     private val from by option("--from").long().help { "timestamp in millis since epoch" }
     private val to by option("--to").long().help { "timestamp in millis since epoch" }
-    private val limit by option("--limit", "-l").long().help { "number of payments in the page, default 20" }
-    private val offset by option("--offset", "-o").long().help { "page offset, default 0 (i.e. the first page)" }
+    private val limit by option("--limit").long().default(20).help { "number of payments in the page" }
+    private val offset by option("--offset").long().default(0).help { "page offset" }
+    private val all by option("--all").boolean().default(false).help { "if true, include unpaid invoices" }
+    private val externalId by option("--externalId").help { "optional external id tied to the payments" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "payments/incoming") {
             url {

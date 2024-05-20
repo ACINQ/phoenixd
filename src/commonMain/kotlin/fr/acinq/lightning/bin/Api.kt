@@ -12,6 +12,8 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
+import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
+import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -113,33 +115,55 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 post("createinvoice") {
                     val formParameters = call.receiveParameters()
                     val amount = formParameters.getOptionalLong("amountSat")?.sat
-                    val description = formParameters.getString("description")
-                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), Either.Left(description))
+                    val maxDescriptionSize = 128
+                    val description = formParameters["description"]
+                        ?.also { if (it.length > maxDescriptionSize) badRequest("Request parameter description is too long (max $maxDescriptionSize characters)") }
+                    val descriptionHash = formParameters.getOptionalByteVector32("descriptionHash")
+                    val eitherDesc = when {
+                        description != null && descriptionHash == null -> Either.Left(description)
+                        description == null && descriptionHash != null -> Either.Right(descriptionHash)
+                        else -> badRequest("Must provide either a description or descriptionHash")
+                    }
+                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), eitherDesc)
                     formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
                         paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+                get("payments/incoming") {
+                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
+                    val externalId = call.parameters["externalId"] // may filter incoming payments by an external id
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val limit = call.parameters.getOptionalLong("limit") ?: 20
+                    val offset = call.parameters.getOptionalLong("offset") ?: 0
+
+                    val payments = if (externalId.isNullOrBlank()) {
+                        paymentDb.listIncomingPayments(from, to, limit, offset, listAll)
+                    } else {
+                        paymentDb.listIncomingPaymentsForExternalId(externalId, from, to, limit, offset, listAll)
+                    }.map { (payment, externalId) ->
+                        IncomingPayment(payment, externalId)
+                    }
+                    call.respond(payments)
+                }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
                     paymentDb.getIncomingPayment(paymentHash)?.let {
                         val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(paymentHash))
-                        call.respond(IncomingPayment(it, metadata))
+                        call.respond(IncomingPayment(it, metadata?.externalId))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
-                get("payments/incoming") {
-                    val externalId = call.parameters.getString("externalId")
-                    val metadataList = paymentDb.metadataQueries.getByExternalId(externalId)
-                    metadataList.mapNotNull { (paymentId, metadata) ->
-                        when (paymentId) {
-                            is WalletPaymentId.IncomingPaymentId -> paymentDb.getIncomingPayment(paymentId.paymentHash)?.let {
-                                IncomingPayment(it, metadata)
-                            }
-                            else -> null
-                        }
-                    }.let { payments ->
-                        call.respond(payments)
+                get("payments/outgoing") {
+                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val limit = call.parameters.getOptionalLong("limit") ?: 20
+                    val offset = call.parameters.getOptionalLong("offset") ?: 0
+                    val payments = paymentDb.listLightningOutgoingPayments(from, to, limit, offset, listAll).map {
+                        OutgoingPayment(it)
                     }
+                    call.respond(payments)
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")
@@ -161,9 +185,10 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
                     val invoice = formParameters.getInvoice("invoice")
                     val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
-                    when (val event = peer.sendLightning(amount, invoice)) {
+                    when (val event = peer.payInvoice(amount, invoice)) {
                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                        is fr.acinq.lightning.io.OfferNotPaid -> TODO()
                     }
                 }
                 post("sendtoaddress") {
@@ -237,13 +262,17 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
 
     private fun invalidType(argName: String, typeName: String): Nothing = throw ParameterConversionException(argName, typeName)
 
+    private fun badRequest(message: String): Nothing = throw BadRequestException(message)
+
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 
     private fun Parameters.getByteVector32(argName: String): ByteVector32 = getString(argName).let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
 
+    private fun Parameters.getOptionalByteVector32(argName: String): ByteVector32? = this[argName]?.let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
+
     private fun Parameters.getUUID(argName: String): UUID = getString(argName).let { uuid -> kotlin.runCatching { UUID.fromString(uuid) }.getOrNull() ?: invalidType(argName, "uuid") }
 
-    private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: error("invalid address")).toByteVector()
+    private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: badRequest("Invalid address")).toByteVector()
 
     private fun Parameters.getInvoice(argName: String): Bolt11Invoice = getString(argName).let { invoice -> Bolt11Invoice.read(invoice).getOrElse { invalidType(argName, "bolt11invoice") } }
 

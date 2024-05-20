@@ -88,4 +88,5 @@ fun IncomingPayment.Origin.mapToDb(): Pair<IncomingOriginTypeVersion, ByteArray>
             Json.encodeToString(IncomingOriginData.SwapIn.V0(address)).toByteArray(Charsets.UTF_8)
     is IncomingPayment.Origin.OnChain -> IncomingOriginTypeVersion.ONCHAIN_V0 to
             Json.encodeToString(IncomingOriginData.OnChain.V0(txId.value, localInputs.toList())).toByteArray(Charsets.UTF_8)
+    is IncomingPayment.Origin.Offer -> TODO()
 }

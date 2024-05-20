@@ -39,7 +39,7 @@ import kotlinx.serialization.json.Json
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), DeleteIncomingPayment(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -170,6 +170,13 @@ class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", he
                 parameters.append("offset", offset.toString())
             }
         }
+    }
+}
+
+class DeleteIncomingPayment : PhoenixCliCommand(name = "deleteincomingpayment", help = "Delete an incoming payment") {
+    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.delete(url = commonOptions.baseUrl / "payments/incoming/$paymentHash")
     }
 }
 

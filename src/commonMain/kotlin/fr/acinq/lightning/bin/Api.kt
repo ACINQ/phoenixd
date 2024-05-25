@@ -14,6 +14,7 @@ import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
 import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
+import fr.acinq.lightning.blockchain.electrum.FinalWallet
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -42,11 +43,14 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
 
-class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
+class Api(private val nodeParams: NodeParams, private val peer: Peer, private val finalWallet: FinalWallet,  private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
     fun Application.module() {
 
@@ -190,6 +194,36 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                         is fr.acinq.lightning.io.OfferNotPaid -> TODO()
                     }
+                }
+                post("/getnewaddress") {
+                    // Generate a new address using the peer's swapInWallet or finalWallet
+                    val wallet = finalWallet.wallet
+                    wallet.addAddressGenerator { index -> "address_$index" }
+                    val walletState = wallet.walletStateFlow.value
+                    val newAddress = walletState.lastDerivedAddress?.first
+                    if (newAddress != null) {
+                        call.respond(newAddress)
+                    } else {
+                        call.respond(HttpStatusCode.InternalServerError, "Failed to generate a new address")
+                    }
+                }
+                get("/onchainfinaladdress"){
+                    val finalAddress = finalWallet.finalAddress
+                    call.respond(finalAddress)
+                }
+                get("/onchainbalance"){
+                    val walletStateFlow = finalWallet.wallet.walletStateFlow
+                    val totalBalanceFlow = walletStateFlow
+                        .map { it.totalBalance }
+                        .distinctUntilChanged()
+
+                    val totalBalance = totalBalanceFlow.first()
+                    call.respond(totalBalance.toString())
+                }
+                get("/onchaintransactions") {
+                    val wallet = finalWallet.wallet
+                    val walletState = wallet.walletStateFlow.value
+                    call.respond(walletState.utxos.toString())
                 }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {

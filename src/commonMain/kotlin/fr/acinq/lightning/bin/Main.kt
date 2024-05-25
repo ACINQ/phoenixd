@@ -37,6 +37,11 @@ import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
 import fr.acinq.lightning.bin.logs.TimestampFormatter
 import fr.acinq.lightning.bin.logs.stringTimestamp
+import fr.acinq.lightning.blockchain.IWatcher
+import fr.acinq.lightning.blockchain.electrum.ElectrumClient
+import fr.acinq.lightning.blockchain.electrum.ElectrumWatcher
+import fr.acinq.lightning.blockchain.electrum.FinalWallet
+import fr.acinq.lightning.blockchain.electrum.IElectrumClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
@@ -47,10 +52,7 @@ import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
-import fr.acinq.lightning.utils.Connection
-import fr.acinq.lightning.utils.msat
-import fr.acinq.lightning.utils.sat
-import fr.acinq.lightning.utils.toByteVector
+import fr.acinq.lightning.utils.*
 import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -277,6 +279,23 @@ class Phoenixd : CliktCommand() {
             }, socketBuilder = TcpSocket.Builder(), scope
         )
 
+        val electrumClient = ElectrumClient(scope, nodeParams.loggerFactory)
+        val serverAddress = ServerAddress("electrum.acinq.co", 50002, TcpSocket.TLS.UNSAFE_CERTIFICATES)
+        val socketBuilder = TcpSocket.Builder()
+
+        runBlocking {
+            val connected = electrumClient.connect(serverAddress, socketBuilder)
+            if (!connected) {
+                consoleLog(yellow("Failed to connect to Electrum server"))
+                return@runBlocking
+            }
+            else{
+                consoleLog(yellow("Successfully Connected to Electrum Server"))
+            }
+        }
+
+        val finalWallet = FinalWallet(nodeParams.chain, nodeParams.keyManager.finalOnChainWallet, electrumClient, scope, nodeParams.loggerFactory)
+
         val eventsFlow: SharedFlow<ApiType.ApiEvent> = MutableSharedFlow<ApiType.ApiEvent>().run {
             scope.launch {
                 launch {
@@ -363,7 +382,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret).run { module() }
+                Api(nodeParams, peer, finalWallet, eventsFlow, httpPassword, webHookUrl, webHookSecret).run { module() }
             }
         )
         val serverJob = scope.launch {

@@ -53,6 +53,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
         val json = Json {
             prettyPrint = true
             isLenient = true
+            allowStructuredMapKeys = true
             serializersModule = fr.acinq.lightning.json.JsonSerializers.json.serializersModule
         }
 

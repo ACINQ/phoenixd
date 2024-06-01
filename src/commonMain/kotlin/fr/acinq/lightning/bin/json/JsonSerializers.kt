@@ -18,10 +18,12 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
+import fr.acinq.lightning.Features
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
+import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.utils.UUID
@@ -69,6 +71,23 @@ sealed class ApiType {
 
     @Serializable
     data class GeneratedInvoice(@SerialName("amountSat") val amount: Satoshi?, val paymentHash: ByteVector32, val serialized: String) : ApiType()
+
+    @Serializable
+    data class DecodedInvoice(val destination: PublicKey, val amountSat: Satoshi?, val amountMsat: MilliSatoshi?, val timestamp: Long, val description: String?, val paymentHash: ByteVector32, val descriptionHash: ByteVector32?, val expiry: Long?, val cltvExpiry: Int?, val fallbackAddress: String?, val features: Features) {
+        constructor(invoice: Bolt11Invoice) : this(
+	    destination = invoice.nodeId,
+	    amountSat = invoice.amount?.truncateToSatoshi(),
+	    amountMsat = invoice.amount,
+	    timestamp = invoice.timestampSeconds,
+	    description = invoice.description,
+	    paymentHash = invoice.paymentHash,
+	    descriptionHash = invoice.descriptionHash,
+	    expiry = invoice.expirySeconds,
+	    cltvExpiry = invoice.minFinalExpiryDelta?.toInt(),
+	    fallbackAddress = invoice.fallbackAddress,
+	    features = invoice.features
+	)
+    }
 
     @Serializable
     sealed class ApiEvent : ApiType() {

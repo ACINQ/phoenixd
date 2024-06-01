@@ -183,6 +183,11 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is fr.acinq.lightning.io.OfferNotPaid -> TODO()
                     }
                 }
+                post("decodepayreq") {
+                    val formParameters = call.receiveParameters()
+                    val invoice = formParameters.getInvoice("paymentRequest")
+                    call.respond(DecodedInvoice(invoice))
+                }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {
                         val formParameters = call.receiveParameters()

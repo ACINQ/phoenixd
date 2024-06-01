@@ -39,7 +39,7 @@ import kotlinx.serialization.json.Json
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), DecodePayReq(), SendToAddress(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -205,6 +205,18 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 append("invoice", invoice)
+            }
+        )
+    }
+}
+
+class DecodePayReq : PhoenixCliCommand(name = "decodepayreq", help = "Decode payment request", printHelpOnEmptyArgs = true) {
+    private val paymentReq by option("--payment-request").required().check { Bolt11Invoice.read(it).isSuccess }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "decodepayreq").toString(),
+            formParameters = parameters {
+                append("paymentRequest", paymentReq)
             }
         )
     }

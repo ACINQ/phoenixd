@@ -39,7 +39,7 @@ import kotlinx.serialization.json.Json
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), DeleteIncomingPayment(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), DeleteIncomingPayment(), CreateInvoice(), PayInvoice(),GetFinalAddress(), GetSwapInAddress(), GetFinalWalletBalance(), GetSwapInWalletBalance(), GetSwapInTransactions(), SendToAddress(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -214,6 +214,36 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
                 append("invoice", invoice)
             }
         )
+    }
+}
+
+class GetFinalAddress : PhoenixCliCommand(name = "getfinaladdress", help = "Retrieve the final wallet address", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getfinaladdress")
+    }
+}
+
+class GetSwapInAddress : PhoenixCliCommand(name = "getswapinaddress", help = "Retrieve the current swap-in address from the wallet", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getswapinaddress")
+    }
+}
+
+class GetFinalWalletBalance : PhoenixCliCommand(name = "getfinalwalletbalance", help = "Retrieve the final wallet balance", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "finalwalletbalance")
+    }
+}
+
+class GetSwapInWalletBalance : PhoenixCliCommand(name = "getswapinwalletbalance", help = "Retrieve the swap-in wallet balance", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "swapinwalletbalance")
+    }
+}
+
+class GetSwapInTransactions : PhoenixCliCommand(name = "getswapintransactions", help = "List transactions for the swap-in wallet", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "swapintransactions")
     }
 }
 

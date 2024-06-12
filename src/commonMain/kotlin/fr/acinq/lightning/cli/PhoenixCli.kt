@@ -39,7 +39,7 @@ import kotlinx.serialization.json.Json
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), DeleteIncomingPayment(), CreateInvoice(), PayInvoice(),GetFinalAddress(), GetSwapInAddress(), GetFinalWalletBalance(), GetSwapInWalletBalance(), GetSwapInTransactions(), SendToAddress(), CloseChannel())
+        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), DeleteIncomingPayment(), CreateInvoice(), PayInvoice(),GetFinalAddress(), GetSwapInAddress(), GetFinalWalletBalance(), GetSwapInWalletBalance(), GetSwapInTransactions(), SendToAddress(), SpliceIn(), CloseChannel())
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -257,6 +257,21 @@ class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to 
             formParameters = parameters {
                 append("amountSat", amountSat.toString())
                 append("address", address)
+                append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
+}
+
+class SpliceIn : PhoenixCliCommand(name = "splicein", help = "Splice in funds to a channel using all available balance in the wallet", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long().required() //not necessarily required, come back to it
+    private val feerateSatByte by option("--feerateSatByte").int().required()
+
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "splicein").toString(),
+            formParameters = parameters {
+                append("amountSat", amountSat.toString())
                 append("feerateSatByte", feerateSatByte.toString())
             }
         )

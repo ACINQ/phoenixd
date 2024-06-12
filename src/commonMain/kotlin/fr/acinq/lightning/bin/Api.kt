@@ -202,6 +202,10 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val finalAddress = peer.finalWallet.finalAddress
                     call.respond(finalAddress)
                 }
+                get("/getnewfinaladdress"){//For testing purposes
+                    val newAddress = peer.finalWallet.wallet.addAddress(nodeParams.keyManager.finalOnChainWallet.address(addressIndex = 1L))
+                    call.respond(newAddress)
+                }
                 get("/getswapinaddress"){
                     peer.swapInWallet.wallet.walletStateFlow
                         .map { it.lastDerivedAddress }
@@ -251,11 +255,11 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is Either.Left -> call.respondText(res.value.message.toString())
                     }
                 }
-                /*post("/finalsplicein") {
+                post("/splicein") {
                     val formParameters = call.receiveParameters()
-                    val amountSat = formParameters.getLong("amountSat").msat
+                    val amountSat = formParameters.getLong("amountSat").msat //the splice in command will send all the balance in wallet
                     val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
-                    val walletInputs = peer.finalWallet.wallet.walletStateFlow.value.utxos
+                    val walletInputs = peer.swapInWallet.wallet.walletStateFlow.value.utxos
 
                     val suitableChannel = peer.channels.values
                         .filterIsInstance<Normal>()
@@ -263,7 +267,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "No suitable channel available for splice-in")
 
                     if (walletInputs.isEmpty()) {
-                        return@post call.respond(HttpStatusCode.BadRequest, "No wallet inputs available for splice-in,final wallet balance too low")
+                        return@post call.respond(HttpStatusCode.BadRequest, "No wallet inputs available for splice-in,swap-in wallet balance too low")
                     }
 
                     try {
@@ -285,7 +289,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     } catch (e: Exception) {
                         call.respond(HttpStatusCode.InternalServerError, "Failed to process splice-in: ${e.localizedMessage}")
                     }
-                }*/
+                }
                 post("closechannel") {
                     val formParameters = call.receiveParameters()
                     val channelId = formParameters.getByteVector32("channelId")

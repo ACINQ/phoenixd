@@ -134,7 +134,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
-                get("getdefaultoffer") {
+                get("getoffer") {
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).encode())
                 }
                 get("payments/incoming") {

@@ -49,7 +49,7 @@ fun main(args: Array<String>) =
             GetIncomingPayment(),
             ListIncomingPayments(),
             CreateInvoice(),
-            GetDefaultOffer(),
+            GetOffer(),
             PayInvoice(),
             PayOffer(),
             DecodeInvoice(),
@@ -213,9 +213,9 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
     }
 }
 
-class GetDefaultOffer : PhoenixCliCommand(name = "getdefaultoffer", help = "Return a Lightning offer (static invoice)") {
+class GetOffer : PhoenixCliCommand(name = "getoffer", help = "Return a Lightning offer (static invoice)") {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
-        it.get(url = commonOptions.baseUrl / "getdefaultoffer")
+        it.get(url = commonOptions.baseUrl / "getoffer")
     }
 }
 

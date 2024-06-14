@@ -22,6 +22,7 @@ import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.datadir
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.wire.OfferTypes
 import io.ktor.client.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
@@ -39,7 +40,23 @@ import kotlinx.serialization.json.Json
 fun main(args: Array<String>) =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-        .subcommands(GetInfo(), GetBalance(), ListChannels(), GetOutgoingPayment(), ListOutgoingPayments(), GetIncomingPayment(), ListIncomingPayments(), CreateInvoice(), PayInvoice(), SendToAddress(), CloseChannel())
+        .subcommands(
+            GetInfo(),
+            GetBalance(),
+            ListChannels(),
+            GetOutgoingPayment(),
+            ListOutgoingPayments(),
+            GetIncomingPayment(),
+            ListIncomingPayments(),
+            CreateInvoice(),
+            GetDefaultOffer(),
+            PayInvoice(),
+            PayOffer(),
+            DecodeInvoice(),
+            DecodeOffer(),
+            SendToAddress(),
+            CloseChannel()
+        )
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
@@ -196,6 +213,12 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
     }
 }
 
+class GetDefaultOffer : PhoenixCliCommand(name = "getdefaultoffer", help = "Return a Lightning offer (static invoice)") {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getdefaultoffer")
+    }
+}
+
 class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
@@ -205,6 +228,44 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 append("invoice", invoice)
+            }
+        )
+    }
+}
+
+class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning offer", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long()
+    private val invoice by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "payoffer").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", amountSat.toString()) }
+                append("offer", invoice)
+            }
+        )
+    }
+}
+
+class DecodeInvoice : PhoenixCliCommand(name = "decodeinvoice", help = "Decode a Lightning invoice", printHelpOnEmptyArgs = true) {
+    private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "decodeinvoice").toString(),
+            formParameters = parameters {
+                append("invoice", invoice)
+            }
+        )
+    }
+}
+
+class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lightning offer", printHelpOnEmptyArgs = true) {
+    private val invoice by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "decodeoffer").toString(),
+            formParameters = parameters {
+                append("offer", invoice)
             }
         )
     }

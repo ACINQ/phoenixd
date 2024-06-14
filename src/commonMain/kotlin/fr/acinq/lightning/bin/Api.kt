@@ -45,17 +45,20 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
 import kotlin.time.Duration.Companion.seconds
 
 class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
 
         val json = Json {
             prettyPrint = true
             isLenient = true
+            explicitNulls = false
             serializersModule = fr.acinq.lightning.json.JsonSerializers.json.serializersModule
         }
 

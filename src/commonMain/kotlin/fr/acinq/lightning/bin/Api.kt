@@ -21,6 +21,7 @@ import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.channel.states.Closed
 import fr.acinq.lightning.channel.states.Closing
 import fr.acinq.lightning.channel.states.ClosingFeerates
+import fr.acinq.lightning.channel.states.Normal
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
@@ -41,10 +42,17 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
+import kotlinx.serialization.Serializable
 
 class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
@@ -107,7 +115,12 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         .filterNot { it is Closing || it is Closed }
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
                         .sum().truncateToSatoshi()
-                    call.respond(Balance(balance, nodeParams.feeCredit.value))
+
+                    val swapInBalance = peer.swapInWallet.wallet.walletStateFlow
+                        .map { it.totalBalance }
+                        .distinctUntilChanged().first()
+
+                    call.respond(Balance(balance, nodeParams.feeCredit.value, swapInBalance))
                 }
                 get("listchannels") {
                     call.respond(peer.channels.values.toList())
@@ -171,6 +184,15 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         call.respond(OutgoingPayment(it))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
+                delete("payments/incoming/{paymentHash}") {
+                    val paymentHash = call.parameters.getByteVector32("paymentHash")
+                    val success = paymentDb.removeIncomingPayment(paymentHash)
+                    if (success) {
+                        call.respondText("Payment successfully deleted", status = HttpStatusCode.OK)
+                    } else {
+                        call.respondText("Payment not found or failed to delete", status = HttpStatusCode.NotFound)
+                    }
+                }
                 post("payinvoice") {
                     val formParameters = call.receiveParameters()
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
@@ -181,6 +203,87 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                         is fr.acinq.lightning.io.OfferNotPaid -> TODO()
                     }
+                }
+                get("/getfinaladdress"){
+                    val finalAddress = peer.finalWallet.finalAddress
+                    call.respond(finalAddress)
+                }
+                get("/getnewfinaladdress"){//For testing purposes
+                    val newAddress = peer.finalWallet.wallet.addAddress(nodeParams.keyManager.finalOnChainWallet.address(addressIndex = 1L))
+                    call.respond(newAddress)
+                }
+                get("/getswapinaddress"){
+                    peer.swapInWallet.wallet.walletStateFlow
+                        .map { it.lastDerivedAddress }
+                        .filterNotNull()
+                        .distinctUntilChanged()
+                        .collect { (address, derived) ->
+                            call.respond(SwapInAddress(address, derived.index))
+                        }
+                }
+                get("/finalwalletbalance"){
+                    val currentBlockHeight :Long = peer.currentTipFlow.filterNotNull().first().first.toLong()
+                    val walletStateFlow = peer.finalWallet.wallet.walletStateFlow
+                    val utxosFlow = walletStateFlow
+                        .map { walletState ->
+                            walletState.utxos.groupBy { utxo ->
+                                val confirmations = currentBlockHeight - utxo.blockHeight + 1
+                                if (confirmations < 1)
+                                    "withoutConfirmations"
+                                else if (confirmations < 3)
+                                    "lightlyConfirmed"
+                                else
+                                    "deeplyConfirmed"
+                            }
+                                .mapValues { entry ->
+                                    entry.value.sumOf { it.amount.toLong() }
+                                }
+                        }
+                        .distinctUntilChanged()
+
+                    val balancesByConfirmation = utxosFlow.first()
+                    val response = WalletBalance(
+                        withoutConfirmations = balancesByConfirmation["withoutConfirmations"] ?: 0L,
+                        lightlyConfirmed = balancesByConfirmation["lightlyConfirmed"] ?: 0L,
+                        deeplyConfirmed = balancesByConfirmation["deeplyConfirmed"] ?: 0L
+                    )
+
+                    call.respond(response)
+                }
+                get("/swapinwalletbalances") {
+                    val currentBlockHeight :Long = peer.currentTipFlow.filterNotNull().first().first.toLong()
+                    val walletStateFlow = peer.swapInWallet.wallet.walletStateFlow
+                    val utxosFlow = walletStateFlow
+                        .map { walletState ->
+                            walletState.utxos.groupBy { utxo ->
+                                val confirmations = currentBlockHeight - utxo.blockHeight + 1
+                                if (confirmations < 1)
+                                    "withoutConfirmations"
+                                else if (confirmations < 3)
+                                    "lightlyConfirmed"
+                                else
+                                    "deeplyConfirmed"
+                            }
+                                .mapValues { entry ->
+                                    entry.value.sumOf { it.amount.toLong() }
+                                }
+                        }
+                        .distinctUntilChanged()
+
+                    val balancesByConfirmation = utxosFlow.first()
+                    val response = WalletBalance(
+                        withoutConfirmations = balancesByConfirmation["withoutConfirmations"] ?: 0L,
+                        lightlyConfirmed = balancesByConfirmation["lightlyConfirmed"] ?: 0L,
+                        deeplyConfirmed = balancesByConfirmation["deeplyConfirmed"] ?: 0L
+                    )
+
+                    call.respond(response)
+                }
+
+                get("/swapintransactions") {
+                    val wallet = peer.swapInWallet.wallet
+                    val walletState = wallet.walletStateFlow.value
+                    call.respond(walletState.utxos.toString()) //no serializable json structure for this
                 }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {
@@ -197,6 +300,41 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                             else -> call.respondText("no channel available")
                         }
                         is Either.Left -> call.respondText(res.value.message.toString())
+                    }
+                }
+                post("/splicein") {
+                    val formParameters = call.receiveParameters()
+                    val amountSat = formParameters.getLong("amountSat").msat //the splice in command will send all the balance in wallet
+                    val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+                    val walletInputs = peer.swapInWallet.wallet.walletStateFlow.value.utxos
+
+                    val suitableChannel = peer.channels.values
+                        .filterIsInstance<Normal>()
+                        .firstOrNull { it.commitments.availableBalanceForReceive() > amountSat }
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, "No suitable channel available for splice-in")
+
+                    if (walletInputs.isEmpty()) {
+                        return@post call.respond(HttpStatusCode.BadRequest, "No wallet inputs available for splice-in,swap-in wallet balance too low")
+                    }
+
+                    try {
+                        val spliceCommand = ChannelCommand.Commitment.Splice.Request(
+                            replyTo = CompletableDeferred(),
+                            spliceIn = ChannelCommand.Commitment.Splice.Request.SpliceIn(walletInputs, amountSat),
+                            spliceOut = null,
+                            requestRemoteFunding = null,
+                            feerate = feerate
+                        )
+
+                        peer.send(WrappedChannelCommand(suitableChannel.channelId, spliceCommand))
+
+                        when (val response = spliceCommand.replyTo.await()) {
+                            is ChannelCommand.Commitment.Splice.Response.Created -> call.respondText("Splice-in successful: transaction ID ${response.fundingTxId}", status = HttpStatusCode.OK)
+                            is ChannelCommand.Commitment.Splice.Response.Failure -> call.respondText("Splice-in failed: $response", status = HttpStatusCode.BadRequest)
+                            else -> call.respondText("Splice-in failed: unexpected response type", status = HttpStatusCode.InternalServerError)
+                        }
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.InternalServerError, "Failed to process splice-in: ${e.localizedMessage}")
                     }
                 }
                 post("closechannel") {

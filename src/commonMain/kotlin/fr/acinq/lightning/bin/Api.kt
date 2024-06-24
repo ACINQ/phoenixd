@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
+import kotlinx.serialization.Serializable
 
 class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
@@ -114,7 +115,12 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         .filterNot { it is Closing || it is Closed }
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
                         .sum().truncateToSatoshi()
-                    call.respond(Balance(balance, nodeParams.feeCredit.value))
+
+                    val swapInBalance = peer.swapInWallet.wallet.walletStateFlow
+                        .map { it.totalBalance }
+                        .distinctUntilChanged().first()
+
+                    call.respond(Balance(balance, nodeParams.feeCredit.value, swapInBalance))
                 }
                 get("listchannels") {
                     call.respond(peer.channels.values.toList())
@@ -212,31 +218,72 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         .filterNotNull()
                         .distinctUntilChanged()
                         .collect { (address, derived) ->
-                            call.respond("Current swap-in address=$address index=${derived.index}")
+                            call.respond(SwapInAddress(address, derived.index))
                         }
                 }
                 get("/finalwalletbalance"){
+                    val currentBlockHeight :Long = peer.currentTipFlow.filterNotNull().first().first.toLong()
                     val walletStateFlow = peer.finalWallet.wallet.walletStateFlow
-                    val totalBalanceFlow = walletStateFlow
-                        .map { it.totalBalance }
+                    val utxosFlow = walletStateFlow
+                        .map { walletState ->
+                            walletState.utxos.groupBy { utxo ->
+                                val confirmations = currentBlockHeight - utxo.blockHeight + 1
+                                if (confirmations < 1)
+                                    "withoutConfirmations"
+                                else if (confirmations < 3)
+                                    "lightlyConfirmed"
+                                else
+                                    "deeplyConfirmed"
+                            }
+                                .mapValues { entry ->
+                                    entry.value.sumOf { it.amount.toLong() }
+                                }
+                        }
                         .distinctUntilChanged()
 
-                    val totalBalance = totalBalanceFlow.first()
-                    call.respond(totalBalance.toString())
+                    val balancesByConfirmation = utxosFlow.first()
+                    val response = WalletBalance(
+                        withoutConfirmations = balancesByConfirmation["withoutConfirmations"] ?: 0L,
+                        lightlyConfirmed = balancesByConfirmation["lightlyConfirmed"] ?: 0L,
+                        deeplyConfirmed = balancesByConfirmation["deeplyConfirmed"] ?: 0L
+                    )
+
+                    call.respond(response)
                 }
-                get("/swapinwalletbalance"){
+                get("/swapinwalletbalances") {
+                    val currentBlockHeight :Long = peer.currentTipFlow.filterNotNull().first().first.toLong()
                     val walletStateFlow = peer.swapInWallet.wallet.walletStateFlow
-                    val totalBalanceFlow = walletStateFlow
-                        .map { it.totalBalance }
+                    val utxosFlow = walletStateFlow
+                        .map { walletState ->
+                            walletState.utxos.groupBy { utxo ->
+                                val confirmations = currentBlockHeight - utxo.blockHeight + 1
+                                if (confirmations < 1)
+                                    "withoutConfirmations"
+                                else if (confirmations < 3)
+                                    "lightlyConfirmed"
+                                else
+                                    "deeplyConfirmed"
+                            }
+                                .mapValues { entry ->
+                                    entry.value.sumOf { it.amount.toLong() }
+                                }
+                        }
                         .distinctUntilChanged()
 
-                    val totalBalance = totalBalanceFlow.first()
-                    call.respond(totalBalance.toString())
+                    val balancesByConfirmation = utxosFlow.first()
+                    val response = WalletBalance(
+                        withoutConfirmations = balancesByConfirmation["withoutConfirmations"] ?: 0L,
+                        lightlyConfirmed = balancesByConfirmation["lightlyConfirmed"] ?: 0L,
+                        deeplyConfirmed = balancesByConfirmation["deeplyConfirmed"] ?: 0L
+                    )
+
+                    call.respond(response)
                 }
+
                 get("/swapintransactions") {
                     val wallet = peer.swapInWallet.wallet
                     val walletState = wallet.walletStateFlow.value
-                    call.respond(walletState.utxos.toString())
+                    call.respond(walletState.utxos.toString()) //no serializable json structure for this
                 }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {

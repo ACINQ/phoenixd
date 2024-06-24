@@ -235,9 +235,9 @@ class GetFinalWalletBalance : PhoenixCliCommand(name = "getfinalwalletbalance", 
     }
 }
 
-class GetSwapInWalletBalance : PhoenixCliCommand(name = "getswapinwalletbalance", help = "Retrieve the swap-in wallet balance", printHelpOnEmptyArgs = true) {
+class GetSwapInWalletBalance : PhoenixCliCommand(name = "getswapinwalletbalances", help = "Retrieve the swap-in wallet balance", printHelpOnEmptyArgs = true) {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
-        it.get(url = commonOptions.baseUrl / "swapinwalletbalance")
+        it.get(url = commonOptions.baseUrl / "swapinwalletbalances")
     }
 }
 

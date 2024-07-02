@@ -8,6 +8,7 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
+import fr.acinq.lightning.Lightning.randomKey
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
@@ -25,6 +26,7 @@ import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.*
+import fr.acinq.lightning.wire.OfferTypes
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -43,16 +45,20 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
+import kotlin.time.Duration.Companion.seconds
 
 class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
 
         val json = Json {
             prettyPrint = true
             isLenient = true
+            explicitNulls = false
             serializersModule = fr.acinq.lightning.json.JsonSerializers.json.serializersModule
         }
 
@@ -131,6 +137,9 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+                get("getoffer") {
+                    call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).encode())
+                }
                 get("payments/incoming") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
                     val externalId = call.parameters["externalId"] // may filter incoming payments by an external id
@@ -180,8 +189,29 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     when (val event = peer.payInvoice(amount, invoice)) {
                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                        is fr.acinq.lightning.io.OfferNotPaid -> TODO()
+                        is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
                     }
+                }
+                post("payoffer") {
+                    val formParameters = call.receiveParameters()
+                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                    val offer = formParameters.getOffer("offer")
+                    val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
+                    when (val event = peer.payOffer(amount, offer, randomKey(), fetchInvoiceTimeout = 30.seconds)) {
+                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                        is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
+                    }
+                }
+                post("decodeinvoice") {
+                    val formParameters = call.receiveParameters()
+                    val invoice = formParameters.getInvoice("invoice")
+                    call.respond(invoice)
+                }
+                post("decodeoffer") {
+                    val formParameters = call.receiveParameters()
+                    val offer = formParameters.getOffer("offer")
+                    call.respond(offer)
                 }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {
@@ -267,6 +297,8 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getAddressAndConvertToScript(argName: String): ByteVector = Script.write(Bitcoin.addressToPublicKeyScript(nodeParams.chainHash, getString(argName)).right ?: badRequest("Invalid address")).toByteVector()
 
     private fun Parameters.getInvoice(argName: String): Bolt11Invoice = getString(argName).let { invoice -> Bolt11Invoice.read(invoice).getOrElse { invalidType(argName, "bolt11invoice") } }
+
+    private fun Parameters.getOffer(argName: String): OfferTypes.Offer = getString(argName).let { invoice -> OfferTypes.Offer.decode(invoice).getOrElse { invalidType(argName, "offer") } }
 
     private fun Parameters.getLong(argName: String): Long = ((this[argName] ?: missing(argName)).toLongOrNull()) ?: invalidType(argName, "integer")
 

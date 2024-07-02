@@ -242,7 +242,7 @@ class Phoenixd : CliktCommand() {
                 liquidityPolicy = MutableStateFlow(liquidityPolicy),
             )
         consoleLog(cyan("nodeid: ${nodeParams.nodeId}"))
-        consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id)}"))
+        consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id).first}"))
 
         val driver = createAppDbDriver(datadir, chain, nodeParams.nodeId)
         val database = PhoenixDatabase(

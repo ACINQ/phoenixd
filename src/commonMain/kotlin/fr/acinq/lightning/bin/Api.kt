@@ -138,7 +138,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
                 get("getoffer") {
-                    call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).encode())
+                    call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }
                 get("payments/incoming") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
@@ -197,7 +197,8 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
                     val offer = formParameters.getOffer("offer")
                     val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
-                    when (val event = peer.payOffer(amount, offer, randomKey(), fetchInvoiceTimeout = 30.seconds)) {
+                    val note = formParameters["message"]
+                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                         is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))

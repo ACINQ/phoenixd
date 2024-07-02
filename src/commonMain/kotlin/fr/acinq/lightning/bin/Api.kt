@@ -97,6 +97,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         nodeId = nodeParams.nodeId,
                         channels = peer.channels.values.map { Channel.from(it) },
                         chain = nodeParams.chain.name.lowercase(),
+                        blockHeight = peer.currentTipFlow.value,
                         version = BuildVersions.phoenixdVersion
                     )
                     call.respond(info)

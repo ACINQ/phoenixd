@@ -61,6 +61,7 @@ sealed class ApiType {
         val nodeId: PublicKey,
         val channels: List<Channel>,
         val chain: String,
+        val blockHeight: Int?,
         val version: String
     )
 

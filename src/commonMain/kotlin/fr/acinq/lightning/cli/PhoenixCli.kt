@@ -235,13 +235,15 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
 
 class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning offer", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
-    private val invoice by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    private val offer by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    private val message by option("--message").help { "Optional payer note" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payoffer").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
-                append("offer", invoice)
+                append("offer", offer)
+                message?.let { append("message", message.toString()) }
             }
         )
     }

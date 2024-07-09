@@ -37,6 +37,8 @@ import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
 import fr.acinq.lightning.bin.logs.TimestampFormatter
 import fr.acinq.lightning.bin.logs.stringTimestamp
+import fr.acinq.lightning.blockchain.electrum.ElectrumClient
+import fr.acinq.lightning.blockchain.electrum.ElectrumWatcher
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
@@ -48,6 +50,7 @@ import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.Connection
+import fr.acinq.lightning.utils.ServerAddress
 import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector
@@ -270,9 +273,26 @@ class Phoenixd : CliktCommand() {
         val paymentsDb = SqlitePaymentsDb(database)
 
         val mempoolSpace = MempoolSpaceClient(mempoolSpaceUrl, loggerFactory)
-        val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
+        //val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
+
+        val electrumClient = ElectrumClient(scope, nodeParams.loggerFactory)
+        val serverAddress = ServerAddress("electrum.acinq.co", 50002, TcpSocket.TLS.UNSAFE_CERTIFICATES)
+        val socketBuilder = TcpSocket.Builder()
+
+        runBlocking {
+            val connected = electrumClient.connect(serverAddress, socketBuilder)
+            if (!connected) {
+                consoleLog(yellow("Failed to connect to Electrum server"))
+                return@runBlocking
+            }
+            else{
+                consoleLog(yellow("Successfully Connected to Electrum Server"))
+            }
+        }
+
+        val electrumWatcher = ElectrumWatcher(electrumClient, scope, nodeParams.loggerFactory)
         val peer = Peer(
-            nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = watcher, db = object : Databases {
+            nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = electrumWatcher, db = object : Databases {
                 override val channels: ChannelsDb get() = channelsDb
                 override val payments: PaymentsDb get() = paymentsDb
             }, socketBuilder = TcpSocket.Builder(), scope
@@ -302,7 +322,10 @@ class Phoenixd : CliktCommand() {
                 peer.connectionState.dropWhile { it is Connection.CLOSED }.collect {
                     when (it) {
                         Connection.ESTABLISHING -> consoleLog(yellow("connecting to lightning peer..."))
-                        Connection.ESTABLISHED -> consoleLog(yellow("connected to lightning peer"))
+                        Connection.ESTABLISHED -> {
+                            consoleLog(yellow("connected to lightning peer"))
+                            peer.startWatchSwapInWallet()
+                        }
                         is Connection.CLOSED -> consoleLog(yellow("disconnected from lightning peer"))
                     }
                 }

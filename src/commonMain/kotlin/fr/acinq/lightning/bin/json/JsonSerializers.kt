@@ -66,8 +66,17 @@ sealed class ApiType {
     )
 
     @Serializable
-    data class Balance(@SerialName("balanceSat") val amount: Satoshi, @SerialName("feeCreditSat") val feeCredit: Satoshi) : ApiType()
+    data class Balance(@SerialName("balanceSat") val amount: Satoshi, @SerialName("feeCreditSat") val feeCredit: Satoshi, @SerialName("swapInSat") val swapInBalance: Satoshi?) : ApiType()
 
+    @Serializable
+    data class SwapInAddress(@SerialName("address") val address: String, @SerialName("index") val index: Int) : ApiType()
+
+    @Serializable
+    data class WalletBalance(
+        val unconfirmed: Long,
+        val weaklyConfirmed: Long,
+        val deeplyConfirmed: Long
+    ) : ApiType()
     @Serializable
     data class GeneratedInvoice(@SerialName("amountSat") val amount: Satoshi?, val paymentHash: ByteVector32, val serialized: String) : ApiType()
 

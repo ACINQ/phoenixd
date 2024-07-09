@@ -48,6 +48,7 @@ fun main(args: Array<String>) =
             ListOutgoingPayments(),
             GetIncomingPayment(),
             ListIncomingPayments(),
+            DeleteIncomingPayment(),
             CreateInvoice(),
             GetOffer(),
             PayInvoice(),
@@ -55,7 +56,13 @@ fun main(args: Array<String>) =
             DecodeInvoice(),
             DecodeOffer(),
             SendToAddress(),
-            CloseChannel()
+            CloseChannel(),
+            GetFinalAddress(),
+            GetSwapInAddress(),
+            GetFinalWalletBalance(),
+            GetSwapInWalletBalance(),
+            GetSwapInTransactions(),
+            ManualSpliceIn()
         )
         .main(args)
 
@@ -190,6 +197,13 @@ class ListIncomingPayments : PhoenixCliCommand(name = "listincomingpayments", he
     }
 }
 
+class DeleteIncomingPayment : PhoenixCliCommand(name = "deleteincomingpayment", help = "Delete an incoming payment") {
+    private val paymentHash by option("--paymentHash", "--h").convert { ByteVector32.fromValidHex(it) }.required()
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.delete(url = commonOptions.baseUrl / "payments/incoming/$paymentHash")
+    }
+}
+
 class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a Lightning invoice", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
     private val description by mutuallyExclusiveOptions(
@@ -273,6 +287,36 @@ class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lig
     }
 }
 
+class GetFinalAddress : PhoenixCliCommand(name = "getfinaladdress", help = "Retrieve the final wallet address", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getfinaladdress")
+    }
+}
+
+class GetSwapInAddress : PhoenixCliCommand(name = "getswapinaddress", help = "Retrieve the current swap-in address from the wallet", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getswapinaddress")
+    }
+}
+
+class GetFinalWalletBalance : PhoenixCliCommand(name = "getfinalwalletbalance", help = "Retrieve the final wallet balance", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "finalwalletbalance")
+    }
+}
+
+class GetSwapInWalletBalance : PhoenixCliCommand(name = "getswapinwalletbalance", help = "Retrieve the swap-in wallet balance", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "swapinwalletbalance")
+    }
+}
+
+class GetSwapInTransactions : PhoenixCliCommand(name = "getswapintransactions", help = "List transactions for the swap-in wallet", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "swapintransactions")
+    }
+}
+
 class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to a Bitcoin address", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long().required()
     private val address by option("--address").required().check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
@@ -283,6 +327,21 @@ class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to 
             formParameters = parameters {
                 append("amountSat", amountSat.toString())
                 append("address", address)
+                append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
+}
+
+class ManualSpliceIn : PhoenixCliCommand(name = "splicein", help = "Splice in funds to a channel using all available balance in the wallet", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long().required() //not necessarily required, come back to it
+    private val feerateSatByte by option("--feerateSatByte").int().required()
+
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "splicein").toString(),
+            formParameters = parameters {
+                append("amountSat", amountSat.toString())
                 append("feerateSatByte", feerateSatByte.toString())
             }
         )

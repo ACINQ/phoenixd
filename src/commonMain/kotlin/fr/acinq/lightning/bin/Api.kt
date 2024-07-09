@@ -140,6 +140,9 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 get("getoffer") {
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }
+                get("getaddress") {
+                    call.respond(if (peer.channels.isNotEmpty()) peer.requestAddress("en") else "must have one channel")
+                }
                 get("payments/incoming") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
                     val externalId = call.parameters["externalId"] // may filter incoming payments by an external id

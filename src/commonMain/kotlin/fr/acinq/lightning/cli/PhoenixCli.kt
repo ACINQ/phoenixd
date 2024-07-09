@@ -50,6 +50,7 @@ fun main(args: Array<String>) =
             ListIncomingPayments(),
             CreateInvoice(),
             GetOffer(),
+            GetAddress(),
             PayInvoice(),
             PayOffer(),
             DecodeInvoice(),
@@ -216,6 +217,12 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
 class GetOffer : PhoenixCliCommand(name = "getoffer", help = "Return a Lightning offer (static invoice)") {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "getoffer")
+    }
+}
+
+class GetAddress : PhoenixCliCommand(name = "getaddress", help = "Return a BIP-353 Lightning address (there must be a channel)") {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getaddress")
     }
 }
 

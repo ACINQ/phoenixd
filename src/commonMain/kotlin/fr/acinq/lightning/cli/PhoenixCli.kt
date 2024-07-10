@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.datadir
+import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.wire.OfferTypes
@@ -53,6 +54,7 @@ fun main(args: Array<String>) =
             GetAddress(),
             PayInvoice(),
             PayOffer(),
+            PayDnsAddress(),
             DecodeInvoice(),
             DecodeOffer(),
             SendToAddress(),
@@ -250,6 +252,22 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 append("offer", offer)
+                message?.let { append("message", message.toString()) }
+            }
+        )
+    }
+}
+
+class PayDnsAddress : PhoenixCliCommand(name = "paydnsaddress", help = "Pay a BIP353 DNS address", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long()
+    private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
+    private val message by option("--message").help { "Optional payer note" }
+    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "paydnsaddress").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", amountSat.toString()) }
+                append("address", address)
                 message?.let { append("message", message.toString()) }
             }
         )

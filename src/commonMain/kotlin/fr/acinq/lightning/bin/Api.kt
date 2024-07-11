@@ -8,13 +8,14 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
-import fr.acinq.lightning.Lightning.randomKey
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
 import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
+import fr.acinq.lightning.bin.payments.Parser
+import fr.acinq.lightning.bin.payments.PayDnsAddress
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -54,6 +55,8 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
 
     @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
+
+        val payDnsAddress = PayDnsAddress()
 
         val json = Json {
             prettyPrint = true
@@ -140,6 +143,9 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 get("getoffer") {
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }
+                get("getlnaddress") {
+                    call.respond(if (peer.channels.isNotEmpty()) peer.requestAddress("en") else "must have one channel")
+                }
                 get("payments/incoming") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
                     val externalId = call.parameters["externalId"] // may filter incoming payments by an external id
@@ -202,6 +208,24 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                         is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
+                    }
+                }
+                post("paylnaddress") {
+                    val formParameters = call.receiveParameters()
+                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                    val (username, domain) = formParameters.getEmailLikeAddress("address")
+                    val offer = payDnsAddress.resolveBip353Offer(username, domain)
+                    when (offer) {
+                        null -> call.respond("no valid offer found for that address")
+                        else -> {
+                            val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
+                            val note = formParameters["message"]
+                            when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                                is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
+                            }
+                        }
                     }
                 }
                 post("decodeinvoice") {
@@ -304,5 +328,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
     private fun Parameters.getLong(argName: String): Long = ((this[argName] ?: missing(argName)).toLongOrNull()) ?: invalidType(argName, "integer")
 
     private fun Parameters.getOptionalLong(argName: String): Long? = this[argName]?.let { it.toLongOrNull() ?: invalidType(argName, "integer") }
+
+    private fun Parameters.getEmailLikeAddress(argName: String): Pair<String, String> = this[argName]?.let { Parser.parseEmailLikeAddress(it) } ?: invalidType(argName, "username@domain")
 
 }

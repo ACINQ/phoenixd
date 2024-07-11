@@ -77,6 +77,13 @@ sealed class ApiType {
         val weaklyConfirmed: Long,
         val deeplyConfirmed: Long
     ) : ApiType()
+
+    @Serializable
+    data class FinalWalletInfo(@SerialName("path") val path: String, @SerialName("xpub") val xpub: String) : ApiType()
+
+    @Serializable
+    data class SwapInWalletInfo(@SerialName("legacyDescriptor") val legacyDescriptor: String, @SerialName("publicDescriptor") val publicDescriptor: String, @SerialName("userPublicKey") val userPublicKey: String) : ApiType()
+
     @Serializable
     data class GeneratedInvoice(@SerialName("amountSat") val amount: Satoshi?, val paymentHash: ByteVector32, val serialized: String) : ApiType()
 

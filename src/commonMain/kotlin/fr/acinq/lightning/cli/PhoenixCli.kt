@@ -62,6 +62,8 @@ fun main(args: Array<String>) =
             GetFinalWalletBalance(),
             GetSwapInWalletBalance(),
             GetSwapInTransactions(),
+            GetFinalWalletInfo(),
+            GetSwapInWalletInfo(),
             ManualSpliceIn()
         )
         .main(args)
@@ -316,6 +318,19 @@ class GetSwapInTransactions : PhoenixCliCommand(name = "getswapintransactions", 
         it.get(url = commonOptions.baseUrl / "swapintransactions")
     }
 }
+
+class GetFinalWalletInfo : PhoenixCliCommand(name = "getfinalwalletinfo", help = "Get the final wallet information", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getfinalwalletinfo")
+    }
+}
+
+class GetSwapInWalletInfo : PhoenixCliCommand(name = "getswapinwalletinfo", help = "Get the swap-in wallet information", printHelpOnEmptyArgs = true) {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getswapinwalletinfo")
+    }
+}
+
 
 class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to a Bitcoin address", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long().required()

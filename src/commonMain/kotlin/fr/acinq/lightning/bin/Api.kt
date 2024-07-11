@@ -22,6 +22,8 @@ import fr.acinq.lightning.channel.states.Closed
 import fr.acinq.lightning.channel.states.Closing
 import fr.acinq.lightning.channel.states.ClosingFeerates
 import fr.acinq.lightning.channel.states.Normal
+import fr.acinq.lightning.crypto.KeyManager
+import fr.acinq.lightning.crypto.div
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.payment.Bolt11Invoice
@@ -308,6 +310,15 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                     val wallet = peer.swapInWallet.wallet
                     val walletState = wallet.walletStateFlow.value
                     call.respond(walletState.utxos.toString()) //no serializable json structure for this
+                }
+                get("/getfinalwalletinfo"){
+                    val finalOnChainWallet = nodeParams.keyManager.finalOnChainWallet
+                    val path = (KeyManager.Bip84OnChainKeys.bip84BasePath(nodeParams.chain) / finalOnChainWallet.account).toString()
+                    call.respond(FinalWalletInfo(path, finalOnChainWallet.xpub))
+                }
+                get("/getswapinwalletinfo"){
+                    val swapInOnChainWallet = nodeParams.keyManager.swapInOnChainWallet
+                    call.respond(SwapInWalletInfo(swapInOnChainWallet.legacyDescriptor, swapInOnChainWallet.publicDescriptor, swapInOnChainWallet.userPublicKey.toHex()))
                 }
                 post("sendtoaddress") {
                     val res = kotlin.runCatching {

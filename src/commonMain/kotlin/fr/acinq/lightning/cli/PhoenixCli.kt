@@ -51,10 +51,10 @@ fun main(args: Array<String>) =
             ListIncomingPayments(),
             CreateInvoice(),
             GetOffer(),
-            GetAddress(),
+            GetLnAddress(),
             PayInvoice(),
             PayOffer(),
-            PayDnsAddress(),
+            PayLnAddress(),
             DecodeInvoice(),
             DecodeOffer(),
             SendToAddress(),
@@ -222,9 +222,9 @@ class GetOffer : PhoenixCliCommand(name = "getoffer", help = "Return a Lightning
     }
 }
 
-class GetAddress : PhoenixCliCommand(name = "getaddress", help = "Return a BIP-353 Lightning address (there must be a channel)") {
+class GetLnAddress : PhoenixCliCommand(name = "getlnaddress", help = "Return a BIP-353 Lightning address (there must be a channel)") {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
-        it.get(url = commonOptions.baseUrl / "getaddress")
+        it.get(url = commonOptions.baseUrl / "getlnaddress")
     }
 }
 
@@ -258,15 +258,15 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
     }
 }
 
-class PayDnsAddress : PhoenixCliCommand(name = "paydnsaddress", help = "Pay a BIP353 DNS address", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
+class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Lightning address (BIP353)", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long().required()
     private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
     private val message by option("--message").help { "Optional payer note" }
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
-            url = (commonOptions.baseUrl / "paydnsaddress").toString(),
+            url = (commonOptions.baseUrl / "paylnaddress").toString(),
             formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
+                append("amountSat", amountSat.toString())
                 append("address", address)
                 message?.let { append("message", message.toString()) }
             }

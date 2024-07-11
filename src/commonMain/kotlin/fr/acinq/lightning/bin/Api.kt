@@ -143,7 +143,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                 get("getoffer") {
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }
-                get("getaddress") {
+                get("getlnaddress") {
                     call.respond(if (peer.channels.isNotEmpty()) peer.requestAddress("en") else "must have one channel")
                 }
                 get("payments/incoming") {
@@ -210,7 +210,7 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
                     }
                 }
-                post("paydnsaddress") {
+                post("paylnaddress") {
                     val formParameters = call.receiveParameters()
                     val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
                     val (username, domain) = formParameters.getEmailLikeAddress("address")

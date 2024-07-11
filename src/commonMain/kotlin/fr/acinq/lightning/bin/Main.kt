@@ -364,7 +364,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret, loggerFactory).run { module() }
             }
         )
         val serverJob = scope.launch {

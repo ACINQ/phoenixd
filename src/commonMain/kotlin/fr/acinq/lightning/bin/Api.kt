@@ -14,6 +14,12 @@ import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
 import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
+import fr.acinq.lightning.bin.payments.lnurl.LnurlHandler
+import fr.acinq.lightning.bin.payments.lnurl.helpers.LnurlParser
+import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
+import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
+import fr.acinq.lightning.bin.payments.lnurl.models.LnurlPay
+import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.PayDnsAddress
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
@@ -23,8 +29,10 @@ import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.channel.states.Closed
 import fr.acinq.lightning.channel.states.Closing
 import fr.acinq.lightning.channel.states.ClosingFeerates
+import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
+import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.*
 import fr.acinq.lightning.wire.OfferTypes
@@ -51,12 +59,21 @@ import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
 import kotlin.time.Duration.Companion.seconds
 
-class Api(private val nodeParams: NodeParams, private val peer: Peer, private val eventsFlow: SharedFlow<ApiEvent>, private val password: String, private val webhookUrl: Url?, private val webhookSecret: String) {
+class Api(
+    private val nodeParams: NodeParams,
+    private val peer: Peer,
+    private val eventsFlow: SharedFlow<ApiEvent>,
+    private val password: String,
+    private val webhookUrl: Url?,
+    private val webhookSecret: String,
+    private val loggerFactory: LoggerFactory,
+) {
 
     @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
 
         val payDnsAddress = PayDnsAddress()
+        val lnurlHandler = LnurlHandler(loggerFactory, nodeParams.keyManager as LocalKeyManager)
 
         val json = Json {
             prettyPrint = true
@@ -228,6 +245,101 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
                         }
                     }
                 }
+                post("paylnurl") {
+                    val formParameters = call.receiveParameters()
+                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                    val comment = formParameters["message"]
+                    val request = formParameters.getLnurl("lnurl")
+                    // early abort to avoid executing an invalid url
+                    when (request) {
+                        is LnurlAuth -> badRequest("this is an authentication lnurl")
+                        is Lnurl.Request -> if (request.tag == Lnurl.Tag.Withdraw) badRequest("this is a withdraw lnurl")
+                        else -> Unit
+                    }
+                    try {
+                        val lnurl = lnurlHandler.executeLnurl(request.initialUrl)
+                        when (lnurl) {
+                            is LnurlWithdraw -> badRequest("this is a withdraw lnurl")
+                            is LnurlPay.PaymentParameters -> {
+                                val amount = (overrideAmount ?: lnurl.minSendable)
+                                val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, comment)
+                                when (val event = peer.payInvoice(amount, invoice.invoice)) {
+                                    is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                    is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                    is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
+                                }
+                            }
+                            else -> badRequest("invalid [${lnurl::class}] lnurl=${lnurl.initialUrl}")
+                        }
+                    } catch (e: Exception) {
+                        badRequest(e.message ?: e::class.toString())
+                    }
+                }
+                post("paylnurladdress") {
+                    val formParameters = call.receiveParameters()
+                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                    val comment = formParameters["message"]
+                    val (username, domain) = formParameters.getEmailLikeAddress("address")
+                    val url = Url("https://$domain/.well-known/lnurlp/$username")
+                    try {
+                        val lnurl = lnurlHandler.executeLnurl(url)
+                        when (lnurl) {
+                            is LnurlWithdraw -> badRequest("this is a withdraw lnurl")
+                            is LnurlPay.PaymentParameters -> {
+                                val amount = (overrideAmount ?: lnurl.minSendable)
+                                val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, comment)
+                                when (val event = peer.payInvoice(amount, invoice.invoice)) {
+                                    is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                    is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                    is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
+                                }
+                            }
+                            else -> badRequest("invalid [${lnurl::class}] lnurl=${lnurl.initialUrl}")
+                        }
+                    } catch (e: Exception) {
+                        badRequest(e.message ?: e::class.toString())
+                    }
+                }
+                post("withdrawlnurl") {
+                    val formParameters = call.receiveParameters()
+                    val request = formParameters.getLnurl("lnurl")
+                    // early abort to avoid executing an invalid url
+                    when (request) {
+                        is LnurlAuth -> badRequest("this is an authentication lnurl")
+                        is Lnurl.Request -> if (request.tag == Lnurl.Tag.Pay) badRequest("this is a payment lnurl")
+                        else -> Unit
+                    }
+                    try {
+                        val lnurl = lnurlHandler.executeLnurl(request.initialUrl)
+                        when (lnurl) {
+                            is LnurlPay -> badRequest("this is a payment lnurl")
+                            is LnurlWithdraw -> {
+                                val invoice = peer.createInvoice(randomBytes32(), lnurl.maxWithdrawable, Either.Left(lnurl.defaultDescription))
+                                lnurlHandler.sendWithdrawInvoice(lnurl, invoice)
+                                call.respond(LnurlWithdrawResponse(lnurl, invoice))
+                            }
+                            else -> badRequest("invalid [${lnurl::class}] lnurl=${lnurl.initialUrl}")
+                        }
+                    } catch (e: Exception) {
+                        badRequest(e.message ?: e::class.toString())
+                    }
+                }
+                post("authlnurl") {
+                    val formParameters = call.receiveParameters()
+                    val request = formParameters.getLnurl("lnurl")
+                    if (request !is LnurlAuth) badRequest("this is a payment or withdraw lnurl")
+                    try {
+                        lnurlHandler.signAndSendAuthRequest(request)
+                        call.respond("authentication success")
+                    } catch (e: Exception) {
+                        badRequest("could not authenticate: ${e.message ?: e::class.toString()}")
+                    }
+                }
+                post("decodelnurl") {
+                    val formParameters = call.receiveParameters()
+                    val request = formParameters.getLnurl("lnurl")
+                    call.respond(LnurlRequest(request))
+                }
                 post("decodeinvoice") {
                     val formParameters = call.receiveParameters()
                     val invoice = formParameters.getInvoice("invoice")
@@ -331,4 +443,6 @@ class Api(private val nodeParams: NodeParams, private val peer: Peer, private va
 
     private fun Parameters.getEmailLikeAddress(argName: String): Pair<String, String> = this[argName]?.let { Parser.parseEmailLikeAddress(it) } ?: invalidType(argName, "username@domain")
 
+    private fun Parameters.getLnurl(argName: String): Lnurl = this[argName]?.let { LnurlParser.extractLnurl(it) } ?: missing(argName)
+    private fun Parameters.getLnurlAuth(argName: String): LnurlAuth = this[argName]?.let { LnurlParser.extractLnurl(it) as LnurlAuth } ?: missing(argName)
 }

@@ -20,15 +20,20 @@ import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.PaymentMetadata
+import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
+import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
+import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
+import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlin.math.ln
 
 sealed class ApiType {
 
@@ -131,6 +136,28 @@ sealed class ApiType {
             fees = payment.fees,
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
+        )
+    }
+
+    @Serializable
+    @SerialName("lnurl_request")
+    data class LnurlRequest(val url: String, val tag: String?) {
+        constructor(lnurl: Lnurl) : this(
+            url = lnurl.initialUrl.toString(),
+            tag = if (lnurl is Lnurl.Request) lnurl.tag?.label else null,
+        )
+    }
+
+    @Serializable
+    @SerialName("lnurl_withdraw")
+    data class LnurlWithdrawResponse(val url: String, val minWithdrawable: MilliSatoshi, val maxWithdrawable: MilliSatoshi, val description: String, val k1: String, val invoice: String) {
+        constructor(lnurl: LnurlWithdraw, invoice: Bolt11Invoice) : this(
+            url = lnurl.initialUrl.toString(),
+            minWithdrawable = lnurl.minWithdrawable,
+            maxWithdrawable = lnurl.maxWithdrawable,
+            description = lnurl.defaultDescription,
+            k1 = lnurl.k1,
+            invoice = invoice.write()
         )
     }
 }

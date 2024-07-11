@@ -57,14 +57,12 @@ fun main(args: Array<String>) =
             GetLnAddress(),
             PayInvoice(),
             PayOffer(),
-            PayDnsAddress(),
-            PayLnurl(),
-            PayLnurlAddress(),
-            WithdrawLnurl(),
-            AuthLnurl(),
-            DecodeLnurl(),
+            PayLnAddress(),
             DecodeInvoice(),
             DecodeOffer(),
+            LnurlPay(),
+            LnurlWithdraw(),
+            LnurlAuth(),
             SendToAddress(),
             CloseChannel()
         )
@@ -266,7 +264,7 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
     }
 }
 
-class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Lightning address (BIP353)", printHelpOnEmptyArgs = true) {
+class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Lightning address (BIP353 or LNURL)", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long().required()
     private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
     private val message by option("--message").help { "Optional payer note" }
@@ -277,82 +275,6 @@ class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Ligh
                 append("amountSat", amountSat.toString())
                 append("address", address)
                 message?.let { append("message", message.toString()) }
-            }
-        )
-    }
-}
-
-class PayLnurl : PhoenixCliCommand(name = "paylnurl", help = "Pay a LNURL", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
-    private val lnurl by option("--lnurl").required().check {
-        val url = LnurlParser.extractLnurl(it)
-        url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
-    }
-    private val message by option("--message").help { "Optional comment" }
-    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
-        it.submitForm(
-            url = (commonOptions.baseUrl / "paylnurl").toString(),
-            formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
-                append("lnurl", lnurl)
-                message?.let { append("message", message.toString()) }
-            }
-        )
-    }
-}
-
-class PayLnurlAddress : PhoenixCliCommand(name = "paylnurladdress", help = "Pay a LNURL-based lightning address", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
-    private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null}
-    private val message by option("--message").help { "Optional comment" }
-    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
-        it.submitForm(
-            url = (commonOptions.baseUrl / "paylnurladdress").toString(),
-            formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
-                append("address", address)
-                message?.let { append("message", message.toString()) }
-            }
-        )
-    }
-}
-
-class WithdrawLnurl : PhoenixCliCommand(name = "withdrawlnurl", help = "Withdraw funds from a LNURL service", printHelpOnEmptyArgs = true) {
-    private val lnurl by option("--lnurl").required().check {
-        val url = LnurlParser.extractLnurl(it)
-        url is Lnurl.Request && (url.tag == Lnurl.Tag.Withdraw || url.tag == null)
-    }
-    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
-        it.submitForm(
-            url = (commonOptions.baseUrl / "withdrawlnurl").toString(),
-            formParameters = parameters {
-                append("lnurl", lnurl)
-            }
-        )
-    }
-}
-
-class AuthLnurl : PhoenixCliCommand(name = "authlnurl", help = "Authenticate on a LNURL service", printHelpOnEmptyArgs = true) {
-    private val lnurl by option("--lnurl").required().check {
-        LnurlParser.extractLnurl(it) is LnurlAuth
-    }
-    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
-        it.submitForm(
-            url = (commonOptions.baseUrl / "authlnurl").toString(),
-            formParameters = parameters {
-                append("lnurl", lnurl)
-            }
-        )
-    }
-}
-
-class DecodeLnurl : PhoenixCliCommand(name = "decodelnurl", help = "Decode a Bech32 LNURL", printHelpOnEmptyArgs = true) {
-    private val lnurl by option("--lnurl").required()
-    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
-        it.submitForm(
-            url = (commonOptions.baseUrl / "decodelnurl").toString(),
-            formParameters = parameters {
-                append("lnurl", lnurl)
             }
         )
     }
@@ -377,6 +299,54 @@ class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lig
             url = (commonOptions.baseUrl / "decodeoffer").toString(),
             formParameters = parameters {
                 append("offer", invoice)
+            }
+        )
+    }
+}
+
+class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long()
+    private val lnurl by option("--lnurl").required().check {
+        val url = LnurlParser.extractLnurl(it)
+        url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
+    }
+    private val message by option("--message").help { "Optional comment" }
+    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "lnurlpay").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", amountSat.toString()) }
+                append("lnurl", lnurl)
+                message?.let { append("message", message.toString()) }
+            }
+        )
+    }
+}
+
+class LnurlWithdraw : PhoenixCliCommand(name = "lnurlwithdraw", help = "Withdraw funds from a LNURL service", printHelpOnEmptyArgs = true) {
+    private val lnurl by option("--lnurl").required().check {
+        val url = LnurlParser.extractLnurl(it)
+        url is Lnurl.Request && (url.tag == Lnurl.Tag.Withdraw || url.tag == null)
+    }
+    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "lnurlwithdraw").toString(),
+            formParameters = parameters {
+                append("lnurl", lnurl)
+            }
+        )
+    }
+}
+
+class LnurlAuth : PhoenixCliCommand(name = "lnurlauth", help = "Authenticate on a LNURL service", printHelpOnEmptyArgs = true) {
+    private val lnurl by option("--lnurl").required().check {
+        LnurlParser.extractLnurl(it) is LnurlAuth
+    }
+    override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "lnurlauth").toString(),
+            formParameters = parameters {
+                append("lnurl", lnurl)
             }
         )
     }

@@ -74,7 +74,7 @@ object LnurlParser {
 
     /** Lnurls are originally bech32 encoded. If unreadable, throw an exception. */
     private fun parseBech32Url(source: String): Url {
-        val (hrp, data) = Bech32.decode(source)
+        val (_, data) = Bech32.decode(source)
         val payload = Bech32.five2eight(data, 0).decodeToString()
         val url = URLBuilder(payload).build()
         if (!url.protocol.isSecure()) throw LnurlError.Invalid.UnsafeResource

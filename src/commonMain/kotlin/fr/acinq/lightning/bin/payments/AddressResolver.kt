@@ -15,8 +15,8 @@ class AddressResolver(val dnsAddress: PayDnsAddress, val lnurlHandler: LnurlHand
         return try {
             val lnurl = lnurlHandler.executeLnurl(url)
             val paymentParameters = lnurl as LnurlPay.PaymentParameters
-            if (amount < paymentParameters.minSendable) throw IllegalArgumentException("amount to small (min=${paymentParameters.minSendable})")
-            if (amount > paymentParameters.maxSendable) throw IllegalArgumentException("amount to big (max=${paymentParameters.maxSendable})")
+            if (amount < paymentParameters.minSendable) throw IllegalArgumentException("amount too small (min=${paymentParameters.minSendable})")
+            if (amount > paymentParameters.maxSendable) throw IllegalArgumentException("amount too big (max=${paymentParameters.maxSendable})")
             val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, note)
             Try.Success(invoice)
         } catch (e: Exception) {

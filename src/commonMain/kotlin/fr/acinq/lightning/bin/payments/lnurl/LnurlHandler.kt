@@ -66,10 +66,10 @@ class LnurlHandler(
     }
 
     /**
-     * Execute an HTTP GET request to obtain a [LnurlPay.Invoice] from a [LnurlPay.Intent]. May throw a
+     * Execute an HTTP GET request to obtain a [LnurlPay.InvoiceToPay] from a [LnurlPay.PaymentParameters]. May throw a
      * [LnurlError.RemoteFailure] or a [LnurlError.Pay.BadInvoice] error.
      *
-     * @param intent the description of the payment as provided by the service.
+     * @param payParameters the description of the payment as provided by the service.
      * @param amount the amount that the user is willing to pay to settle the [LnurlPay.Intent].
      * @param comment an optional string commenting the payment and sent to the service.
      */

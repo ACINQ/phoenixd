@@ -162,7 +162,12 @@ class Api(
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }
                 get("getlnaddress") {
-                    call.respond(if (peer.channels.isNotEmpty()) peer.requestAddress("en") else "must have one channel")
+                    if (peer.channels.isEmpty()) {
+                        call.respond("must have one channel")
+                    } else {
+                        val address = peer.requestAddress("en")
+                        call.respond("₿$address")
+                    }
                 }
                 get("payments/incoming") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received

@@ -15,7 +15,7 @@ object Parser {
             return null
         }
 
-        val username = components[0].lowercase()
+        val username = components[0].lowercase().dropWhile { it == '₿' }
         val domain = components[1]
         return username to domain
     }

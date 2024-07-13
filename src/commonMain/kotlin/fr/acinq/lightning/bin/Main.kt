@@ -111,8 +111,9 @@ class Phoenixd : CliktCommand() {
             terminal.println(white("done"))
             value
         }
-    private val webHookUrl by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
+    private val webHookUrls by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
         .convert { Url(it) }
+        .multiple()
     private val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
         .defaultLazy {
             // if we are here then no value is defined in phoenix.conf
@@ -364,7 +365,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret, loggerFactory).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrls, webHookSecret, loggerFactory).run { module() }
             }
         )
         val serverJob = scope.launch {

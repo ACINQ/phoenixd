@@ -64,7 +64,7 @@ class Api(
     private val peer: Peer,
     private val eventsFlow: SharedFlow<ApiEvent>,
     private val password: String,
-    private val webhookUrl: Url?,
+    private val webhookUrls: List<Url>,
     private val webhookSecret: String,
     private val loggerFactory: LoggerFactory,
 ) {
@@ -372,7 +372,7 @@ class Api(
             }
         }
 
-        webhookUrl?.let { url ->
+        webhookUrls.forEach { url ->
             val client = HttpClient {
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
                     json(json = Json {

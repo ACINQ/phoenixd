@@ -5,6 +5,7 @@ import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.output.MordantHelpFormatter
@@ -79,7 +80,11 @@ class Phoenixd : CliktCommand() {
     private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
         .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false) }
         .defaultLazy {
-            val value = getOrGenerateSeed(datadir)
+            val value = try {
+                getOrGenerateSeed(datadir)
+            } catch (t: Throwable) {
+                throw UsageError(t.message, paramName = "seed")
+            }
             if (value.isNew) {
                 terminal.print(yellow("Generating new seed..."))
                 runBlocking { delay(500.milliseconds) }
@@ -114,8 +119,9 @@ class Phoenixd : CliktCommand() {
             terminal.println(white("done"))
             value
         }
-    private val webHookUrl by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
+    private val webHookUrls by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
         .convert { Url(it) }
+        .multiple()
     private val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
         .defaultLazy {
             // if we are here then no value is defined in phoenix.conf
@@ -387,7 +393,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrl, webHookSecret, loggerFactory).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrls, webHookSecret, loggerFactory).run { module() }
             }
         )
         val serverJob = scope.launch {

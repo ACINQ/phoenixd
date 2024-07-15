@@ -132,6 +132,11 @@ kotlin {
                 implementation("app.cash.sqldelight:coroutines-extensions:${Versions.sqlDelight}")
             }
         }
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
         jvmMain {
             dependencies {
                 implementation("app.cash.sqldelight:sqlite-driver:${Versions.sqlDelight}")

@@ -23,5 +23,6 @@ fun getOrGenerateSeed(dir: Path): PhoenixSeed {
         FileSystem.SYSTEM.write(file) { writeUtf8(mnemonics) }
         mnemonics to true
     }
+    MnemonicCode.validate(mnemonics)
     return PhoenixSeed(seed = MnemonicCode.toSeed(mnemonics, "").toByteVector(), isNew = isNew)
 }

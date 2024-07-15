@@ -16,7 +16,8 @@ data class PhoenixSeed(val seed: ByteVector, val isNew: Boolean)
 fun getOrGenerateSeed(dir: Path): PhoenixSeed {
     val file = dir / "seed.dat"
     val (mnemonics, isNew) = if (FileSystem.SYSTEM.exists(file)) {
-        val mnemonics = FileSystem.SYSTEM.read(file) { readUtf8() }.trim().split(" ", "\n").map { it.trim() }
+        val contents = FileSystem.SYSTEM.read(file) { readUtf8() }
+        val mnemonics = Regex("[a-z]+").findAll(contents).map { it.value }.toList()
         mnemonics to false
     } else {
         val entropy = randomBytes(16)

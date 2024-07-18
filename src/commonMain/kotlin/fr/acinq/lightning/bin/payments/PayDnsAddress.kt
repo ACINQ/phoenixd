@@ -57,14 +57,7 @@ class PayDnsAddress {
             } ?: return null
 
             val data = matchingRecord["data"]?.jsonPrimitive?.content ?: return null
-            if (!data.startsWith("bitcoin:")) return null
-            val offerString = data.substringAfter("lno=").substringBefore("?")
-            if (offerString.isBlank()) return null
-
-            return when (val offer = OfferTypes.Offer.decode(offerString)) {
-                is Try.Success -> { offer.result }
-                is Try.Failure -> { null }
-            }
+            return Parser.parseBip21Offer(data)
         } catch (e: Exception) {
             return null
         }

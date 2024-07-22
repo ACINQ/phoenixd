@@ -35,6 +35,7 @@ class ParserTestsCommon {
             TestCase("not-an-uri", null),
             TestCase("notbitcoin:?lno=$offer", null),
             TestCase("bitcoin:?foo=bar&bar=baz", null),
+            TestCase("bitcoin:tb1qla78tll0eua3l5f4nvfq3tx58u35yc3m44flfu?time=1618931109&exp=604800", null),
         )
 
         testCases.forEach { testCase -> assertEquals(testCase.offer, Parser.parseBip21Offer(testCase.uri)) }

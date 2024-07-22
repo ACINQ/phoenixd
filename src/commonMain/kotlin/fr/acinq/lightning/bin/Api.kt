@@ -127,7 +127,6 @@ class Api(
                         blockHeight = peer.currentTipFlow.value,
                         version = BuildVersions.phoenixdVersion
                     )
-                    call.request.uri
                     call.respond(info)
                 }
                 get("getbalance") {

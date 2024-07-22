@@ -24,7 +24,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
@@ -32,8 +32,8 @@ import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
-import kotlin.math.ln
 
 sealed class ApiType {
 
@@ -83,8 +83,8 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("payment_received")
-    data class PaymentReceived(@SerialName("amountSat") val amount: Satoshi, val paymentHash: ByteVector32, val externalId: String?) : ApiEvent() {
-        constructor(event: fr.acinq.lightning.PaymentEvents.PaymentReceived, metadata: PaymentMetadata?) : this(event.amount.truncateToSatoshi(), event.paymentHash, metadata?.externalId)
+    data class PaymentReceived(@SerialName("amountSat") val amount: Satoshi, val paymentHash: ByteVector32, val externalId: String?, @Transient val webhookUrl: Url? = null) : ApiEvent() {
+        constructor(event: fr.acinq.lightning.PaymentEvents.PaymentReceived, metadata: PaymentMetadata?) : this(event.amount.truncateToSatoshi(), event.paymentHash, metadata?.externalId, metadata?.webhookUrl)
     }
 
     @Serializable

@@ -4,6 +4,7 @@ import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase
+import io.ktor.http.*
 
 class PaymentsMetadataQueries(private val database: PhoenixDatabase) {
 
@@ -14,24 +15,19 @@ class PaymentsMetadataQueries(private val database: PhoenixDatabase) {
             .executeAsOneOrNull()
     }
 
-    fun getByExternalId(id: String): List<Pair<WalletPaymentId, PaymentMetadata>> {
-        return queries.getByExternalId(id).executeAsList().mapNotNull { res ->
-            WalletPaymentId.create(type = res.type, id = res.id)?.let { it to mapper(res.external_id, res.created_at) }
-        }
-    }
-
-    fun insertExternalId(walletPaymentId: WalletPaymentId, id: String) {
+    fun insertExternalId(walletPaymentId: WalletPaymentId, externalId: String?, webhookUrl: Url?) {
         database.transaction {
-            queries.insert(type = walletPaymentId.dbType.value, id = walletPaymentId.dbId, external_id = id, created_at = currentTimestampMillis())
+            queries.insert(type = walletPaymentId.dbType.value, id = walletPaymentId.dbId, external_id = externalId, webhook_url =  webhookUrl.toString(), created_at = currentTimestampMillis())
         }
     }
 
     companion object {
         fun mapper(
             external_id: String?,
+            webhook_url: String?,
             created_at: Long,
         ): PaymentMetadata {
-            return PaymentMetadata(externalId = external_id, createdAt = created_at)
+            return PaymentMetadata(externalId = external_id, webhookUrl = webhook_url?.let { Url(it) }, createdAt = created_at)
         }
     }
 }

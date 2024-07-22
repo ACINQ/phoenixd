@@ -1,0 +1,34 @@
+-- Migration: v1 -> v2
+--
+-- Changes:
+-- * Made column external_id nullable
+-- * Added column webhook_url
+
+CREATE TABLE payments_metadata_backup (
+    type INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (type, id)
+);
+
+INSERT INTO payments_metadata_backup SELECT * FROM payments_metadata;
+
+DROP TABLE payments_metadata;
+
+CREATE TABLE payments_metadata (
+    type INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    external_id TEXT,
+    webhook_url TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (type, id)
+);
+
+CREATE INDEX IF NOT EXISTS payments_metadata_external_id ON payments_metadata(external_id);
+
+INSERT INTO payments_metadata SELECT type, id, external_id, NULL, created_at FROM payments_metadata_backup;
+
+DROP TABLE payments_metadata_backup;
+
+

@@ -1,5 +1,9 @@
 package fr.acinq.lightning.bin.payments
 
+import fr.acinq.bitcoin.utils.Try
+import fr.acinq.lightning.wire.OfferTypes
+import io.ktor.http.*
+
 object Parser {
     fun parseEmailLikeAddress(input: String): Pair<String, String>? {
         if (!input.contains("@", ignoreCase = true)) return null
@@ -18,5 +22,16 @@ object Parser {
         val username = components[0].lowercase().dropWhile { it == '₿' }
         val domain = components[1]
         return username to domain
+    }
+
+    fun parseBip21Offer(uri: String): OfferTypes.Offer? {
+        val url = Url(uri)
+        if (url.protocol.name != "bitcoin") return null
+        return url.parameters["lno"]?.let {
+            when (val offer = OfferTypes.Offer.decode(it)) {
+                is Try.Success -> offer.result
+                is Try.Failure -> null
+            }
+        }
     }
 }

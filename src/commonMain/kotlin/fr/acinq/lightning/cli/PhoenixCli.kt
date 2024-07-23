@@ -12,18 +12,18 @@ import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
-import com.github.ajalt.clikt.sources.MapValueSource
 import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.BuildVersions
+import fr.acinq.lightning.bin.conf.ListValueSource
 import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.datadir
+import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.lnurl.helpers.LnurlParser
 import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
-import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.wire.OfferTypes
@@ -79,7 +79,7 @@ class PhoenixCli : CliktCommand() {
 
     init {
         context {
-            valueSource = MapValueSource(readConfFile(confFile))
+            valueSource = ListValueSource(readConfFile(confFile))
             helpFormatter = { MordantHelpFormatter(it, showDefaultValues = true) }
         }
     }
@@ -213,7 +213,7 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
             formParameters = parameters {
                 amountSat?.let { append("amountSat", it.toString()) }
                 externalId?.let { append("externalId", it) }
-                when(val d = description) {
+                when (val d = description) {
                     is Either.Left -> append("description", d.value)
                     is Either.Right -> append("descriptionHash", d.value.toHex())
                 }
@@ -330,6 +330,7 @@ class LnurlWithdraw : PhoenixCliCommand(name = "lnurlwithdraw", help = "Withdraw
             val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
             url is Lnurl.Request && (url.tag == Lnurl.Tag.Withdraw || url.tag == null)
         }
+
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlwithdraw").toString(),
@@ -346,6 +347,7 @@ class LnurlAuth : PhoenixCliCommand(name = "lnurlauth", help = "Authenticate on 
             val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
             url is LnurlAuth
         }
+
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlauth").toString(),

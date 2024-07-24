@@ -14,6 +14,8 @@ actual val datadir: Path = (System.getenv()[PHOENIX_DATADIR]?.toPath() ?: System
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
     val path = dir / "phoenix.${chain.name.lowercase()}.${nodeId.toHex().take(6)}.db"
+    // We have to use migrateEmptySchema = true because for the first release we called Schema.create(driver), which
+    // didn't set the version to 1.
     val driver = JdbcSqliteDriver("jdbc:sqlite:$path", Properties(), PhoenixDatabase.Schema, migrateEmptySchema = true)
     return driver
 }

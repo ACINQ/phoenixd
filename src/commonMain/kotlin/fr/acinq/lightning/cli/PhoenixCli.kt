@@ -306,8 +306,9 @@ class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lig
 
 class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
-    private val lnurl by option("--lnurl").required().check {
-        val url = LnurlParser.extractLnurl(it)
+    private val lnurl by option("--lnurl").required()
+        .check("not a valid lnurl-pay link") {
+        val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
         url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
     }
     private val message by option("--message").help { "Optional comment" }
@@ -324,10 +325,11 @@ class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", prin
 }
 
 class LnurlWithdraw : PhoenixCliCommand(name = "lnurlwithdraw", help = "Withdraw funds from a LNURL service", printHelpOnEmptyArgs = true) {
-    private val lnurl by option("--lnurl").required().check {
-        val url = LnurlParser.extractLnurl(it)
-        url is Lnurl.Request && (url.tag == Lnurl.Tag.Withdraw || url.tag == null)
-    }
+    private val lnurl by option("--lnurl").required()
+        .check("not a valid lnurl-withdraw link") {
+            val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
+            url is Lnurl.Request && (url.tag == Lnurl.Tag.Withdraw || url.tag == null)
+        }
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlwithdraw").toString(),
@@ -339,9 +341,11 @@ class LnurlWithdraw : PhoenixCliCommand(name = "lnurlwithdraw", help = "Withdraw
 }
 
 class LnurlAuth : PhoenixCliCommand(name = "lnurlauth", help = "Authenticate on a LNURL service", printHelpOnEmptyArgs = true) {
-    private val lnurl by option("--lnurl").required().check {
-        LnurlParser.extractLnurl(it) is LnurlAuth
-    }
+    private val lnurl by option("--lnurl").required()
+        .check("not a valid lnurl-auth link") {
+            val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
+            url is LnurlAuth
+        }
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlauth").toString(),

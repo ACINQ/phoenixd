@@ -15,7 +15,6 @@ import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
-import com.github.ajalt.clikt.sources.MapValueSource
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
 import fr.acinq.bitcoin.Chain
@@ -27,9 +26,9 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_SEED
 import fr.acinq.lightning.bin.conf.LSP
+import fr.acinq.lightning.bin.conf.ListValueSource
 import fr.acinq.lightning.bin.conf.PhoenixSeed
 import fr.acinq.lightning.bin.conf.getOrGenerateSeed
-import fr.acinq.lightning.bin.conf.readConfFile
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
@@ -171,7 +170,7 @@ class Phoenixd : CliktCommand() {
     init {
         FileSystem.SYSTEM.createDirectories(datadir)
         context {
-            valueSource = MapValueSource(readConfFile(confFile))
+            valueSource = ListValueSource.fromFile(confFile)
             helpFormatter = { MordantHelpFormatter(it, showDefaultValues = true) }
         }
     }

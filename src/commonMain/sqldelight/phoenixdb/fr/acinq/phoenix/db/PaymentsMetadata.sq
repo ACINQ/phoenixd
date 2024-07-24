@@ -5,7 +5,8 @@
 CREATE TABLE IF NOT EXISTS payments_metadata (
     type INTEGER NOT NULL,
     id TEXT NOT NULL,
-    external_id TEXT NOT NULL,
+    external_id TEXT,
+    webhook_url TEXT,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (type, id)
 );
@@ -19,13 +20,10 @@ INSERT INTO payments_metadata (
             type,
             id,
             external_id,
+            webhook_url,
             created_at
-) VALUES (?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?);
 
 get:
-SELECT external_id, created_at FROM payments_metadata
+SELECT external_id, webhook_url, created_at FROM payments_metadata
 WHERE type = ? AND id = ?;
-
-getByExternalId:
-SELECT type, id, external_id, created_at FROM payments_metadata
-WHERE external_id = ?;

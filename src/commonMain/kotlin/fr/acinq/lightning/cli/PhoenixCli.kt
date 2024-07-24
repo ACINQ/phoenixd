@@ -207,16 +207,18 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
     ).single().required()
 
     private val externalId by option("--externalId")
+    private val webhookUrl by option("--webhookUrl")
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "createinvoice").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", it.toString()) }
-                externalId?.let { append("externalId", it) }
                 when (val d = description) {
                     is Either.Left -> append("description", d.value)
                     is Either.Right -> append("descriptionHash", d.value.toHex())
                 }
+                externalId?.let { append("externalId", it) }
+                webhookUrl?.let { append("webhookUrl", it) }
             }
         )
     }

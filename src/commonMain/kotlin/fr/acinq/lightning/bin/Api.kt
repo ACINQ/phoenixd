@@ -53,6 +53,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -165,8 +166,10 @@ class Api(
                         else -> badRequest("Must provide either a description or descriptionHash")
                     }
                     val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), eitherDesc)
-                    formParameters["externalId"]?.takeUnless { it.isBlank() }?.let { externalId ->
-                        paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId)
+                    val externalId = formParameters["externalId"]
+                    val webhookUrl = formParameters.getOptionalUrl("webhookUrl")
+                    if (externalId != null || webhookUrl != null) {
+                        paymentDb.metadataQueries.insert(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId, webhookUrl)
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
@@ -390,33 +393,44 @@ class Api(
             }
         }
 
+        val client = HttpClient {
+            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                json(json = Json {
+                    prettyPrint = true
+                    isLenient = true
+                })
+            }
+        }
+        client.sendPipeline.intercept(HttpSendPipeline.State) {
+            when (val body = context.body) {
+                is TextContent -> {
+                    val bodyBytes = body.text.encodeUtf8()
+                    val secretBytes = webhookSecret.encodeUtf8()
+                    val sig = bodyBytes.hmacSha256(secretBytes)
+                    context.headers.append("X-Phoenix-Signature", sig.hex())
+                }
+            }
+        }
+        suspend fun notifyWebhook(url: Url, event: ApiEvent) {
+            println("posting webhook to $url")
+            client.post(url) {
+                contentType(ContentType.Application.Json)
+                setBody(event)
+            }
+        }
+        // general webhook urls
         webhookUrls.forEach { url ->
-            val client = HttpClient {
-                install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                    json(json = Json {
-                        prettyPrint = true
-                        isLenient = true
-                    })
-                }
-            }
-            client.sendPipeline.intercept(HttpSendPipeline.State) {
-                when (val body = context.body) {
-                    is TextContent -> {
-                        val bodyBytes = body.text.encodeUtf8()
-                        val secretBytes = webhookSecret.encodeUtf8()
-                        val sig = bodyBytes.hmacSha256(secretBytes)
-                        context.headers.append("X-Phoenix-Signature", sig.hex())
-                    }
-                }
-            }
             launch {
-                eventsFlow.collect { event ->
-                    client.post(url) {
-                        contentType(ContentType.Application.Json)
-                        setBody(event)
-                    }
-                }
+                eventsFlow.collect { event -> notifyWebhook(url, event) }
             }
+        }
+        // per-event webhook url
+        launch {
+            eventsFlow
+                .filterIsInstance<PaymentReceived>()
+                .collect { event ->
+                    event.webhookUrl?.let { url -> notifyWebhook(url, event) }
+                }
         }
     }
 
@@ -451,4 +465,6 @@ class Api(
     private fun Parameters.getLnurl(argName: String): Lnurl = this[argName]?.let { LnurlParser.extractLnurl(it) } ?: missing(argName)
 
     private fun Parameters.getLnurlAuth(argName: String): LnurlAuth = this[argName]?.let { LnurlParser.extractLnurl(it) as LnurlAuth } ?: missing(argName)
+
+    private fun Parameters.getOptionalUrl(argName: String): Url? = this[argName]?.let { runCatching { Url(it) }.getOrNull() ?: invalidType(argName, "url") }
 }

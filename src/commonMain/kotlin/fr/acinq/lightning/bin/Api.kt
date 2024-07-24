@@ -157,7 +157,7 @@ class Api(
                     val externalId = formParameters["externalId"]
                     val webhookUrl = formParameters.getOptionalUrl("webhookUrl")
                     if (externalId != null || webhookUrl != null) {
-                        paymentDb.metadataQueries.insertExternalId(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId, webhookUrl)
+                        paymentDb.metadataQueries.insert(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId, webhookUrl)
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }

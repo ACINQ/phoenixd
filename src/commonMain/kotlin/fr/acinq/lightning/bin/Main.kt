@@ -119,7 +119,7 @@ class Phoenixd : CliktCommand() {
     private val httpPasswordLimitedAccess by option("--http-password-limited-access", help = "Password for the http api (limited access)")
         .defaultLazy {
             // if we are here then no value is defined in phoenix.conf
-            terminal.print(yellow("Generating default api password..."))
+            terminal.print(yellow("Generating limited access api password..."))
             val value = randomBytes32().toHex()
             FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password-limited-access=$value") }
             terminal.println(white("done"))

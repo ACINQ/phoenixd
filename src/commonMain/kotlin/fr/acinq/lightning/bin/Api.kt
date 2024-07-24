@@ -63,7 +63,8 @@ class Api(
     private val nodeParams: NodeParams,
     private val peer: Peer,
     private val eventsFlow: SharedFlow<ApiEvent>,
-    private val password: String,
+    private val fullAccessPassword: String,
+    private val limitedAccessPassword: String,
     private val webhookUrls: List<Url>,
     private val webhookSecret: String,
     private val loggerFactory: LoggerFactory,
@@ -75,6 +76,9 @@ class Api(
         val payDnsAddress = PayDnsAddress()
         val lnurlHandler = LnurlHandler(loggerFactory, nodeParams.keyManager as LocalKeyManager)
         val addressResolver = AddressResolver(payDnsAddress, lnurlHandler)
+
+        val fullAccessUser = UserIdPrincipal("full-access")
+        val limitedAccessUser = UserIdPrincipal("limited-access")
 
         val json = Json {
             prettyPrint = true
@@ -108,10 +112,18 @@ class Api(
         install(Authentication) {
             basic {
                 validate { credentials ->
-                    if (credentials.password == password) {
-                        UserIdPrincipal(credentials.name)
-                    } else {
-                        null
+                    when (credentials.password) {
+                        fullAccessPassword -> fullAccessUser
+                        limitedAccessPassword -> limitedAccessUser
+                        else -> null
+                    }
+                }
+            }
+            basic("full-access") {
+                validate { credentials ->
+                    when (credentials.password) {
+                        fullAccessPassword -> fullAccessUser
+                        else -> null
                     }
                 }
             }
@@ -210,56 +222,58 @@ class Api(
                         call.respond(OutgoingPayment(it))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
-                post("payinvoice") {
-                    val formParameters = call.receiveParameters()
-                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
-                    val invoice = formParameters.getInvoice("invoice")
-                    val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
-                    when (val event = peer.payInvoice(amount, invoice)) {
-                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
-                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                        is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
-                    }
-                }
-                post("payoffer") {
-                    val formParameters = call.receiveParameters()
-                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
-                    val offer = formParameters.getOffer("offer")
-                    val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
-                    val note = formParameters["message"]
-                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
-                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
-                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                        is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
-                    }
-                }
-                post("paylnaddress") {
-                    val formParameters = call.receiveParameters()
-                    val amount = formParameters.getLong("amountSat").sat.toMilliSatoshi()
-                    val (username, domain) = formParameters.getEmailLikeAddress("address")
-                    val note = formParameters["message"]
-                    when (val res = addressResolver.resolveAddress(username, domain, amount, note)) {
-                        is Try.Success -> when (val either = res.result) {
-                            is Either.Left -> {
-                                // LNURL
-                                val lnurlInvoice = either.value
-                                when (val event = peer.payInvoice(amount, lnurlInvoice.invoice)) {
-                                    is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
-                                    is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                                    is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
-                                }
-                            }
-                            is Either.Right -> {
-                                // OFFER
-                                val offer = either.value
-                                when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
-                                    is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
-                                    is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                                    is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
-                                }
-                            }
+                authenticate("full-access", strategy = AuthenticationStrategy.Required) {
+                    post("payinvoice") {
+                        val formParameters = call.receiveParameters()
+                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val invoice = formParameters.getInvoice("invoice")
+                        val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
+                        when (val event = peer.payInvoice(amount, invoice)) {
+                            is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                            is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                            is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
                         }
-                        is Try.Failure -> error("cannot resolve address: ${res.error.message}")
+                    }
+                    post("payoffer") {
+                        val formParameters = call.receiveParameters()
+                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val offer = formParameters.getOffer("offer")
+                        val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
+                        val note = formParameters["message"]
+                        when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                            is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                            is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                            is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
+                        }
+                    }
+                    post("paylnaddress") {
+                        val formParameters = call.receiveParameters()
+                        val amount = formParameters.getLong("amountSat").sat.toMilliSatoshi()
+                        val (username, domain) = formParameters.getEmailLikeAddress("address")
+                        val note = formParameters["message"]
+                        when (val res = addressResolver.resolveAddress(username, domain, amount, note)) {
+                            is Try.Success -> when (val either = res.result) {
+                                is Either.Left -> {
+                                    // LNURL
+                                    val lnurlInvoice = either.value
+                                    when (val event = peer.payInvoice(amount, lnurlInvoice.invoice)) {
+                                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                        is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
+                                    }
+                                }
+                                is Either.Right -> {
+                                    // OFFER
+                                    val offer = either.value
+                                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                        is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
+                                    }
+                                }
+                            }
+                            is Try.Failure -> error("cannot resolve address: ${res.error.message}")
+                        }
                     }
                 }
                 post("decodeinvoice") {
@@ -272,34 +286,36 @@ class Api(
                     val offer = formParameters.getOffer("offer")
                     call.respond(offer)
                 }
-                post("lnurlpay") {
-                    val formParameters = call.receiveParameters()
-                    val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
-                    val comment = formParameters["message"]
-                    val request = formParameters.getLnurl("lnurl")
-                    // early abort to avoid executing an invalid url
-                    when (request) {
-                        is LnurlAuth -> badRequest("this is an authentication lnurl")
-                        is Lnurl.Request -> if (request.tag == Lnurl.Tag.Withdraw) badRequest("this is a withdraw lnurl")
-                        else -> Unit
-                    }
-                    try {
-                        val lnurl = lnurlHandler.executeLnurl(request.initialUrl)
-                        when (lnurl) {
-                            is LnurlWithdraw -> badRequest("this is a withdraw lnurl")
-                            is LnurlPay.PaymentParameters -> {
-                                val amount = (overrideAmount ?: lnurl.minSendable)
-                                val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, comment)
-                                when (val event = peer.payInvoice(amount, invoice.invoice)) {
-                                    is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
-                                    is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
-                                    is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
-                                }
-                            }
-                            else -> badRequest("invalid [${lnurl::class}] lnurl=${lnurl.initialUrl}")
+                authenticate("full-access", strategy = AuthenticationStrategy.Required) {
+                    post("lnurlpay") {
+                        val formParameters = call.receiveParameters()
+                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val comment = formParameters["message"]
+                        val request = formParameters.getLnurl("lnurl")
+                        // early abort to avoid executing an invalid url
+                        when (request) {
+                            is LnurlAuth -> badRequest("this is an authentication lnurl")
+                            is Lnurl.Request -> if (request.tag == Lnurl.Tag.Withdraw) badRequest("this is a withdraw lnurl")
+                            else -> Unit
                         }
-                    } catch (e: Exception) {
-                        badRequest(e.message ?: e::class.toString())
+                        try {
+                            val lnurl = lnurlHandler.executeLnurl(request.initialUrl)
+                            when (lnurl) {
+                                is LnurlWithdraw -> badRequest("this is a withdraw lnurl")
+                                is LnurlPay.PaymentParameters -> {
+                                    val amount = (overrideAmount ?: lnurl.minSendable)
+                                    val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, comment)
+                                    when (val event = peer.payInvoice(amount, invoice.invoice)) {
+                                        is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
+                                        is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
+                                        is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
+                                    }
+                                }
+                                else -> badRequest("invalid [${lnurl::class}] lnurl=${lnurl.initialUrl}")
+                            }
+                        } catch (e: Exception) {
+                            badRequest(e.message ?: e::class.toString())
+                        }
                     }
                 }
                 post("lnurlwithdraw") {
@@ -326,41 +342,43 @@ class Api(
                         badRequest(e.message ?: e::class.toString())
                     }
                 }
-                post("lnurlauth") {
-                    val formParameters = call.receiveParameters()
-                    val request = formParameters.getLnurl("lnurl")
-                    if (request !is LnurlAuth) badRequest("this is a payment or withdraw lnurl")
-                    try {
-                        lnurlHandler.signAndSendAuthRequest(request)
-                        call.respond("authentication success")
-                    } catch (e: Exception) {
-                        badRequest("could not authenticate: ${e.message ?: e::class.toString()}")
-                    }
-                }
-                post("sendtoaddress") {
-                    val res = kotlin.runCatching {
+                authenticate("full-access", strategy = AuthenticationStrategy.Required) {
+                    post("lnurlauth") {
                         val formParameters = call.receiveParameters()
-                        val amount = formParameters.getLong("amountSat").sat
+                        val request = formParameters.getLnurl("lnurl")
+                        if (request !is LnurlAuth) badRequest("this is a payment or withdraw lnurl")
+                        try {
+                            lnurlHandler.signAndSendAuthRequest(request)
+                            call.respond("authentication success")
+                        } catch (e: Exception) {
+                            badRequest("could not authenticate: ${e.message ?: e::class.toString()}")
+                        }
+                    }
+                    post("sendtoaddress") {
+                        val res = kotlin.runCatching {
+                            val formParameters = call.receiveParameters()
+                            val amount = formParameters.getLong("amountSat").sat
+                            val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
+                            val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+                            peer.spliceOut(amount, scriptPubKey, feerate)
+                        }.toEither()
+                        when (res) {
+                            is Either.Right -> when (val r = res.value) {
+                                is ChannelCommand.Commitment.Splice.Response.Created -> call.respondText(r.fundingTxId.toString())
+                                is ChannelCommand.Commitment.Splice.Response.Failure -> call.respondText(r.toString())
+                                else -> call.respondText("no channel available")
+                            }
+                            is Either.Left -> call.respondText(res.value.message.toString())
+                        }
+                    }
+                    post("closechannel") {
+                        val formParameters = call.receiveParameters()
+                        val channelId = formParameters.getByteVector32("channelId")
                         val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
                         val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
-                        peer.spliceOut(amount, scriptPubKey, feerate)
-                    }.toEither()
-                    when (res) {
-                        is Either.Right -> when (val r = res.value) {
-                            is ChannelCommand.Commitment.Splice.Response.Created -> call.respondText(r.fundingTxId.toString())
-                            is ChannelCommand.Commitment.Splice.Response.Failure -> call.respondText(r.toString())
-                            else -> call.respondText("no channel available")
-                        }
-                        is Either.Left -> call.respondText(res.value.message.toString())
+                        peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(scriptPubKey, ClosingFeerates(feerate))))
+                        call.respondText("ok")
                     }
-                }
-                post("closechannel") {
-                    val formParameters = call.receiveParameters()
-                    val channelId = formParameters.getByteVector32("channelId")
-                    val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
-                    val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
-                    peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(scriptPubKey, ClosingFeerates(feerate))))
-                    call.respondText("ok")
                 }
                 webSocket("/websocket") {
                     try {

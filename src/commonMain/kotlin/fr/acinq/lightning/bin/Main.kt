@@ -106,12 +106,21 @@ class Phoenixd : CliktCommand() {
         .default(10.minutes)
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPassword by option("--http-password", help = "Password for the http api")
+    private val httpPassword by option("--http-password", help = "Password for the http api (full access)")
         .defaultLazy {
             // if we are here then no value is defined in phoenix.conf
             terminal.print(yellow("Generating default api password..."))
             val value = randomBytes32().toHex()
             FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password=$value") }
+            terminal.println(white("done"))
+            value
+        }
+    private val httpPasswordLimitedAccess by option("--http-password-limited-access", help = "Password for the http api (limited access)")
+        .defaultLazy {
+            // if we are here then no value is defined in phoenix.conf
+            terminal.print(yellow("Generating limited access api password..."))
+            val value = randomBytes32().toHex()
+            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password-limited-access=$value") }
             terminal.println(white("done"))
             value
         }
@@ -369,7 +378,7 @@ class Phoenixd : CliktCommand() {
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, webHookUrls, webHookSecret, loggerFactory).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpPassword, httpPasswordLimitedAccess, webHookUrls, webHookSecret, loggerFactory).run { module() }
             }
         )
         val serverJob = scope.launch {

@@ -2,7 +2,7 @@ import fr.acinq.lightning.bin.db.payments.InboundLiquidityLeaseTypeVersion;
 
 -- Stores in a flat row payments standing for an inbound liquidity request (which are done through a splice).
 -- The lease data are stored in a complex column, as a json-encoded blob. See InboundLiquidityLeaseType file.
-CREATE TABLE IF NOT EXISTS inbound_liquidity_outgoing_payments (
+CREATE TABLE  inbound_liquidity_outgoing_payments (
     id TEXT NOT NULL PRIMARY KEY,
     mining_fees_sat INTEGER NOT NULL,
     channel_id BLOB NOT NULL,

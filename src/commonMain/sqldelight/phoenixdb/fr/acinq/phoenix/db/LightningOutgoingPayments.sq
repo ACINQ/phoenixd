@@ -8,7 +8,7 @@ PRAGMA foreign_keys = 1;
 
 -- outgoing payments
 -- Stores an outgoing payment in a flat row. Some columns can be null.
-CREATE TABLE IF NOT EXISTS lightning_outgoing_payments (
+CREATE TABLE  lightning_outgoing_payments (
     id TEXT NOT NULL PRIMARY KEY,
     recipient_amount_msat INTEGER NOT NULL,
     recipient_node_id TEXT NOT NULL,
@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS lightning_outgoing_payments (
 
 -- Create indexes to optimize the queries in AggregatedQueries.
 -- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX IF NOT EXISTS outgoing_payments_filter_idx
+CREATE INDEX  outgoing_payments_filter_idx
     ON lightning_outgoing_payments(completed_at);
 
 -- Stores the lightning parts that make up a lightning payment
-CREATE TABLE IF NOT EXISTS lightning_outgoing_payment_parts (
+CREATE TABLE  lightning_outgoing_payment_parts (
     part_id TEXT NOT NULL PRIMARY KEY,
     part_parent_id TEXT NOT NULL,
     part_amount_msat INTEGER NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS lightning_outgoing_payment_parts (
 -- > Indices are not required for child key columns but they are almost always beneficial.
 -- > [...] So, in most real systems, an index should be created on the child key columns
 -- > of each foreign key constraint.
-CREATE INDEX IF NOT EXISTS parent_id_idx ON lightning_outgoing_payment_parts(part_parent_id);
+CREATE INDEX  parent_id_idx ON lightning_outgoing_payment_parts(part_parent_id);
 
 -- queries for outgoing payments
 

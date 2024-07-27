@@ -2,7 +2,7 @@
 -- * tx_id => hex identifier of an on-chain transaction
 -- * type  => tracks the type of a payment. The value is an int as defined in the DbType enum
 -- * id    => the identifier of the payment, can be a payment hash (incoming) or a UUID (outgoing)
-CREATE TABLE  link_tx_to_payments (
+CREATE TABLE link_tx_to_payments (
     tx_id BLOB NOT NULL,
     type INTEGER NOT NULL,
     id TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE  link_tx_to_payments (
     PRIMARY KEY (tx_id, type, id)
 );
 
-CREATE INDEX  link_tx_to_payments_txid ON link_tx_to_payments(tx_id);
+CREATE INDEX link_tx_to_payments_txid ON link_tx_to_payments(tx_id);
 
 listUnconfirmed:
 SELECT DISTINCT(tx_id) FROM link_tx_to_payments WHERE confirmed_at IS NULL;

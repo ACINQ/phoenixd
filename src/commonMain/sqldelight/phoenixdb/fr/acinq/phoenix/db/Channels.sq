@@ -4,14 +4,14 @@ PRAGMA foreign_keys = 1;
 
 -- channels table
 -- note: boolean are stored as INTEGER, with 0=false
-CREATE TABLE  local_channels (
+CREATE TABLE local_channels (
     channel_id BLOB NOT NULL PRIMARY KEY,
     data BLOB NOT NULL,
     is_closed INTEGER AS Boolean DEFAULT 0 NOT NULL
 );
 
 -- htlcs info table
-CREATE TABLE  htlc_infos (
+CREATE TABLE htlc_infos (
     channel_id BLOB NOT NULL,
     commitment_number INTEGER NOT NULL,
     payment_hash BLOB NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE  htlc_infos (
     FOREIGN KEY(channel_id) REFERENCES local_channels(channel_id)
 );
 
-CREATE INDEX  htlc_infos_idx ON htlc_infos(channel_id, commitment_number);
+CREATE INDEX htlc_infos_idx ON htlc_infos(channel_id, commitment_number);
 
 -- channels queries
 getChannel:

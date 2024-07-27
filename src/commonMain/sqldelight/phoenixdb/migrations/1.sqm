@@ -25,7 +25,7 @@ CREATE TABLE payments_metadata (
     PRIMARY KEY (type, id)
 );
 
-CREATE INDEX  payments_metadata_external_id ON payments_metadata(external_id);
+CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
 
 INSERT INTO payments_metadata SELECT type, id, external_id, NULL, created_at FROM payments_metadata_backup;
 

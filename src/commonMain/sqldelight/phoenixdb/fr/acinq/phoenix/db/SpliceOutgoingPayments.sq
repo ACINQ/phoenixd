@@ -1,6 +1,6 @@
 -- store a splice-out payment in a flat row
 -- there are no complex json columns like in the outgoing_payments table
-CREATE TABLE IF NOT EXISTS splice_outgoing_payments (
+CREATE TABLE splice_outgoing_payments (
     id TEXT NOT NULL PRIMARY KEY,
     recipient_amount_sat INTEGER NOT NULL,
     address TEXT NOT NULL,

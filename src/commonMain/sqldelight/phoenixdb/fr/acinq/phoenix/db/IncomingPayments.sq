@@ -2,7 +2,7 @@ import fr.acinq.lightning.bin.db.payments.IncomingOriginTypeVersion;
 import fr.acinq.lightning.bin.db.payments.IncomingReceivedWithTypeVersion;
 
 -- incoming payments
-CREATE TABLE IF NOT EXISTS incoming_payments (
+CREATE TABLE incoming_payments (
     payment_hash BLOB NOT NULL PRIMARY KEY,
     preimage BLOB NOT NULL,
     created_at INTEGER NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS incoming_payments (
 
 -- Create indexes to optimize the queries in AggregatedQueries.
 -- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX IF NOT EXISTS incoming_payments_filter_idx
+CREATE INDEX incoming_payments_filter_idx
     ON incoming_payments(received_at)
  WHERE received_at IS NOT NULL;
 

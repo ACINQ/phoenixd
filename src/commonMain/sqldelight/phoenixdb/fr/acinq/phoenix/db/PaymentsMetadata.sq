@@ -2,7 +2,7 @@
 -- * type        => the type of a payment, an int as defined in the DbType enum
 -- * id          => the internal identifier of a payment, can be a payment hash (incoming) or a UUID (outgoing)
 -- * external_id => an arbitrary string defined by the user to track the payment in their own system
-CREATE TABLE IF NOT EXISTS payments_metadata (
+CREATE TABLE payments_metadata (
     type INTEGER NOT NULL,
     id TEXT NOT NULL,
     external_id TEXT,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS payments_metadata (
     PRIMARY KEY (type, id)
 );
 
-CREATE INDEX IF NOT EXISTS payments_metadata_external_id ON payments_metadata(external_id);
+CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
 
 -- queries for payments_metadata table
 

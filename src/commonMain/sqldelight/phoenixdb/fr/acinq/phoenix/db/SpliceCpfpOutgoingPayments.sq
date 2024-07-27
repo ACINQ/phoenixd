@@ -2,7 +2,7 @@ import fr.acinq.lightning.bin.db.payments.OutgoingPartClosingInfoTypeVersion;
 
 -- Store in a flat row the outgoing payments standing for a CPFP (which are done throuh a splice).
 -- There are no complex json columns like in the outgoing_payments table.
-CREATE TABLE IF NOT EXISTS splice_cpfp_outgoing_payments (
+CREATE TABLE splice_cpfp_outgoing_payments (
     id TEXT NOT NULL PRIMARY KEY,
     mining_fees_sat INTEGER NOT NULL,
     channel_id BLOB NOT NULL,

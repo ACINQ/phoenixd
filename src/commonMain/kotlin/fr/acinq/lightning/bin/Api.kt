@@ -412,7 +412,6 @@ class Api(
             }
         }
         suspend fun notifyWebhook(url: Url, event: ApiEvent) {
-            println("posting webhook to $url")
             client.post(url) {
                 contentType(ContentType.Application.Json)
                 setBody(event)

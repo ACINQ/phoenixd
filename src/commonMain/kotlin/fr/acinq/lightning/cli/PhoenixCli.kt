@@ -1,31 +1,40 @@
 package fr.acinq.lightning.cli
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.requireObject
-import com.github.ajalt.clikt.core.subcommands
+import co.touchlab.kermit.CommonWriter
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.StaticConfig
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.output.MordantHelpFormatter
 import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.required
 import com.github.ajalt.clikt.parameters.groups.single
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.boolean
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
-import fr.acinq.bitcoin.Base58Check
-import fr.acinq.bitcoin.Bech32
-import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.*
+import fr.acinq.bitcoin.crypto.musig2.IndividualNonce
+import fr.acinq.bitcoin.crypto.musig2.Musig2
 import fr.acinq.bitcoin.utils.Either
+import fr.acinq.bitcoin.utils.toResult
 import fr.acinq.lightning.BuildVersions
-import fr.acinq.lightning.bin.conf.ListValueSource
-import fr.acinq.lightning.bin.conf.readConfFile
+import fr.acinq.lightning.Lightning.randomBytes32
+import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.bin.conf.*
+import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_SEED
 import fr.acinq.lightning.bin.datadir
+import fr.acinq.lightning.bin.logs.TimestampFormatter
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.lnurl.helpers.LnurlParser
 import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
+import fr.acinq.lightning.crypto.LocalKeyManager
+import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.sat
+import fr.acinq.lightning.utils.toByteVector
 import fr.acinq.lightning.wire.OfferTypes
 import io.ktor.client.*
 import io.ktor.client.plugins.auth.*
@@ -64,7 +73,8 @@ fun main(args: Array<String>) =
             LnurlWithdraw(),
             LnurlAuth(),
             SendToAddress(),
-            CloseChannel()
+            CloseChannel(),
+            UnlockSwapIn()
         )
         .main(args)
 
@@ -389,6 +399,65 @@ class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close chan
                 append("feerateSatByte", feerateSatByte.toString())
             }
         )
+    }
+}
+
+class UnlockSwapIn : CliktCommand(name = "unlockswapin", help = "Unlock swap-in", printHelpOnEmptyArgs = true, hidden = true) {
+    private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
+        .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false) }
+        .defaultLazy {
+            val value = try {
+                getOrGenerateSeed(datadir)
+            } catch (t: Throwable) {
+                throw UsageError(t.message, paramName = "seed")
+            }
+            value
+        }
+    private val chain by option("--chain", help = "Bitcoin chain to use").choice(
+        "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
+    ).default(Chain.Mainnet, defaultForHelp = "mainnet")
+    private val isLegacy by option("--legacy").flag(default = false)
+    private val parentAmount by option("--parentAmount").int().convert { it.sat }.required()
+    private val parentPubKeyScript by option("--parentPubKeyScript").convert { ByteVector(it) }.required()
+    private val unsignedTx by option("--tx").convert { Transaction.read(it) }.required()
+    private val serverKey by option("--serverKey").convert { PublicKey.fromHex(it) }.required()
+    private val addressIndex by option("--addressIndex").int()
+    private val serverNonce by option("--serverNonce").convert { IndividualNonce(it) }
+    override fun run() {
+        val loggerFactory = LoggerFactory(StaticConfig(minSeverity = Severity.Info, logWriterList = listOf(CommonWriter(TimestampFormatter))))
+        val lsp = LSP.from(chain)
+        val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)
+        val nodeParams = NodeParams(chain, loggerFactory, keyManager)
+
+        echo()
+        echo("chain=$chain")
+        echo("swapInXpub=${lsp.swapInXpub}")
+        echo("nodeId=${nodeParams.nodeId}")
+
+        if (isLegacy) {
+            val swapInProtocol = nodeParams.keyManager.swapInOnChainWallet.legacySwapInProtocol
+            val userSig = swapInProtocol.signSwapInputUser(unsignedTx, 0, TxOut(parentAmount, parentPubKeyScript), nodeParams.keyManager.swapInOnChainWallet.userPrivateKey)
+            echo("address=${swapInProtocol.address(chain)}")
+            echo("userKey=${swapInProtocol.userPublicKey}")
+            echo("userSig=$userSig")
+        } else {
+            val swapInProtocol = nodeParams.keyManager.swapInOnChainWallet.getSwapInProtocol(addressIndex!!)
+            val (userPrivateNonce, userNonce) = Musig2.generateNonce(randomBytes32(), nodeParams.keyManager.swapInOnChainWallet.userPrivateKey, listOf(swapInProtocol.userPublicKey, serverKey))
+            val userSig = swapInProtocol.signSwapInputUser(
+                fundingTx = unsignedTx,
+                index = 0,
+                parentTxOuts = listOf(TxOut(parentAmount, parentPubKeyScript)),
+                userPrivateKey = nodeParams.keyManager.swapInOnChainWallet.userPrivateKey,
+                privateNonce = userPrivateNonce,
+                userNonce = userNonce,
+                serverNonce = serverNonce!!
+            ).toResult().getOrThrow()
+            echo("address=${swapInProtocol.address(chain)}")
+            echo("userKey=${swapInProtocol.userPublicKey}")
+            echo("userRefundKey=${swapInProtocol.userRefundKey}")
+            echo("userNonce=$userNonce")
+            echo("userSig=$userSig")
+        }
     }
 }
 

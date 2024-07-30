@@ -27,6 +27,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlPay
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
+import fr.acinq.lightning.bin.utils.CsvWriter
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -438,6 +439,35 @@ class Api(
                         val channelClose = res.await()
                         call.respondText(channelClose.txId.toString())
                     }
+                }
+            }
+            post("export") {
+                val from = call.parameters.getOptionalLong("from") ?: 0L
+                val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                val batchSize = 32L
+                var batchOffset = 0L
+                var fetching = true
+                val rows = mutableListOf<String>()
+                val csvConfig = CsvWriter.Configuration(
+                    includesOriginDestination = true,
+                )
+                rows += CsvWriter.makeHeaderRow(csvConfig)
+                while (fetching) {
+                    paymentDb.listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset).map {
+                        rows += CsvWriter.makeRow(it, csvConfig)
+                    }.let { result ->
+                        if (result.isEmpty()) {
+                            fetching = false
+                        } else {
+                            batchOffset += result.size
+                        }
+                    }
+                }
+                val paymentsFound = rows.size - 1
+                if (paymentsFound == 0) {
+                    call.respondText("no payments found in that range")
+                } else {
+
                 }
             }
             route("/websocket") {

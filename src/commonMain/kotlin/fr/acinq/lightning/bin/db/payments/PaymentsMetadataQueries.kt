@@ -17,7 +17,7 @@ class PaymentsMetadataQueries(private val database: PhoenixDatabase) {
 
     fun insert(walletPaymentId: WalletPaymentId, externalId: String?, webhookUrl: Url?) {
         database.transaction {
-            queries.insert(type = walletPaymentId.dbType.value, id = walletPaymentId.dbId, external_id = externalId, webhook_url =  webhookUrl.toString(), created_at = currentTimestampMillis())
+            queries.insert(type = walletPaymentId.dbType.value, id = walletPaymentId.dbId, external_id = externalId, webhook_url =  webhookUrl?.toString(), created_at = currentTimestampMillis())
         }
     }
 

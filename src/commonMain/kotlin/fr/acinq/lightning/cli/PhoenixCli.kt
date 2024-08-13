@@ -420,7 +420,6 @@ class UnlockSwapIn : CliktCommand(name = "unlockswapin", help = "Unlock swap-in"
     private val parentAmount by option("--parentAmount").int().convert { it.sat }.required()
     private val parentPubKeyScript by option("--parentPubKeyScript").convert { ByteVector(it) }.required()
     private val unsignedTx by option("--tx").convert { Transaction.read(it) }.required()
-    private val serverKey by option("--serverKey").convert { PublicKey.fromHex(it) }.required()
     private val addressIndex by option("--addressIndex").int()
     private val serverNonce by option("--serverNonce").convert { IndividualNonce(it) }
     override fun run() {
@@ -442,7 +441,7 @@ class UnlockSwapIn : CliktCommand(name = "unlockswapin", help = "Unlock swap-in"
             echo("userSig=$userSig")
         } else {
             val swapInProtocol = nodeParams.keyManager.swapInOnChainWallet.getSwapInProtocol(addressIndex!!)
-            val (userPrivateNonce, userNonce) = Musig2.generateNonce(randomBytes32(), nodeParams.keyManager.swapInOnChainWallet.userPrivateKey, listOf(swapInProtocol.userPublicKey, serverKey))
+            val (userPrivateNonce, userNonce) = Musig2.generateNonce(randomBytes32(), nodeParams.keyManager.swapInOnChainWallet.userPrivateKey, listOf(swapInProtocol.userPublicKey, swapInProtocol.serverPublicKey))
             val userSig = swapInProtocol.signSwapInputUser(
                 fundingTx = unsignedTx,
                 index = 0,

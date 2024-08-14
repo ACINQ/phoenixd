@@ -10,6 +10,7 @@ import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
@@ -131,6 +132,13 @@ class Api(
                     }
                 }
             }
+            register(WebsocketProtocolAuthenticationProvider("websocket-protocol") { protocols ->
+                when {
+                    protocols.any { it.value == fullAccessPassword } -> fullAccessUser
+                    protocols.any { it.value == limitedAccessPassword } -> limitedAccessUser
+                    else -> null
+                }
+            })
         }
 
         routing {
@@ -386,11 +394,15 @@ class Api(
                         call.respondText("ok")
                     }
                 }
-                webSocket("/websocket") {
-                    kotlin.runCatching {
-                        eventsFlow.collect { sendSerialized(it) }
-                    }.onFailure {
-                        log.warning { "websocket failure: ${it.message}" }
+            }
+            route("/websocket") {
+                authenticate(configurations = arrayOf(null, "websocket-protocol"), strategy = AuthenticationStrategy.FirstSuccessful) {
+                    webSocket {
+                        kotlin.runCatching {
+                            eventsFlow.collect { sendSerialized(it) }
+                        }.onFailure {
+                            log.warning { "websocket failure: ${it.message}" }
+                        }
                     }
                 }
             }

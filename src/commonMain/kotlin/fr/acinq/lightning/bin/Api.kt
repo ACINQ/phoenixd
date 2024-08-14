@@ -33,6 +33,7 @@ import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
+import fr.acinq.lightning.logging.warning
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.*
 import fr.acinq.lightning.wire.OfferTypes
@@ -73,6 +74,8 @@ class Api(
 
     @OptIn(ExperimentalSerializationApi::class)
     fun Application.module() {
+
+        val log = loggerFactory.newLogger(this::class)
 
         val payDnsAddress = PayDnsAddress()
         val lnurlHandler = LnurlHandler(loggerFactory, nodeParams.keyManager as LocalKeyManager)
@@ -384,10 +387,10 @@ class Api(
                     }
                 }
                 webSocket("/websocket") {
-                    try {
+                    kotlin.runCatching {
                         eventsFlow.collect { sendSerialized(it) }
-                    } catch (e: Throwable) {
-                        println("onError ${closeReason.await()?.message}")
+                    }.onFailure {
+                        log.warning { "websocket failure: ${it.message}" }
                     }
                 }
             }
@@ -412,9 +415,13 @@ class Api(
             }
         }
         suspend fun notifyWebhook(url: Url, event: ApiEvent) {
-            client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(event)
+            kotlin.runCatching {
+                client.post(url) {
+                    contentType(ContentType.Application.Json)
+                    setBody(event)
+                }
+            }.onFailure {
+                log.warning { "webhook failure: ${it.message}" }
             }
         }
         // general webhook urls

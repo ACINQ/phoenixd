@@ -299,8 +299,9 @@ class Phoenixd : CliktCommand() {
                         .collect {
                             when {
                                 it is PaymentEvents.PaymentReceived && it.amount > 0.msat -> {
+                                    val incomingPayment = paymentsDb.getIncomingPayment(it.paymentHash)
                                     val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(it.paymentHash))
-                                    emit(ApiType.PaymentReceived(it, metadata))
+                                    emit(ApiType.PaymentReceived(it, incomingPayment, metadata))
                                 }
                                 else -> {}
                             }

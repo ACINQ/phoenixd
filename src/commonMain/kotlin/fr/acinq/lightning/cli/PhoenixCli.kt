@@ -205,6 +205,7 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
         option("--description", "--desc").convert { Either.Left(it) },
         option("--descriptionHash", "--desc-hash").convert { Either.Right(it.toByteVector32()) }
     ).single().required()
+    private val expirySeconds by option("--expirySeconds").long()
 
     private val externalId by option("--externalId")
     private val webhookUrl by option("--webhookUrl")
@@ -217,6 +218,7 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
                     is Either.Left -> append("description", d.value)
                     is Either.Right -> append("descriptionHash", d.value.toHex())
                 }
+                expirySeconds?.let { append("expirySeconds", it.toString()) }
                 externalId?.let { append("externalId", it) }
                 webhookUrl?.let { append("webhookUrl", it) }
             }

@@ -47,6 +47,7 @@ fun main(args: Array<String>) =
         .subcommands(
             GetInfo(),
             GetBalance(),
+            EstimateLiquidityFees(),
             ListChannels(),
             GetOutgoingPayment(),
             ListOutgoingPayments(),
@@ -136,6 +137,17 @@ class GetInfo : PhoenixCliCommand(name = "getinfo", help = "Show basic info abou
 class GetBalance : PhoenixCliCommand(name = "getbalance", help = "Returns your current balance") {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "getbalance")
+    }
+}
+
+class EstimateLiquidityFees : PhoenixCliCommand(name = "estimateliquidityfees", help = "Estimates the liquidity fees for a given amount, at current feerates.") {
+    private val amountSat by option("--amountSat").long().required()
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "estimateliquidityfees") {
+            url {
+                parameters.append("amountSat", amountSat.toString())
+            }
+        }
     }
 }
 

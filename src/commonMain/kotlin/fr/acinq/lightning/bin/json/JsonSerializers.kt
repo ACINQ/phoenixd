@@ -29,6 +29,7 @@ import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.wire.LiquidityAds
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
@@ -73,6 +74,11 @@ sealed class ApiType {
 
     @Serializable
     data class Balance(@SerialName("balanceSat") val amount: Satoshi, @SerialName("feeCreditSat") val feeCredit: Satoshi) : ApiType()
+
+    @Serializable
+    data class LiquidityFees(@SerialName("miningFeeSat") val miningFee: Satoshi, @SerialName("serviceFeeSat") val serviceFee: Satoshi) : ApiType() {
+        constructor(leaseFees: LiquidityAds.LeaseFees) : this(leaseFees.miningFee, leaseFees.serviceFee)
+    }
 
     @Serializable
     data class GeneratedInvoice(@SerialName("amountSat") val amount: Satoshi?, val paymentHash: ByteVector32, val serialized: String) : ApiType()

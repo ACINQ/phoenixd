@@ -2,9 +2,12 @@ package fr.acinq.lightning.bin.conf
 
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
+import fr.acinq.bitcoin.Satoshi
 import fr.acinq.lightning.*
+import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
+import fr.acinq.lightning.wire.LiquidityAds
 
 
 data class LSP(val walletParams: WalletParams, val swapInXpub: String) {
@@ -53,27 +56,34 @@ data class LSP(val walletParams: WalletParams, val swapInXpub: String) {
             else -> error("unsupported chain $chain")
         }
 
-//        fun liquidityLeaseRate(amount: Satoshi): LiquidityAds.LeaseRate {
-//            // WARNING : THIS MUST BE KEPT IN SYNC WITH LSP OTHERWISE FUNDING REQUEST WILL BE REJECTED BY PHOENIX
-//            val fundingWeight = if (amount <= 100_000.sat) {
-//                271 * 2 // 2-inputs (wpkh) / 0-change
-//            } else if (amount <= 250_000.sat) {
-//                271 * 2 // 2-inputs (wpkh) / 0-change
-//            } else if (amount <= 500_000.sat) {
-//                271 * 4 // 4-inputs (wpkh) / 0-change
-//            } else if (amount <= 1_000_000.sat) {
-//                271 * 4 // 4-inputs (wpkh) / 0-change
-//            } else {
-//                271 * 6 // 6-inputs (wpkh) / 0-change
-//            }
-//            return LiquidityAds.LeaseRate(
-//                leaseDuration = 0,
-//                fundingWeight = fundingWeight,
-//                leaseFeeProportional = 100, // 1%
-//                leaseFeeBase = 0.sat,
-//                maxRelayFeeProportional = 100,
-//                maxRelayFeeBase = 1_000.msat
-//            )
-//        }
+        fun liquidityFees(amount: Satoshi, feerate: FeeratePerKw, isNew: Boolean): LiquidityAds.LeaseFees {
+            val creationFee = if (isNew) 1_000.sat else 0.sat
+            val leaseRate = liquidityLeaseRate(amount)
+            val leaseFees = leaseRate.fees(feerate, requestedAmount = amount, contributedAmount = amount)
+            return leaseFees.copy(serviceFee = creationFee + leaseFees.serviceFee)
+        }
+
+        private fun liquidityLeaseRate(amount: Satoshi): LiquidityAds.LeaseRate {
+            // WARNING : THIS MUST BE KEPT IN SYNC WITH LSP OTHERWISE FUNDING REQUEST WILL BE REJECTED BY PHOENIX
+            val fundingWeight = if (amount <= 100_000.sat) {
+                271 * 2 // 2-inputs (wpkh) / 0-change
+            } else if (amount <= 250_000.sat) {
+                271 * 2 // 2-inputs (wpkh) / 0-change
+            } else if (amount <= 500_000.sat) {
+                271 * 4 // 4-inputs (wpkh) / 0-change
+            } else if (amount <= 1_000_000.sat) {
+                271 * 4 // 4-inputs (wpkh) / 0-change
+            } else {
+                271 * 6 // 6-inputs (wpkh) / 0-change
+            }
+            return LiquidityAds.LeaseRate(
+                leaseDuration = 0,
+                fundingWeight = fundingWeight,
+                leaseFeeProportional = 100, // 1%
+                leaseFeeBase = 0.sat,
+                maxRelayFeeProportional = 100,
+                maxRelayFeeBase = 1_000.msat
+            )
+        }
     }
 }

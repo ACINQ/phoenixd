@@ -11,6 +11,7 @@ import fr.acinq.lightning.BuildVersions
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
+import fr.acinq.lightning.bin.conf.LSP
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
@@ -56,6 +57,8 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -160,6 +163,12 @@ class Api(
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
                         .sum().truncateToSatoshi()
                     call.respond(Balance(balance, nodeParams.feeCredit.value))
+                }
+                get("estimateliquidityfees") {
+                    val amount = call.parameters.getLong("amountSat").sat
+                    val feerate = peer.onChainFeeratesFlow.filterNotNull().first().fundingFeerate
+                    val liquidityFees = LSP.liquidityFees(amount, feerate, isNew = peer.channels.isEmpty())
+                    call.respond(LiquidityFees(liquidityFees))
                 }
                 get("listchannels") {
                     call.respond(peer.channels.values.toList())

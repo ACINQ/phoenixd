@@ -66,7 +66,7 @@ sealed class InboundLiquidityLeaseData {
         fun deserialize(
             typeVersion: InboundLiquidityLeaseTypeVersion,
             blob: ByteArray,
-        ): LiquidityAds.Lease = DbTypesHelper.decodeBlob(blob) { json, format ->
+        ): LiquidityAds.Purchase = DbTypesHelper.decodeBlob(blob) { json, format ->
             when (typeVersion) {
                 InboundLiquidityLeaseTypeVersion.LEASE_V0 -> format.decodeFromString<V0>(json).let {
                     LiquidityAds.Lease(

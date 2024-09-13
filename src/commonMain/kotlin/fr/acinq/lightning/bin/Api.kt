@@ -162,13 +162,19 @@ class Api(
                         .filterNot { it is Closing || it is Closed }
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
                         .sum().truncateToSatoshi()
-                    call.respond(Balance(balance, nodeParams.feeCredit.value))
+                    call.respond(Balance(balance, peer.feeCreditFlow.value.truncateToSatoshi()))
                 }
                 get("estimateliquidityfees") {
                     val amount = call.parameters.getLong("amountSat").sat
                     val feerate = peer.onChainFeeratesFlow.filterNotNull().first().fundingFeerate
-                    val liquidityFees = LSP.liquidityFees(amount, feerate, isNew = peer.channels.isEmpty())
-                    call.respond(LiquidityFees(liquidityFees))
+                    val fundingRates = peer.remoteFundingRates.filterNotNull().first()
+                    when (val fundingRate = fundingRates.findRate(amount)) {
+                        null -> badRequest("no available funding rates for amount=$amount")
+                        else -> {
+                            val liquidityFees = fundingRate.fees(feerate, amount, amount, isChannelCreation = peer.channels.isEmpty())
+                            call.respond(LiquidityFees(liquidityFees))
+                        }
+                    }
                 }
                 get("listchannels") {
                     call.respond(peer.channels.values.toList())

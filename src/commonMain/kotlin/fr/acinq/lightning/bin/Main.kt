@@ -47,10 +47,7 @@ import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
-import fr.acinq.lightning.utils.Connection
-import fr.acinq.lightning.utils.msat
-import fr.acinq.lightning.utils.sat
-import fr.acinq.lightning.utils.toByteVector
+import fr.acinq.lightning.utils.*
 import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -90,14 +87,14 @@ class Phoenixd : CliktCommand() {
         }
     private val agreeToTermsOfService by option("--agree-to-terms-of-service", hidden = true, help = "Agree to terms of service").flag()
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
-        "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet
+        "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet3
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
     private val mempoolSpaceUrl by option("--mempool-space-url", help = "Custom mempool.space instance")
         .convert { Url(it) }
         .defaultLazy {
             when (chain) {
                 Chain.Mainnet -> MempoolSpaceClient.OfficialMempoolMainnet
-                Chain.Testnet -> MempoolSpaceClient.OfficialMempoolTestnet
+                Chain.Testnet3 -> MempoolSpaceClient.OfficialMempoolTestnet
                 else -> error("unsupported chain")
             }
         }
@@ -155,7 +152,7 @@ class Phoenixd : CliktCommand() {
             "off" to 0.sat,
             "50k" to 50_000.sat,
             "100k" to 100_000.sat,
-        ).default(100_000.sat, "100k")
+        ).convert { it.toMilliSatoshi() }.default(100_000.sat.toMilliSatoshi(), "100k")
         private val maxRelativeFeePct by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
             .int()
             .restrictTo(1..50)
@@ -244,10 +241,11 @@ class Phoenixd : CliktCommand() {
         )
         val lsp = LSP.from(chain)
         val liquidityPolicy = LiquidityPolicy.Auto(
-            maxMiningFee = liquidityOptions.maxMiningFee,
+            inboundLiquidityTarget = liquidityOptions.autoLiquidity,
+            maxAbsoluteFee = liquidityOptions.maxMiningFee,
             maxRelativeFeeBasisPoints = liquidityOptions.maxRelativeFeeBasisPoints,
-            skipMiningFeeCheck = false,
-            maxAllowedCredit = liquidityOptions.maxFeeCredit
+            skipAbsoluteFeeCheck = false,
+            maxAllowedFeeCredit = liquidityOptions.maxFeeCredit
         )
         val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)
         val nodeParams = NodeParams(chain, loggerFactory, keyManager)
@@ -332,30 +330,32 @@ class Phoenixd : CliktCommand() {
             }
             launch {
                 nodeParams.nodeEvents
-                    .filterIsInstance<LiquidityEvents.Decision.Rejected>()
+                    .filterIsInstance<LiquidityEvents.Rejected>()
                     .collect {
                         when (val reason = it.reason) {
-                            is LiquidityEvents.Decision.Rejected.Reason.OverMaxCredit -> {
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit (max=${reason.maxAllowedCredit})"))
-                            }
-                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverMaxMiningFee -> {
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max mining fee (max=${reason.maxMiningFee})"))
-                            }
-                            is LiquidityEvents.Decision.Rejected.Reason.TooExpensive.OverRelativeFee -> {
+//                            is LiquidityEvents.Rejected.Reason.OverMaxCredit -> {
+//                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit (max=${reason.maxAllowedCredit})"))
+//                            }
+                            is LiquidityEvents.Rejected.Reason.TooExpensive.OverAbsoluteFee ->
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max mining fee (max=${reason.maxAbsoluteFee})"))
+                            is LiquidityEvents.Rejected.Reason.TooExpensive.OverRelativeFee ->
                                 consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} more than ${reason.maxRelativeFeeBasisPoints.toDouble() / 100}% of amount"))
-                            }
-                            LiquidityEvents.Decision.Rejected.Reason.ChannelInitializing -> {
-                                consoleLog(yellow("channels are initializing"))
-                            }
-                            LiquidityEvents.Decision.Rejected.Reason.PolicySetToDisabled -> {
+                            LiquidityEvents.Rejected.Reason.PolicySetToDisabled ->
                                 consoleLog(yellow("automated liquidity is disabled"))
-                            }
+                            LiquidityEvents.Rejected.Reason.ChannelFundingInProgress ->
+                                consoleLog(yellow("channel operation is in progress"))
+                            is LiquidityEvents.Rejected.Reason.MissingOffChainAmountTooLow ->
+                                consoleLog(yellow("missing offchain amount is too low (missingOffChainAmount=${reason.missingOffChainAmount} currentFeeCredit=${reason.currentFeeCredit}"))
+                            LiquidityEvents.Rejected.Reason.NoMatchingFundingRate ->
+                                consoleLog(yellow("no matching funding rates"))
+                            is LiquidityEvents.Rejected.Reason.TooManyParts ->
+                                consoleLog(yellow("too many payment parts"))
                         }
                     }
             }
             launch {
-                nodeParams.feeCredit
-                    .drop(1) // we drop the initial value which is 0 sat
+                peer.feeCreditFlow
+                    .drop(1) // we drop the initial value which is 0 msat
                     .collect { feeCredit -> consoleLog("fee credit: $feeCredit") }
             }
         }
@@ -370,8 +370,6 @@ class Phoenixd : CliktCommand() {
 
         runBlocking {
             peer.connectionState.first { it == Connection.ESTABLISHED }
-            peer.registerFcmToken("super-${randomBytes32().toHex()}")
-            peer.setAutoLiquidityParams(liquidityOptions.autoLiquidity)
         }
 
         val server = embeddedServer(CIO, port = httpBindPort, host = httpBindIp,

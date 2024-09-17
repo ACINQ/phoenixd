@@ -40,7 +40,7 @@ import kotlinx.serialization.UseSerializers
 sealed class ApiType {
 
     @Serializable
-    data class Channel internal constructor(
+    data class Channel(
         val state: String,
         val channelId: ByteVector32? = null,
         val balanceSat: Satoshi? = null,

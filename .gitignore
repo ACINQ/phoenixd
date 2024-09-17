@@ -1,6 +1,7 @@
 .gradle
 build/
 .cxx
+.kotlin
 
 # this file is local to the dev environment and must not be pushed!
 local.properties
@@ -24,23 +25,8 @@ gradle-app.setting
 *.class
 *.log
 
-# sbt specific
-.cache/
-.history/
-.lib/
-dist/*
-target/
-lib_managed/
-src_managed/
-project/boot/
-project/plugins/project/
-
-# Scala-IDE specific
-.scala_dependencies
-.worksheet
-
 .idea
 *.iml
 target/
 project/target
-DeleteMe*.scala
+

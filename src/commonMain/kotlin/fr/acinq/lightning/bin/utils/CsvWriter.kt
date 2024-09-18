@@ -1,6 +1,13 @@
 package fr.acinq.lightning.bin.utils
 
+import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.Satoshi
+import fr.acinq.bitcoin.TxId
+import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.utils.msat
+import fr.acinq.lightning.utils.sat
+import fr.acinq.lightning.utils.toMilliSatoshi
 import kotlinx.datetime.Instant
 import okio.BufferedSink
 import okio.FileSystem
@@ -40,63 +47,66 @@ open class CsvWriter(path: Path) {
     }
 }
 
-class WalletPaymentCsvWriter(path: Path, val includeOriginDestination: Boolean = false) : CsvWriter(path) {
+class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
-    private val FIELD_DATE = "Date"
-    private val FIELD_AMOUNT_MSAT = "Amount Millisatoshi"
-    private val FIELD_FEES_MSAT = "Fees Millisatoshi"
-    private val FIELD_CONTEXT = "Context"
+    private val FIELD_DATE = "date"
+    private val FIELD_TYPE = "type"
+    private val FIELD_AMOUNT_MSAT = "amount_msat"
+    private val FIELD_MINING_FEE_SAT = "mining_fee_sat"
+    private val FIELD_SERVICE_FEE_MSAT = "service_fee_msat"
+    private val FIELD_PAYMENT_HASH = "payment_hash"
+    private val FIELD_TX_ID = "tx_id"
 
     init {
-        val headers = buildList {
-            add(FIELD_DATE)
-            add(FIELD_AMOUNT_MSAT)
-            add(FIELD_FEES_MSAT)
-            if (includeOriginDestination) add(FIELD_CONTEXT)
-        }
-        addRow(headers)
+        addRow(FIELD_DATE, FIELD_TYPE, FIELD_AMOUNT_MSAT, FIELD_MINING_FEE_SAT, FIELD_SERVICE_FEE_MSAT, FIELD_PAYMENT_HASH, FIELD_TX_ID)
+    }
+
+    data class Details(
+        val type: String,
+        val miningFee: Satoshi,
+        val serviceFee: MilliSatoshi,
+        val paymentHash: ByteVector32?,
+        val txId: TxId?
+    )
+
+    private fun addRow(
+        timestamp: Long,
+        amount: MilliSatoshi,
+        details: Details
+    ) {
+        val dateStr = Instant.fromEpochMilliseconds(timestamp).toString() // ISO-8601 format
+        addRow(dateStr, details.type, amount.msat.toString(), details.miningFee.sat.toString(), details.serviceFee.msat.toString(), details.paymentHash?.toHex() ?: "", details.txId?.toString() ?: "")
     }
 
     fun addRow(payment: WalletPayment) {
-        val fields = buildList {
-            val date = payment.completedAt ?: payment.createdAt
-            val dateStr = Instant.fromEpochMilliseconds(date).toString() // ISO-8601 format
-            add(dateStr)
+        val timestamp = payment.completedAt ?: payment.createdAt
 
-            val amtMsat = payment.amount.msat
-            val feesMsat = payment.fees.msat
-            val isOutgoing = payment is OutgoingPayment
-
-            val amtMsatStr = if (isOutgoing) "-$amtMsat" else "$amtMsat"
-            add(amtMsatStr)
-
-            val feesMsatStr = if (feesMsat > 0) "-$feesMsat" else "$feesMsat"
-            add(feesMsatStr)
-
-            if (includeOriginDestination) {
-                val details = when (payment) {
-                    is IncomingPayment -> when (val origin = payment.origin) {
-                        is IncomingPayment.Origin.Invoice -> "Incoming LN payment"
-                        is IncomingPayment.Origin.SwapIn -> "Swap-in to ${origin.address ?: "N/A"}"
-                        is IncomingPayment.Origin.OnChain -> "Swap-in with inputs: ${origin.localInputs.map { it.txid.toString() }}"
-                        is IncomingPayment.Origin.Offer -> "Incoming offer ${origin.metadata.offerId}"
-                    }
-
-                    is LightningOutgoingPayment -> when (val details = payment.details) {
-                        is LightningOutgoingPayment.Details.Normal -> "Outgoing LN payment to ${details.paymentRequest.nodeId.toHex()}"
-                        is LightningOutgoingPayment.Details.SwapOut -> "Swap-out to ${details.address}"
-                        is LightningOutgoingPayment.Details.Blinded -> "Offer to ${details.payerKey.publicKey()}"
-                    }
-
-                    is SpliceOutgoingPayment -> "Outgoing splice to ${payment.address}"
-                    is ChannelCloseOutgoingPayment -> "Channel closing to ${payment.address}"
-                    is SpliceCpfpOutgoingPayment -> "Accelerate transactions with CPFP"
-                is InboundLiquidityOutgoingPayment -> "+${payment.purchase.amount.sat} sat inbound liquidity"
-                }
-                add(details)
+        val details = when (payment) {
+            is IncomingPayment -> when (val origin = payment.origin) {
+                is IncomingPayment.Origin.Invoice -> Details("lightning_received", miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.Origin.SwapIn -> Details("legacy_swap_in", miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.Origin.OnChain -> Details("swap_in", miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = origin.txId)
+                is IncomingPayment.Origin.Offer -> Details("lightning_received", miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null)
             }
+
+            is LightningOutgoingPayment -> when (val details = payment.details) {
+                is LightningOutgoingPayment.Details.Normal -> Details("lightning_sent", miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null)
+                is LightningOutgoingPayment.Details.SwapOut -> Details("legacy_swap_out", miningFee = details.swapOutFee, serviceFee = 0.msat, paymentHash = null, txId = null)
+                is LightningOutgoingPayment.Details.Blinded -> Details("lightning_sent", miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null)
+            }
+
+            is SpliceOutgoingPayment -> Details("splice_out", miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId)
+            is ChannelCloseOutgoingPayment -> Details("channel_close", miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId)
+            is SpliceCpfpOutgoingPayment -> Details("fee_bumping", miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId)
+            is InboundLiquidityOutgoingPayment -> Details("liquidity", miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId)
         }
 
-        addRow(fields)
+        val isOutgoing = payment is OutgoingPayment
+
+        addRow(
+            timestamp = timestamp,
+            amount = if (isOutgoing) -payment.amount else payment.amount,
+            details = details
+        )
     }
 }

@@ -66,6 +66,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
+import okio.Path.Companion.toPath
 import kotlin.time.Duration.Companion.seconds
 
 class Api(
@@ -440,34 +441,34 @@ class Api(
                         call.respondText(channelClose.txId.toString())
                     }
                 }
-            }
-            post("export") {
-                val from = call.parameters.getOptionalLong("from") ?: 0L
-                val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
-                val batchSize = 32L
-                var batchOffset = 0L
-                var fetching = true
-                val rows = mutableListOf<String>()
-                val csvConfig = CsvWriter.Configuration(
-                    includesOriginDestination = true,
-                )
-                rows += CsvWriter.makeHeaderRow(csvConfig)
-                while (fetching) {
-                    paymentDb.listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset).map {
-                        rows += CsvWriter.makeRow(it, csvConfig)
-                    }.let { result ->
-                        if (result.isEmpty()) {
-                            fetching = false
-                        } else {
-                            batchOffset += result.size
-                        }
-                    }
-                }
-                val paymentsFound = rows.size - 1
-                if (paymentsFound == 0) {
-                    call.respondText("no payments found in that range")
-                } else {
-
+                post("export") {
+//                    val from = call.parameters.getOptionalLong("from") ?: 0L
+//                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+//                    val batchSize = 32L
+//                    var batchOffset = 0L
+//                    var fetching = true
+//                    val rows = mutableListOf<String>()
+//                    val csvConfig = CsvWriter.Configuration(
+//                        includesOriginDestination = true,
+//                    )
+//                    rows += CsvWriter.makeHeaderRow(csvConfig)
+//                    while (fetching) {
+//                        paymentDb.listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset).map {
+//                            rows += CsvWriter.makeRow(it, csvConfig)
+//                        }.let { result ->
+//                            if (result.isEmpty()) {
+//                                fetching = false
+//                            } else {
+//                                batchOffset += result.size
+//                            }
+//                        }
+//                    }
+//                    val paymentsFound = rows.size - 1
+//                    if (paymentsFound == 0) {
+//                        call.respondText("no payments found in that range")
+//                    } else {
+//
+//                    }
                 }
             }
             route("/websocket") {

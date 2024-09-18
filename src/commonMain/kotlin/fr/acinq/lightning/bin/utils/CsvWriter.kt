@@ -40,7 +40,7 @@ open class CsvWriter(path: Path) {
     }
 }
 
-class WalletPaymentCsvWriter(path: Path, val includesOriginDestination: Boolean = false) : CsvWriter(path) {
+class WalletPaymentCsvWriter(path: Path, val includeOriginDestination: Boolean = false) : CsvWriter(path) {
 
     private val FIELD_DATE = "Date"
     private val FIELD_AMOUNT_MSAT = "Amount Millisatoshi"
@@ -52,7 +52,7 @@ class WalletPaymentCsvWriter(path: Path, val includesOriginDestination: Boolean 
             add(FIELD_DATE)
             add(FIELD_AMOUNT_MSAT)
             add(FIELD_FEES_MSAT)
-            if (includesOriginDestination) add(FIELD_CONTEXT)
+            if (includeOriginDestination) add(FIELD_CONTEXT)
         }
         addRow(headers)
     }
@@ -73,7 +73,7 @@ class WalletPaymentCsvWriter(path: Path, val includesOriginDestination: Boolean 
             val feesMsatStr = if (feesMsat > 0) "-$feesMsat" else "$feesMsat"
             add(feesMsatStr)
 
-            if (includesOriginDestination) {
+            if (includeOriginDestination) {
                 val details = when (payment) {
                     is IncomingPayment -> when (val origin = payment.origin) {
                         is IncomingPayment.Origin.Invoice -> "Incoming LN payment"

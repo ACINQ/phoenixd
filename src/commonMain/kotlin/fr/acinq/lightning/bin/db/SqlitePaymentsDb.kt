@@ -316,16 +316,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    suspend fun listSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32): List<WalletPayment> {
+    suspend fun processSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32, process: (WalletPayment) -> Unit) {
         var batchOffset = 0L
         var fetching = true
-        return buildList {
-            while (fetching) {
-                val results = listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset)
-                addAll(results)
-                fetching = results.isNotEmpty()
-                batchOffset += results.size
-            }
+        while (fetching) {
+            val results = listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset)
+            results.forEach { process(it) }
+            fetching = results.isNotEmpty()
+            batchOffset += results.size
         }
     }
 }

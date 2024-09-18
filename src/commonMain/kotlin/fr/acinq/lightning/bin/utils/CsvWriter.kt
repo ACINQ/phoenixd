@@ -78,7 +78,7 @@ object CsvWriter {
                 is SpliceOutgoingPayment -> "Outgoing splice to ${payment.address}"
                 is ChannelCloseOutgoingPayment -> "Channel closing to ${payment.address}"
                 is SpliceCpfpOutgoingPayment -> "Accelerate transactions with CPFP"
-                is InboundLiquidityOutgoingPayment -> "+${payment.lease.amount.sat} sat inbound liquidity"
+                is InboundLiquidityOutgoingPayment -> "+${payment.purchase.amount.sat} sat inbound liquidity"
             }
             row += ",${processField(details)}"
         }

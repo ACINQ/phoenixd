@@ -19,14 +19,14 @@ package fr.acinq.lightning.bin.db
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.TxId
-import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.bin.db.csvexport.CsvExportQueries
-import fr.acinq.lightning.bin.db.payments.LinkTxToPaymentQueries
-import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
+import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.FinalFailure
-import fr.acinq.lightning.utils.*
-import fr.acinq.phoenix.db.*
+import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.currentTimestampMillis
+import fr.acinq.lightning.utils.toByteVector32
+import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -289,7 +289,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    suspend fun listSuccessfulPayments(from: Long, to: Long, limit: Long, offset: Long,): List<WalletPayment> {
+    private suspend fun listSuccessfulPayments(from: Long, to: Long, limit: Long, offset: Long): List<WalletPayment> {
         return withContext(Dispatchers.Default) {
             csvExportQueries.listSuccessfulPaymentIds(from, to, limit, offset).mapNotNull { paymentId ->
                 when (paymentId) {
@@ -312,6 +312,19 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                         channelCloseQueries.getChannelCloseOutgoingPayment(paymentId.id)
                     }
                 }
+            }
+        }
+    }
+
+    suspend fun listSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32): List<WalletPayment> {
+        var batchOffset = 0L
+        var fetching = true
+        return buildList {
+            while (fetching) {
+                val results = listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset)
+                addAll(results)
+                fetching = results.isNotEmpty()
+                batchOffset += results.size
             }
         }
     }

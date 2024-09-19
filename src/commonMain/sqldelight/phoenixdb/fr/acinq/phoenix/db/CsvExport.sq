@@ -18,28 +18,28 @@ UNION ALL
         3            AS type,
         id           AS id,
         created_at   AS created_at,
-        confirmed_at AS completed_at
+        locked_at AS completed_at
     FROM splice_outgoing_payments
-    WHERE splice_outgoing_payments.confirmed_at IS NOT NULL
-    AND   splice_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+    WHERE splice_outgoing_payments.locked_at IS NOT NULL
+    AND   splice_outgoing_payments.locked_at BETWEEN :startDate AND :endDate
 UNION ALL
     SELECT
         4            AS type,
         id           AS id,
         created_at   AS created_at,
-        confirmed_at AS completed_at
+        locked_at AS completed_at
     FROM channel_close_outgoing_payments
-    WHERE channel_close_outgoing_payments.confirmed_at IS NOT NULL
-    AND   channel_close_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+    WHERE channel_close_outgoing_payments.locked_at IS NOT NULL
+    AND   channel_close_outgoing_payments.locked_at BETWEEN :startDate AND :endDate
 UNION ALL
     SELECT
         5            AS type,
         id           AS id,
         created_at   AS created_at,
-        confirmed_at AS completed_at
+        locked_at AS completed_at
     FROM splice_cpfp_outgoing_payments
-    WHERE splice_cpfp_outgoing_payments.confirmed_at IS NOT NULL
-    AND   splice_cpfp_outgoing_payments.confirmed_at BETWEEN :startDate AND :endDate
+    WHERE splice_cpfp_outgoing_payments.locked_at IS NOT NULL
+    AND   splice_cpfp_outgoing_payments.locked_at BETWEEN :startDate AND :endDate
 UNION ALL
     SELECT
         6            AS type,

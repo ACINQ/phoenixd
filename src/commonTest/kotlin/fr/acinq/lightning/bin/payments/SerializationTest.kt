@@ -1,8 +1,9 @@
 package fr.acinq.lightning.bin.payments
 
 import fr.acinq.lightning.Lightning.randomBytes32
-import fr.acinq.lightning.wire.LiquidityAds
-import fr.acinq.phoenix.types.db.LiquidityAdsDb
+import fr.acinq.phoenix.types.db.LiquidityAds
+import fr.acinq.phoenix.types.db.LiquidityAds.PaymentDetails.Companion.asDb
+import fr.acinq.phoenix.types.db.LiquidityAds.PaymentDetails.Companion.asOfficial
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -12,17 +13,17 @@ class SerializationTest {
     @Test
     fun `polymorphic serialization`() {
 
-        val paymentDetails = LiquidityAds.PaymentDetails.FromFutureHtlc(listOf(randomBytes32(), randomBytes32()))
+        val paymentDetails = fr.acinq.lightning.wire.LiquidityAds.PaymentDetails.FromFutureHtlc(listOf(randomBytes32(), randomBytes32()))
 
-        val paymentDetailsV0: LiquidityAdsDb.PaymentDetailsDb = LiquidityAdsDb.PaymentDetailsDb.FutureHtlc.V0(paymentDetails.paymentHashes)
+        val paymentDetailsV0: LiquidityAds.PaymentDetails = paymentDetails.asDb()
 
         val serialized = Json.encodeToString(paymentDetailsV0)
         println(serialized)
 
-        val deserialized = Json.decodeFromString<LiquidityAdsDb.PaymentDetailsDb>(serialized)
+        val deserialized = Json.decodeFromString<LiquidityAds.PaymentDetails>(serialized)
 
         println(deserialized)
 
-        val paymentDetails_ = LiquidityAds.PaymentDetails.FromFutureHtlc(listOf(randomBytes32(), randomBytes32()))
+        val paymentDetails_ = deserialized.asOfficial()
     }
 }

@@ -1,11 +1,11 @@
-import fr.acinq.lightning.wire.LiquidityAds;
+import fr.acinq.phoenix.types.db.LiquidityAds;
 
 -- Stores in a flat row payments standing for an inbound liquidity request (which are done through a splice).
 -- The purchase data are stored in a complex column, as a json-encoded blob. See InboundLiquidityLeaseType file.
 --
 -- Note that these purchase data used to be called "lease" in the old on-the-fly channel mechanism, that's why the
 -- colum uses that name, it's a legacy artifact. They now map to a "LiquidityAds.Purchase" object.
-CREATE TABLE inbound_liquidity_outgoing_payments (
+CREATE TABLE outgoing_payments_liquidity_purchases (
     id TEXT NOT NULL PRIMARY KEY,
     mining_fees_sat INTEGER NOT NULL,
     channel_id BLOB NOT NULL,
@@ -19,25 +19,25 @@ CREATE TABLE inbound_liquidity_outgoing_payments (
 );
 
 insert:
-INSERT INTO inbound_liquidity_outgoing_payments (
+INSERT INTO outgoing_payments_liquidity_purchases (
     id, mining_fees_sat, channel_id, tx_id, purchase_type, payment_details_type, purchase_json, created_at, confirmed_at, locked_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 setConfirmed:
-UPDATE inbound_liquidity_outgoing_payments SET confirmed_at=? WHERE id=?;
+UPDATE outgoing_payments_liquidity_purchases SET confirmed_at=? WHERE id=?;
 
 setLocked:
-UPDATE inbound_liquidity_outgoing_payments SET locked_at=? WHERE id=?;
+UPDATE outgoing_payments_liquidity_purchases SET locked_at=? WHERE id=?;
 
 get:
 SELECT *
-FROM inbound_liquidity_outgoing_payments
+FROM outgoing_payments_liquidity_purchases
 WHERE id=?;
 
 getByTxId:
 SELECT *
-FROM inbound_liquidity_outgoing_payments
+FROM outgoing_payments_liquidity_purchases
 WHERE tx_id=?;
 
 delete:
-DELETE FROM inbound_liquidity_outgoing_payments WHERE id=?;
+DELETE FROM outgoing_payments_liquidity_purchases WHERE id=?;

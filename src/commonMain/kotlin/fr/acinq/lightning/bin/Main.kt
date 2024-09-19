@@ -275,7 +275,7 @@ class Phoenixd : CliktCommand() {
             channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
                 closing_info_typeAdapter = EnumColumnAdapter()
             ),
-            inbound_liquidity_outgoing_paymentsAdapter = Inbound_liquidity_outgoing_payments.Adapter(
+            outgoing_payments_liquidity_purchasesAdapter = Outgoing_payments_liquidity_purchases.Adapter(
                 purchase_jsonAdapter = LiquidityAdsPurchaseAdapter()
             ),
         )

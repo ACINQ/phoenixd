@@ -16,13 +16,13 @@ class CsvExportTestsCommon {
     @Test
     @Ignore
     fun `export to csv`() {
-        val driver = createAppDbDriver(datadir, Chain.Testnet, PublicKey.fromHex("0211dadf19b1268f1f21b0b233e22c4f648d419e2476bfd8fe356479fbad5c146d"))
+        val driver = createAppDbDriver(datadir, Chain.Testnet3, PublicKey.fromHex("0211dadf19b1268f1f21b0b233e22c4f648d419e2476bfd8fe356479fbad5c146d"))
         val database = createPhoenixDb(driver)
         val paymentsDb = SqlitePaymentsDb(database)
         val csvWriter = WalletPaymentCsvWriter("csv/export.csv".toPath())
         runBlocking {
             paymentsDb.processSuccessfulPayments(0, currentTimestampMillis()) { payment ->
-                csvWriter.addRow(payment)
+                csvWriter.add(payment)
             }
         }
         csvWriter.close()

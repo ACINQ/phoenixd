@@ -29,10 +29,22 @@ object DbTypesHelper {
 
     val module = SerializersModule {
         polymorphic(IncomingReceivedWithData.Part::class) {
+            @Suppress("DEPRECATION")
             subclass(IncomingReceivedWithData.Part.Htlc.V0::class)
+            subclass(IncomingReceivedWithData.Part.Htlc.V1::class)
             subclass(IncomingReceivedWithData.Part.NewChannel.V2::class)
             subclass(IncomingReceivedWithData.Part.SpliceIn.V0::class)
             subclass(IncomingReceivedWithData.Part.FeeCredit.V0::class)
+        }
+        polymorphic(InboundLiquidityPaymentDetailsData::class) {
+            subclass(InboundLiquidityPaymentDetailsData.ChannelBalance.V0::class)
+            subclass(InboundLiquidityPaymentDetailsData.FutureHtlc.V0::class)
+            subclass(InboundLiquidityPaymentDetailsData.FutureHtlcWithPreimage.V0::class)
+            subclass(InboundLiquidityPaymentDetailsData.ChannelBalanceForFutureHtlc.V0::class)
+        }
+        polymorphic(InboundLiquidityPurchaseData::class) {
+            subclass(InboundLiquidityPurchaseData.Standard.V0::class)
+            subclass(InboundLiquidityPurchaseData.WithFeeCredit.V0::class)
         }
     }
 

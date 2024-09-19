@@ -98,6 +98,12 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
+    override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
+        return withContext(Dispatchers.Default) {
+            inboundLiquidityQueries.getByTxId(fundingTxId)
+        }
+    }
+
     override suspend fun completeOutgoingPaymentOffchain(
         id: UUID,
         finalFailure: FinalFailure,

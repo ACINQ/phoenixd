@@ -15,7 +15,11 @@ import java.util.*
 actual val datadir: Path = (System.getenv()[PHOENIX_DATADIR]?.toPath() ?: System.getProperty("user.home").toPath().div(".phoenix"))
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
-    val path = dir / "phoenix.${chain.name.lowercase()}.${nodeId.toHex().take(6)}.db"
+    val chainName = when (chain) {
+        is Chain.Testnet3 -> "testnet"
+        else -> chain.name.lowercase()
+    }
+    val path = dir / "phoenix.$chainName.${nodeId.toHex().take(6)}.db"
 
     // Initial schema version wasn't set, so we need to set it manually
     JdbcSqliteDriver("jdbc:sqlite:$path").let { driver ->

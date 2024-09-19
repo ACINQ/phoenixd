@@ -28,14 +28,16 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
 
     fun add(payment: InboundLiquidityOutgoingPayment) {
         database.transaction {
-            val (leaseType, leaseData) = payment.mapLeaseToDb()
+            val (purchase, details) = payment.mapPurchaseToDb()
            queries.insert(
                id = payment.id.toString(),
                mining_fees_sat = payment.miningFees.sat,
                channel_id = payment.channelId.toByteArray(),
                tx_id = payment.txId.value.toByteArray(),
-               lease_type = leaseType,
-               lease_blob = leaseData,
+               lease_type = purchase.first,
+               lease_blob = purchase.second,
+               payment_details_type = details.first,
+               payment_details_blob = details.second,
                created_at = payment.createdAt,
                confirmed_at = payment.confirmedAt,
                locked_at = payment.lockedAt,
@@ -45,6 +47,11 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
 
     fun get(id: UUID): InboundLiquidityOutgoingPayment? {
         return queries.get(id = id.toString(), mapper = Companion::mapPayment)
+            .executeAsOneOrNull()
+    }
+
+    fun getByTxId(txId: TxId): InboundLiquidityOutgoingPayment? {
+        return queries.getByTxId(tx_id = txId.value.toByteArray(), mapper = Companion::mapPayment)
             .executeAsOneOrNull()
     }
 
@@ -66,8 +73,9 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
             mining_fees_sat: Long,
             channel_id: ByteArray,
             tx_id: ByteArray,
-            lease_type: InboundLiquidityLeaseTypeVersion,
+            lease_type: InboundLiquidityPurchaseType,
             lease_blob: ByteArray,
+            payment_details_blob: ByteArray,
             created_at: Long,
             confirmed_at: Long?,
             locked_at: Long?
@@ -77,7 +85,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
                 miningFees = mining_fees_sat.sat,
                 channelId = channel_id.toByteVector32(),
                 txId = TxId(tx_id),
-                lease = InboundLiquidityLeaseData.deserialize(lease_type, lease_blob),
+                purchase = InboundLiquidityPurchaseData.deserialize(lease_type, lease_blob, payment_details_blob),
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at

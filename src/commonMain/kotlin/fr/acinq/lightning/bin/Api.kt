@@ -449,7 +449,7 @@ class Api(
                     log.info { "exporting payments to $csvPath..." }
                     val csvWriter = WalletPaymentCsvWriter(csvPath)
                     paymentDb.processSuccessfulPayments(from, to) { payment ->
-                        csvWriter.addRow(payment)
+                        csvWriter.add(payment)
                     }
                     csvWriter.close()
                     log.info { "csv export completed" }

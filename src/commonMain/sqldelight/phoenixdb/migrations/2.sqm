@@ -1,4 +1,5 @@
 import fr.acinq.lightning.bin.db.payments.InboundLiquidityPaymentDetailsType;
+import fr.acinq.lightning.wire.LiquidityAds.PaymentDetails;
 
 -- Migration: v2 -> v3
 --
@@ -9,4 +10,4 @@ import fr.acinq.lightning.bin.db.payments.InboundLiquidityPaymentDetailsType;
 -- * Added column [payment_details_blob] in table [inbound_liquidity_outgoing_payments]
 
 ALTER TABLE inbound_liquidity_outgoing_payments ADD COLUMN payment_details_type TEXT AS InboundLiquidityPaymentDetailsTypeVersion NOT NULL;
-ALTER TABLE inbound_liquidity_outgoing_payments ADD COLUMN payment_details_blob BLOB NOT NULL;
+ALTER TABLE inbound_liquidity_outgoing_payments ADD COLUMN payment_details_blob TEXT AS PaymentDetails NOT NULL;

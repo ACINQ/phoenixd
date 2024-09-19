@@ -36,16 +36,6 @@ object DbTypesHelper {
             subclass(IncomingReceivedWithData.Part.SpliceIn.V0::class)
             subclass(IncomingReceivedWithData.Part.FeeCredit.V0::class)
         }
-        polymorphic(InboundLiquidityPaymentDetailsData::class) {
-            subclass(InboundLiquidityPaymentDetailsData.ChannelBalance.V0::class)
-            subclass(InboundLiquidityPaymentDetailsData.FutureHtlc.V0::class)
-            subclass(InboundLiquidityPaymentDetailsData.FutureHtlcWithPreimage.V0::class)
-            subclass(InboundLiquidityPaymentDetailsData.ChannelBalanceForFutureHtlc.V0::class)
-        }
-        polymorphic(InboundLiquidityPurchaseData::class) {
-            subclass(InboundLiquidityPurchaseData.Standard.V0::class)
-            subclass(InboundLiquidityPurchaseData.WithFeeCredit.V0::class)
-        }
     }
 
     val polymorphicFormat = Json { serializersModule = module }

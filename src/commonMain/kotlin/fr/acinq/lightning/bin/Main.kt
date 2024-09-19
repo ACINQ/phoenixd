@@ -32,6 +32,7 @@ import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
+import fr.acinq.lightning.bin.db.adapters.LiquidityAdsPurchaseAdapter
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
@@ -275,8 +276,7 @@ class Phoenixd : CliktCommand() {
                 closing_info_typeAdapter = EnumColumnAdapter()
             ),
             inbound_liquidity_outgoing_paymentsAdapter = Inbound_liquidity_outgoing_payments.Adapter(
-                lease_typeAdapter = EnumColumnAdapter(),
-                payment_details_typeAdapter = EnumColumnAdapter()
+                purchase_jsonAdapter = LiquidityAdsPurchaseAdapter()
             ),
         )
         val channelsDb = SqliteChannelsDb(driver, database)

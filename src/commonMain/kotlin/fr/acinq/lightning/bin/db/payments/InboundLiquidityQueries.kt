@@ -21,6 +21,7 @@ import fr.acinq.lightning.db.InboundLiquidityOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
+import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenix.db.PhoenixDatabase
 
 class InboundLiquidityQueries(val database: PhoenixDatabase) {
@@ -28,20 +29,26 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
 
     fun add(payment: InboundLiquidityOutgoingPayment) {
         database.transaction {
-            val (purchase, details) = payment.mapPurchaseToDb()
-           queries.insert(
-               id = payment.id.toString(),
-               mining_fees_sat = payment.miningFees.sat,
-               channel_id = payment.channelId.toByteArray(),
-               tx_id = payment.txId.value.toByteArray(),
-               lease_type = purchase.first,
-               lease_blob = purchase.second,
-               payment_details_type = details.first,
-               payment_details_blob = details.second,
-               created_at = payment.createdAt,
-               confirmed_at = payment.confirmedAt,
-               locked_at = payment.lockedAt,
-           )
+            queries.insert(
+                id = payment.id.toString(),
+                mining_fees_sat = payment.miningFees.sat,
+                channel_id = payment.channelId.toByteArray(),
+                tx_id = payment.txId.value.toByteArray(),
+                purchase_type = when (payment.purchase) {
+                    is LiquidityAds.Purchase.Standard -> "standard"
+                    is LiquidityAds.Purchase.WithFeeCredit -> "with_fee_credit"
+                },
+                payment_details_type = when (payment.purchase.paymentDetails) {
+                    is LiquidityAds.PaymentDetails.FromChannelBalance -> "from_channel_balance"
+                    is LiquidityAds.PaymentDetails.FromFutureHtlc -> "from_future_htlc"
+                    is LiquidityAds.PaymentDetails.FromFutureHtlcWithPreimage -> "from_future_htlc_with_preimage"
+                    is LiquidityAds.PaymentDetails.FromChannelBalanceForFutureHtlc -> "from_channel_balance_for_future_htlc"
+                },
+                purchase_json = payment.purchase,
+                created_at = payment.createdAt,
+                confirmed_at = payment.confirmedAt,
+                locked_at = payment.lockedAt,
+            )
         }
     }
 
@@ -73,9 +80,9 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
             mining_fees_sat: Long,
             channel_id: ByteArray,
             tx_id: ByteArray,
-            lease_type: InboundLiquidityPurchaseType,
-            lease_blob: ByteArray,
-            payment_details_blob: ByteArray,
+            purchase_type: String,
+            payment_details_type: String,
+            purchase_json: LiquidityAds.Purchase,
             created_at: Long,
             confirmed_at: Long?,
             locked_at: Long?
@@ -85,7 +92,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
                 miningFees = mining_fees_sat.sat,
                 channelId = channel_id.toByteVector32(),
                 txId = TxId(tx_id),
-                purchase = InboundLiquidityPurchaseData.deserialize(lease_type, lease_blob, payment_details_blob),
+                purchase = purchase_json,
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at

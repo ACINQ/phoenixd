@@ -33,7 +33,7 @@ import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-
+@Serializable
 sealed class PurchaseData {
     sealed class Standard : PurchaseData() {
         @Serializable

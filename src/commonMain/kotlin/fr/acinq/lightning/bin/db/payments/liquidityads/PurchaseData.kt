@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 ACINQ SAS
+ * Copyright 2024 ACINQ SAS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,34 +15,23 @@
  */
 
 @file:UseSerializers(
-    ByteVectorSerializer::class,
-    ByteVector32Serializer::class,
-    ByteVector64Serializer::class,
     SatoshiSerializer::class,
     MilliSatoshiSerializer::class
 )
 
 package fr.acinq.lightning.bin.db.payments.liquidityads
 
-import fr.acinq.bitcoin.ByteVector
-import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.bitcoin.ByteVector64
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.bin.db.payments.DbTypesHelper
 import fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.Companion.asCanonical
 import fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.Companion.asDb
-import fr.acinq.lightning.bin.db.serializers.v1.ByteVectorSerializer
-import fr.acinq.lightning.bin.db.serializers.v1.ByteVector32Serializer
-import fr.acinq.lightning.bin.db.serializers.v1.ByteVector64Serializer
-import fr.acinq.lightning.bin.db.serializers.v1.SatoshiSerializer
-import fr.acinq.lightning.bin.db.serializers.v1.MilliSatoshiSerializer
+import fr.acinq.lightning.bin.db.serializers.v1.*
 import fr.acinq.lightning.wire.LiquidityAds
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlin.text.toByteArray
 
 
 sealed class PurchaseData {
@@ -102,7 +91,7 @@ sealed class PurchaseData {
          * @param typeVersion only used for the legacy leased data, where the blob did not contain the type of the object.
          */
         @Suppress("DEPRECATION")
-        fun decodeDataToCanonical(
+        fun decodeAsCanonical(
             typeVersion: String,
             blob: ByteArray,
         ): LiquidityAds.Purchase = DbTypesHelper.decodeBlob(blob) { json, format ->
@@ -112,6 +101,6 @@ sealed class PurchaseData {
             }
         }
 
-        fun LiquidityAds.Purchase.encodeForDb(): ByteArray = Json.encodeToString(this.asDb()).toByteArray(Charsets.UTF_8)
+        fun LiquidityAds.Purchase.encodeAsDb(): ByteArray = Json.encodeToString(this.asDb()).toByteArray(Charsets.UTF_8)
     }
 }

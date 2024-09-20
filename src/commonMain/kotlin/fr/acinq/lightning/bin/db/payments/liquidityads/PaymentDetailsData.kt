@@ -15,11 +15,7 @@
  */
 
 @file:UseSerializers(
-    ByteVectorSerializer::class,
     ByteVector32Serializer::class,
-    ByteVector64Serializer::class,
-    SatoshiSerializer::class,
-    MilliSatoshiSerializer::class
 )
 
 package fr.acinq.lightning.bin.db.payments.liquidityads

@@ -18,7 +18,7 @@ package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData
-import fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.Companion.encodeForDb
+import fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.Companion.encodeAsDb
 import fr.acinq.lightning.db.InboundLiquidityOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
@@ -40,7 +40,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
                    is LiquidityAds.Purchase.Standard -> "STANDARD"
                    is LiquidityAds.Purchase.WithFeeCredit -> "WITH_FEE_CREDIT"
                },
-               lease_blob = payment.purchase.encodeForDb(),
+               lease_blob = payment.purchase.encodeAsDb(),
                payment_details_type = when (payment.purchase.paymentDetails) {
                    is LiquidityAds.PaymentDetails.FromChannelBalance -> "FROM_CHANNEL_BALANCE"
                    is LiquidityAds.PaymentDetails.FromFutureHtlc -> "FROM_FUTURE_HTLC"
@@ -94,7 +94,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
                 miningFees = mining_fees_sat.sat,
                 channelId = channel_id.toByteVector32(),
                 txId = TxId(tx_id),
-                purchase = PurchaseData.decodeDataToCanonical(lease_type, lease_blob),
+                purchase = PurchaseData.decodeAsCanonical(lease_type, lease_blob),
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at

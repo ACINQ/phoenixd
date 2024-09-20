@@ -40,14 +40,13 @@ import fr.acinq.lightning.bin.logs.stringTimestamp
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
-import fr.acinq.lightning.db.ChannelsDb
-import fr.acinq.lightning.db.Databases
-import fr.acinq.lightning.db.PaymentsDb
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.*
+import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -319,10 +318,18 @@ class Phoenixd : CliktCommand() {
             }
             launch {
                 nodeParams.nodeEvents
-                    .filterIsInstance<PaymentEvents.PaymentReceived>()
-                    .filter { it.amount > 0.msat }
+                    .filterIsInstance<PaymentEvents>()
                     .collect {
-                        consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} (${it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }})")
+                        when (it) {
+                            is PaymentEvents.PaymentReceived ->
+                                consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} (${it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }})")
+                            is PaymentEvents.PaymentSent ->
+                                when(val payment = it.payment) {
+                             is InboundLiquidityOutgoingPayment ->
+                                 consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (fee=${payment.fees.truncateToSatoshi()} feeCreditUsed=${(payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed?.truncateToSatoshi() ?: 0.sat} type=${payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()})")
+                                else -> {}
+                            }
+                        }
                     }
             }
             launch {
@@ -334,9 +341,9 @@ class Phoenixd : CliktCommand() {
 //                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit (max=${reason.maxAllowedCredit})"))
 //                            }
                             is LiquidityEvents.Rejected.Reason.TooExpensive.OverAbsoluteFee ->
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max mining fee (max=${reason.maxAbsoluteFee})"))
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over absolute fee (fee=${it.fee.truncateToSatoshi()} max=${reason.maxAbsoluteFee})"))
                             is LiquidityEvents.Rejected.Reason.TooExpensive.OverRelativeFee ->
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): fee=${it.fee.truncateToSatoshi()} more than ${reason.maxRelativeFeeBasisPoints.toDouble() / 100}% of amount"))
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over relative fee (fee=${it.fee.truncateToSatoshi()} max=${reason.maxRelativeFeeBasisPoints.toDouble() / 100}%"))
                             LiquidityEvents.Rejected.Reason.PolicySetToDisabled ->
                                 consoleLog(yellow("automated liquidity is disabled"))
                             LiquidityEvents.Rejected.Reason.ChannelFundingInProgress ->

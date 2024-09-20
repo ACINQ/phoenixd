@@ -87,31 +87,10 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
         val details: List<Details> = when (payment) {
             is IncomingPayment -> when (val origin = payment.origin) {
-                is IncomingPayment.Origin.Invoice -> payment.received?.receivedWith.orEmpty()
-                    .map {
-                        when (it) {
-                            is IncomingPayment.ReceivedWith.LightningPayment -> Details("lightning_received", amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = null, txId = null)
-                            is IncomingPayment.ReceivedWith.AddedToFeeCredit -> Details("fee_credit", amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = null, txId = null)
-                            is IncomingPayment.ReceivedWith.NewChannel -> Details("pay_to_open", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = null, txId = null)
-                            is IncomingPayment.ReceivedWith.SpliceIn -> Details("pay_to_splice", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = null, txId = null)
-                            else -> error("unexpected receivedWith part $it")
-                        }
-                    }
-                    .groupBy { it.type }
-                    .values.map { parts ->
-                        Details(
-                            type = parts.first().type,
-                            amount = parts.map { it.amount }.sum(),
-                            feeCredit = parts.map { it.feeCredit }.sum(),
-                            miningFee = parts.map { it.miningFee }.sum(),
-                            serviceFee = parts.map { it.serviceFee }.sum(),
-                            paymentHash = parts.first().paymentHash,
-                            txId = parts.first().txId
-                        )
-                    }.toList()
+                is IncomingPayment.Origin.Invoice -> extractLightningPaymentParts(payment)
                 is IncomingPayment.Origin.SwapIn -> listOf(Details("legacy_swap_in", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null))
                 is IncomingPayment.Origin.OnChain -> listOf(Details("swap_in", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = origin.txId))
-                is IncomingPayment.Origin.Offer -> listOf(Details("lightning_received", amount = payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
+                is IncomingPayment.Origin.Offer -> extractLightningPaymentParts(payment)
             }
 
             is LightningOutgoingPayment -> when (val details = payment.details) {
@@ -129,4 +108,27 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         details.forEach { addRow(timestamp, it) }
 
     }
+
+    private fun extractLightningPaymentParts(payment: IncomingPayment): List<Details> = payment.received?.receivedWith.orEmpty()
+        .map {
+            when (it) {
+                is IncomingPayment.ReceivedWith.LightningPayment -> Details("lightning_received", amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.AddedToFeeCredit -> Details("fee_credit", amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.NewChannel -> Details("pay_to_open", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.SpliceIn -> Details("pay_to_splice", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = null)
+                else -> error("unexpected receivedWith part $it")
+            }
+        }
+        .groupBy { it.type }
+        .values.map { parts ->
+            Details(
+                type = parts.first().type,
+                amount = parts.map { it.amount }.sum(),
+                feeCredit = parts.map { it.feeCredit }.sum(),
+                miningFee = parts.map { it.miningFee }.sum(),
+                serviceFee = parts.map { it.serviceFee }.sum(),
+                paymentHash = parts.first().paymentHash,
+                txId = parts.first().txId
+            )
+        }.toList()
 }

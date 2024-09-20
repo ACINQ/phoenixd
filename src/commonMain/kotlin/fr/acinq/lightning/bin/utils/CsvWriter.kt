@@ -9,6 +9,7 @@ import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.sum
 import fr.acinq.lightning.utils.toMilliSatoshi
+import fr.acinq.lightning.wire.LiquidityAds
 import kotlinx.datetime.Instant
 import okio.BufferedSink
 import okio.FileSystem
@@ -122,7 +123,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             is SpliceOutgoingPayment -> listOf(Details("splice_out", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is ChannelCloseOutgoingPayment -> listOf(Details("channel_close", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is InboundLiquidityOutgoingPayment -> listOf(Details("liquidity", amount = 0.msat, feeCredit = payment.amount, miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId))
+            is InboundLiquidityOutgoingPayment -> listOf(Details("liquidity", amount = 0.msat, feeCredit = -((payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed ?: 0.msat), miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId))
         }
 
         details.forEach { addRow(timestamp, it) }

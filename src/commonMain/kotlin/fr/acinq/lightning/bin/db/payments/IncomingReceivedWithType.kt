@@ -27,9 +27,11 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.asCanonical
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.asDb
 import fr.acinq.lightning.bin.db.serializers.v1.*
 import fr.acinq.lightning.db.IncomingPayment
-import fr.acinq.lightning.wire.LiquidityAds
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
@@ -58,7 +60,7 @@ sealed class IncomingReceivedWithData {
                 val amountReceived: MilliSatoshi,
                 val channelId: ByteVector32,
                 val htlcId: Long,
-                @Serializable(with = FundingFeeSerializer::class) val fundingFee: LiquidityAds.FundingFee?,
+                val fundingFee: FundingFeeData?,
             ) : Htlc()
         }
 
@@ -116,7 +118,7 @@ sealed class IncomingReceivedWithData {
                             amountReceived = it.amountReceived,
                             channelId = it.channelId,
                             htlcId = it.htlcId,
-                            fundingFee = it.fundingFee
+                            fundingFee = it.fundingFee?.asCanonical()
                         )
                         is Part.NewChannel.V2 -> IncomingPayment.ReceivedWith.NewChannel(
                             amountReceived = it.amount,
@@ -153,7 +155,7 @@ fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeV
             amountReceived = it.amountReceived,
             channelId = it.channelId,
             htlcId = it.htlcId,
-            fundingFee = it.fundingFee
+            fundingFee = it.fundingFee?.asDb()
         )
         is IncomingPayment.ReceivedWith.NewChannel -> IncomingReceivedWithData.Part.NewChannel.V2(
             amount = it.amountReceived,

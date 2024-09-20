@@ -1,5 +1,4 @@
-import fr.acinq.lightning.bin.db.payments.InboundLiquidityPurchaseType;
-import fr.acinq.lightning.bin.db.payments.InboundLiquidityPaymentDetailsType;
+import fr.acinq.lightning.bin.db.payments.liquidityads.InboundLiquidityPurchaseType;
 
 -- Stores in a flat row payments standing for an inbound liquidity request (which are done through a splice).
 -- The purchase data are stored in a complex column, as a json-encoded blob. See InboundLiquidityLeaseType file.
@@ -11,10 +10,9 @@ CREATE TABLE inbound_liquidity_outgoing_payments (
     mining_fees_sat INTEGER NOT NULL,
     channel_id BLOB NOT NULL,
     tx_id BLOB NOT NULL,
-    lease_type TEXT AS InboundLiquidityPurchaseType NOT NULL,
+    lease_type TEXT NOT NULL,
     lease_blob BLOB NOT NULL,
-    payment_details_type TEXT AS InboundLiquidityPaymentDetailsType NOT NULL,
-    payment_details_blob BLOB NOT NULL,
+    payment_details_type TEXT DEFAULT NULL,
     created_at INTEGER NOT NULL,
     confirmed_at INTEGER DEFAULT NULL,
     locked_at INTEGER DEFAULT NULL
@@ -22,8 +20,8 @@ CREATE TABLE inbound_liquidity_outgoing_payments (
 
 insert:
 INSERT INTO inbound_liquidity_outgoing_payments (
-    id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, payment_details_blob, created_at, confirmed_at, locked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, created_at, confirmed_at, locked_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 setConfirmed:
 UPDATE inbound_liquidity_outgoing_payments SET confirmed_at=? WHERE id=?;
@@ -32,12 +30,12 @@ setLocked:
 UPDATE inbound_liquidity_outgoing_payments SET locked_at=? WHERE id=?;
 
 get:
-SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_blob, created_at, confirmed_at, locked_at
+SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, created_at, confirmed_at, locked_at
 FROM inbound_liquidity_outgoing_payments
 WHERE id=?;
 
 getByTxId:
-SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_blob, created_at, confirmed_at, locked_at
+SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, created_at, confirmed_at, locked_at
 FROM inbound_liquidity_outgoing_payments
 WHERE tx_id=?;
 

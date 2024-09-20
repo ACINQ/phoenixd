@@ -274,10 +274,6 @@ class Phoenixd : CliktCommand() {
             channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
                 closing_info_typeAdapter = EnumColumnAdapter()
             ),
-            inbound_liquidity_outgoing_paymentsAdapter = Inbound_liquidity_outgoing_payments.Adapter(
-                lease_typeAdapter = EnumColumnAdapter(),
-                payment_details_typeAdapter = EnumColumnAdapter()
-            ),
         )
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)

@@ -99,10 +99,10 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
                 is LightningOutgoingPayment.Details.Blinded -> listOf(Details("lightning_sent", amount = -payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
             }
 
-            is SpliceOutgoingPayment -> listOf(Details("splice_out", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is ChannelCloseOutgoingPayment -> listOf(Details("channel_close", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is InboundLiquidityOutgoingPayment -> listOf(Details("liquidity", amount = 0.msat, feeCredit = -((payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed ?: 0.msat), miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId))
+            is SpliceOutgoingPayment -> listOf(Details("splice_out", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is ChannelCloseOutgoingPayment -> listOf(Details("channel_close", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = 0.msat, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is InboundLiquidityOutgoingPayment -> listOf(Details("liquidity", amount = 0.msat, feeCredit = -payment.feeCreditUsed, miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId))
         }
 
         details.forEach { addRow(timestamp, it) }

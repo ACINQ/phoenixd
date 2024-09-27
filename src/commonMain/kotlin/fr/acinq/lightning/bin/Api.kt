@@ -27,6 +27,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
+import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.channel.states.Closed
 import fr.acinq.lightning.channel.states.Closing
@@ -394,8 +395,8 @@ class Api(
                         }.toEither()
                         when (res) {
                             is Either.Right -> when (val r = res.value) {
-                                is ChannelCommand.Commitment.Splice.Response.Created -> call.respondText(r.fundingTxId.toString())
-                                is ChannelCommand.Commitment.Splice.Response.Failure -> call.respondText(r.toString())
+                                is ChannelFundingResponse.Success -> call.respondText(r.fundingTxId.toString())
+                                is ChannelFundingResponse.Failure -> call.respondText(r.toString())
                                 else -> call.respondText("no channel available")
                             }
                             is Either.Left -> call.respondText(res.value.message.toString())

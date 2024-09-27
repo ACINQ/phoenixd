@@ -17,6 +17,7 @@ import fr.acinq.lightning.bin.conf.LSP
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
+import fr.acinq.lightning.bin.json.ApiType.Channel
 import fr.acinq.lightning.bin.payments.AddressResolver
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.PayDnsAddress
@@ -30,10 +31,8 @@ import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
-import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.channel.states.Closed
-import fr.acinq.lightning.channel.states.Closing
-import fr.acinq.lightning.channel.states.ClosingFeerates
+import fr.acinq.lightning.channel.LocalFundingStatus
+import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.io.ChannelClosing
@@ -402,6 +401,25 @@ class Api(
                                 else -> call.respondText("no channel available")
                             }
                             is Either.Left -> call.respondText(res.value.message.toString())
+                        }
+                    }
+                    post("bumpfee") {
+                        val formParameters = call.receiveParameters()
+                        val targetFeerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+                        val channel = peer.channels.values.filterIsInstance<Normal>().firstOrNull()
+                        val cpfpFeerate = channel?.let { peer.estimateFeeForSpliceCpfp(it.channelId, targetFeerate)?.first }
+                        if (cpfpFeerate == null) {
+                            call.respondText("no channel available")
+                            return@post
+                        }
+                        if (cpfpFeerate == targetFeerate) {
+                            call.respondText("cpfp is useless")
+                            return@post
+                        }
+                        when (val r = peer.spliceCpfp(channel.channelId, cpfpFeerate)) {
+                            is ChannelFundingResponse.Success -> call.respondText(r.fundingTxId.toString())
+                            is ChannelFundingResponse.Failure -> call.respondText(r.toString())
+                            else -> call.respondText("no channel available")
                         }
                     }
                     post("closechannel") {

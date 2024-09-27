@@ -337,6 +337,7 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<LiquidityEvents.Rejected>()
                     .collect {
                         when (val reason = it.reason) {
+                            // TODO: put this back after rework of LiquidityPolicy to handle fee credit
 //                            is LiquidityEvents.Rejected.Reason.OverMaxCredit -> {
 //                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over max fee credit (max=${reason.maxAllowedCredit})"))
 //                            }
@@ -360,7 +361,7 @@ class Phoenixd : CliktCommand() {
             launch {
                 peer.feeCreditFlow
                     .drop(1) // we drop the initial value which is 0 msat
-                    .collect { feeCredit -> consoleLog("fee credit: $feeCredit") }
+                    .collect { feeCredit -> consoleLog("fee credit: ${feeCredit.truncateToSatoshi()}") }
             }
         }
 

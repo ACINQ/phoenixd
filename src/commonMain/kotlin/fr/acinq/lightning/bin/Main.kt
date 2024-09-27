@@ -321,14 +321,23 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<PaymentEvents>()
                     .collect {
                         when (it) {
-                            is PaymentEvents.PaymentReceived ->
-                                consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} (${it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }})")
-                            is PaymentEvents.PaymentSent ->
-                                when(val payment = it.payment) {
-                             is InboundLiquidityOutgoingPayment ->
-                                 consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (fee=${payment.fees.truncateToSatoshi()} feeCreditUsed=${(payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed?.truncateToSatoshi() ?: 0.sat} type=${payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()})")
-                                else -> {}
+                            is PaymentEvents.PaymentReceived -> {
+                                val fee = it.receivedWith.filterIsInstance<IncomingPayment.ReceivedWith.LightningPayment>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
+                                val type = it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }
+                                consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
                             }
+                            is PaymentEvents.PaymentSent ->
+                                when (val payment = it.payment) {
+                                    is InboundLiquidityOutgoingPayment -> {
+                                        val totalFee = payment.fees.truncateToSatoshi()
+                                        val feePaidFromBalance = payment.feePaidFromChannelBalance.total
+                                        val feePaidFromFeeCredit = (payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed?.truncateToSatoshi() ?: 0.sat
+                                        val feeRemaining = totalFee - feePaidFromBalance - feePaidFromFeeCredit
+                                        val purchaseType = payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
+                                        consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")
+                                    }
+                                    else -> {}
+                                }
                         }
                     }
             }
@@ -344,7 +353,7 @@ class Phoenixd : CliktCommand() {
                             is LiquidityEvents.Rejected.Reason.TooExpensive.OverAbsoluteFee ->
                                 consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over absolute fee (fee=${it.fee.truncateToSatoshi()} max=${reason.maxAbsoluteFee})"))
                             is LiquidityEvents.Rejected.Reason.TooExpensive.OverRelativeFee ->
-                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over relative fee (fee=${it.fee.truncateToSatoshi()} max=${reason.maxRelativeFeeBasisPoints.toDouble() / 100}%"))
+                                consoleLog(yellow("lightning payment rejected (amount=${it.amount.truncateToSatoshi()}): over relative fee (fee=${it.fee.truncateToSatoshi()} max=${reason.maxRelativeFeeBasisPoints.toDouble() / 100}%)"))
                             LiquidityEvents.Rejected.Reason.PolicySetToDisabled ->
                                 consoleLog(yellow("automated liquidity is disabled"))
                             LiquidityEvents.Rejected.Reason.ChannelFundingInProgress ->

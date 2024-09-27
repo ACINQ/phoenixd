@@ -331,7 +331,7 @@ class Phoenixd : CliktCommand() {
                                     is InboundLiquidityOutgoingPayment -> {
                                         val totalFee = payment.fees.truncateToSatoshi()
                                         val feePaidFromBalance = payment.feePaidFromChannelBalance.total
-                                        val feePaidFromFeeCredit = (payment.purchase as? LiquidityAds.Purchase.WithFeeCredit)?.feeCreditUsed?.truncateToSatoshi() ?: 0.sat
+                                        val feePaidFromFeeCredit = payment.feeCreditUsed.truncateToSatoshi()
                                         val feeRemaining = totalFee - feePaidFromBalance - feePaidFromFeeCredit
                                         val purchaseType = payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
                                         consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")

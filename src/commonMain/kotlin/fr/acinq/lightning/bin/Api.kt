@@ -8,8 +8,10 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.BuildVersions
+import fr.acinq.lightning.ChannelEvents
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
 import fr.acinq.lightning.bin.conf.LSP
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
@@ -33,6 +35,8 @@ import fr.acinq.lightning.channel.states.Closed
 import fr.acinq.lightning.channel.states.Closing
 import fr.acinq.lightning.channel.states.ClosingFeerates
 import fr.acinq.lightning.crypto.LocalKeyManager
+import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
+import fr.acinq.lightning.io.ChannelClosing
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
@@ -56,10 +60,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -407,8 +409,16 @@ class Api(
                         val channelId = formParameters.getByteVector32("channelId")
                         val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
                         val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+                        val res = async {
+                            nodeParams.nodeEvents
+                                .filterIsInstance<PaymentEvents.PaymentSent>()
+                                .map { it.payment }
+                                .filterIsInstance<ChannelCloseOutgoingPayment>()
+                                .first()
+                        }
                         peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(scriptPubKey, ClosingFeerates(feerate))))
-                        call.respondText("ok")
+                        val channelClose = res.await()
+                        call.respondText(channelClose.txId.toString())
                     }
                 }
             }

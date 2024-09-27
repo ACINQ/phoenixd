@@ -107,6 +107,7 @@ sealed class IncomingReceivedWithData {
         ): List<IncomingPayment.ReceivedWith> = DbTypesHelper.decodeBlob(blob) { json, _ ->
             when (typeVersion) {
                 IncomingReceivedWithTypeVersion.MULTIPARTS_V1 -> DbTypesHelper.polymorphicFormat.decodeFromString(SetSerializer(PolymorphicSerializer(Part::class)), json).map {
+                    @Suppress("DEPRECATION")
                     when (it) {
                         is Part.Htlc.V0 -> IncomingPayment.ReceivedWith.LightningPayment(
                             amountReceived = it.amount,

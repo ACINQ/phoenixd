@@ -84,7 +84,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
             tx_id: ByteArray,
             lease_type: String,
             lease_blob: ByteArray,
-            payment_details_type: String?,
+            @Suppress("UNUSED_PARAMETER") payment_details_type: String?,
             created_at: Long,
             confirmed_at: Long?,
             locked_at: Long?

@@ -17,6 +17,7 @@ import fr.acinq.lightning.bin.conf.LSP
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
+import fr.acinq.lightning.bin.json.ApiType.Channel
 import fr.acinq.lightning.bin.payments.AddressResolver
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.PayDnsAddress
@@ -31,10 +32,8 @@ import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
-import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.channel.states.Closed
-import fr.acinq.lightning.channel.states.Closing
-import fr.acinq.lightning.channel.states.ClosingFeerates
+import fr.acinq.lightning.channel.LocalFundingStatus
+import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.io.ChannelClosing
@@ -397,6 +396,25 @@ class Api(
                             val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
                             val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
                             peer.spliceOut(amount, scriptPubKey, feerate)
+                        }.toEither()
+                        when (res) {
+                            is Either.Right -> when (val r = res.value) {
+                                is ChannelFundingResponse.Success -> call.respondText(r.fundingTxId.toString())
+                                is ChannelFundingResponse.Failure -> call.respondText(r.toString())
+                                else -> call.respondText("no channel available")
+                            }
+                            is Either.Left -> call.respondText(res.value.message.toString())
+                        }
+                    }
+                    post("bumpfee") {
+                        val res = kotlin.runCatching {
+                            val formParameters = call.receiveParameters()
+                            val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+                            val channel = peer.channels.values
+                                .filterIsInstance<Normal>()
+                                .filter { it.commitments.latest.localFundingStatus is LocalFundingStatus.UnconfirmedFundingTx }
+                                .firstOrNull()
+                            channel?.let { peer.spliceCpfp(it.channelId, feerate) }
                         }.toEither()
                         when (res) {
                             is Either.Right -> when (val r = res.value) {

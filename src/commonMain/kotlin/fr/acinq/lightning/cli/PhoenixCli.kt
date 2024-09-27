@@ -65,6 +65,7 @@ fun main(args: Array<String>) =
             LnurlWithdraw(),
             LnurlAuth(),
             SendToAddress(),
+            BumpFee(),
             CloseChannel(),
             ExportCsv()
         )
@@ -385,6 +386,18 @@ class SendToAddress : PhoenixCliCommand(name = "sendtoaddress", help = "Send to 
             formParameters = parameters {
                 append("amountSat", amountSat.toString())
                 append("address", address)
+                append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
+}
+
+class BumpFee : PhoenixCliCommand(name = "bumpfee", help = "Bump the fee of an outgoing on-chain transaction", printHelpOnEmptyArgs = true) {
+    private val feerateSatByte by option("--feerateSatByte").int().required()
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "bumpfee").toString(),
+            formParameters = parameters {
                 append("feerateSatByte", feerateSatByte.toString())
             }
         )

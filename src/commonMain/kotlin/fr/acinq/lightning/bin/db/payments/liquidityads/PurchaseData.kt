@@ -101,6 +101,6 @@ sealed class PurchaseData {
             }
         }
 
-        fun LiquidityAds.Purchase.encodeAsDb(): ByteArray = Json.encodeToString(this.asDb()).toByteArray(Charsets.UTF_8)
+        fun LiquidityAds.Purchase.encodeAsDb(): ByteArray = Json.encodeToString(this.asDb()).encodeToByteArray()
     }
 }

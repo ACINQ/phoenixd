@@ -77,7 +77,7 @@ sealed class ApiType {
 
     @Serializable
     data class LiquidityFees(@SerialName("miningFeeSat") val miningFee: Satoshi, @SerialName("serviceFeeSat") val serviceFee: Satoshi) : ApiType() {
-        constructor(leaseFees: LiquidityAds.LeaseFees) : this(leaseFees.miningFee, leaseFees.serviceFee)
+        constructor(leaseFees: LiquidityAds.Fees) : this(leaseFees.miningFee, leaseFees.serviceFee)
     }
 
     @Serializable

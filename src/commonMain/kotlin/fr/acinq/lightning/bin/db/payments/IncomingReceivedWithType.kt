@@ -27,11 +27,11 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.asCanonical
+import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.asDb
+import fr.acinq.lightning.bin.db.serializers.v1.*
 import fr.acinq.lightning.db.IncomingPayment
-import fr.acinq.lightning.bin.db.serializers.v1.ByteVector32Serializer
-import fr.acinq.lightning.bin.db.serializers.v1.MilliSatoshiSerializer
-import fr.acinq.lightning.bin.db.serializers.v1.UUIDSerializer
-import fr.acinq.lightning.bin.db.serializers.v1.SatoshiSerializer
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
@@ -47,11 +47,20 @@ sealed class IncomingReceivedWithData {
     @Serializable
     sealed class Part : IncomingReceivedWithData() {
         sealed class Htlc : Part() {
+            @Deprecated("Replaced by [Htlc.V1], which supports the liquidity ads funding fee")
             @Serializable
             data class V0(
                 @Serializable val amount: MilliSatoshi,
                 @Serializable val channelId: ByteVector32,
                 val htlcId: Long
+            ) : Htlc()
+
+            @Serializable
+            data class V1(
+                val amountReceived: MilliSatoshi,
+                val channelId: ByteVector32,
+                val htlcId: Long,
+                val fundingFee: FundingFeeData?,
             ) : Htlc()
         }
 
@@ -98,14 +107,22 @@ sealed class IncomingReceivedWithData {
         ): List<IncomingPayment.ReceivedWith> = DbTypesHelper.decodeBlob(blob) { json, _ ->
             when (typeVersion) {
                 IncomingReceivedWithTypeVersion.MULTIPARTS_V1 -> DbTypesHelper.polymorphicFormat.decodeFromString(SetSerializer(PolymorphicSerializer(Part::class)), json).map {
+                    @Suppress("DEPRECATION")
                     when (it) {
                         is Part.Htlc.V0 -> IncomingPayment.ReceivedWith.LightningPayment(
-                            amount = it.amount,
+                            amountReceived = it.amount,
                             channelId = it.channelId,
-                            htlcId = it.htlcId
+                            htlcId = it.htlcId,
+                            fundingFee = null
+                        )
+                        is Part.Htlc.V1 -> IncomingPayment.ReceivedWith.LightningPayment(
+                            amountReceived = it.amountReceived,
+                            channelId = it.channelId,
+                            htlcId = it.htlcId,
+                            fundingFee = it.fundingFee?.asCanonical()
                         )
                         is Part.NewChannel.V2 -> IncomingPayment.ReceivedWith.NewChannel(
-                            amount = it.amount,
+                            amountReceived = it.amount,
                             serviceFee = it.serviceFee,
                             miningFee = it.miningFee,
                             channelId = it.channelId,
@@ -114,7 +131,7 @@ sealed class IncomingReceivedWithData {
                             lockedAt = it.lockedAt,
                         )
                         is Part.SpliceIn.V0 -> IncomingPayment.ReceivedWith.SpliceIn(
-                            amount = it.amount,
+                            amountReceived = it.amount,
                             serviceFee = it.serviceFee,
                             miningFee = it.miningFee,
                             channelId = it.channelId,
@@ -122,8 +139,8 @@ sealed class IncomingReceivedWithData {
                             confirmedAt = it.confirmedAt,
                             lockedAt = it.lockedAt,
                         )
-                        is Part.FeeCredit.V0 -> IncomingPayment.ReceivedWith.FeeCreditPayment(
-                            amount = it.amount
+                        is Part.FeeCredit.V0 -> IncomingPayment.ReceivedWith.AddedToFeeCredit(
+                            amountReceived = it.amount
                         )
                     }
                 }
@@ -135,13 +152,14 @@ sealed class IncomingReceivedWithData {
 /** Only serialize received_with into the [IncomingReceivedWithTypeVersion.MULTIPARTS_V1] type. */
 fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeVersion, ByteArray>? = map {
     when (it) {
-        is IncomingPayment.ReceivedWith.LightningPayment -> IncomingReceivedWithData.Part.Htlc.V0(
-            amount = it.amount,
+        is IncomingPayment.ReceivedWith.LightningPayment -> IncomingReceivedWithData.Part.Htlc.V1(
+            amountReceived = it.amountReceived,
             channelId = it.channelId,
-            htlcId = it.htlcId
+            htlcId = it.htlcId,
+            fundingFee = it.fundingFee?.asDb()
         )
         is IncomingPayment.ReceivedWith.NewChannel -> IncomingReceivedWithData.Part.NewChannel.V2(
-            amount = it.amount,
+            amount = it.amountReceived,
             serviceFee = it.serviceFee,
             miningFee = it.miningFee,
             channelId = it.channelId,
@@ -150,7 +168,7 @@ fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeV
             lockedAt = it.lockedAt,
         )
         is IncomingPayment.ReceivedWith.SpliceIn -> IncomingReceivedWithData.Part.SpliceIn.V0(
-            amount = it.amount,
+            amount = it.amountReceived,
             serviceFee = it.serviceFee,
             miningFee = it.miningFee,
             channelId = it.channelId,
@@ -158,8 +176,8 @@ fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeV
             confirmedAt = it.confirmedAt,
             lockedAt = it.lockedAt,
         )
-        is IncomingPayment.ReceivedWith.FeeCreditPayment -> IncomingReceivedWithData.Part.FeeCredit.V0(
-            amount = it.amount
+        is IncomingPayment.ReceivedWith.AddedToFeeCredit -> IncomingReceivedWithData.Part.FeeCredit.V0(
+            amount = it.amountReceived
         )
     }
 }.takeIf { it.isNotEmpty() }?.toSet()?.let {

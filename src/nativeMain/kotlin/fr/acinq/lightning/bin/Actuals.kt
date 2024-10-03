@@ -19,7 +19,11 @@ actual val datadir: Path = setenv("KTOR_LOG_LEVEL", "WARN", 1)
         getenv(PHOENIX_DATADIR)?.toKString()?.toPath() ?: getenv("HOME")?.toKString()!!.toPath().div(".phoenix") }
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
-    return NativeSqliteDriver(PhoenixDatabase.Schema, "phoenix.${chain.name.lowercase()}.${nodeId.toHex().take(6)}.db",
+    val chainName = when (chain) {
+        is Chain.Testnet3 -> "testnet"
+        else -> chain.name.lowercase()
+    }
+    return NativeSqliteDriver(PhoenixDatabase.Schema, "phoenix.$chainName.${nodeId.toHex().take(6)}.db",
         onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) }
     )
 }

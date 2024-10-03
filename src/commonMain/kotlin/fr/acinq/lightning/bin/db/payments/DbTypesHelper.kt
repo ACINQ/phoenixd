@@ -29,7 +29,9 @@ object DbTypesHelper {
 
     val module = SerializersModule {
         polymorphic(IncomingReceivedWithData.Part::class) {
+            @Suppress("DEPRECATION")
             subclass(IncomingReceivedWithData.Part.Htlc.V0::class)
+            subclass(IncomingReceivedWithData.Part.Htlc.V1::class)
             subclass(IncomingReceivedWithData.Part.NewChannel.V2::class)
             subclass(IncomingReceivedWithData.Part.SpliceIn.V0::class)
             subclass(IncomingReceivedWithData.Part.FeeCredit.V0::class)

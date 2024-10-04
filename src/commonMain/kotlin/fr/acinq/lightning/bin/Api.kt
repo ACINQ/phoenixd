@@ -13,7 +13,6 @@ import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
-import fr.acinq.lightning.bin.conf.LSP
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
@@ -27,7 +26,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlPay
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
-import fr.acinq.lightning.bin.utils.WalletPaymentCsvWriter
+import fr.acinq.lightning.bin.csv.WalletPaymentCsvWriter
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -67,7 +66,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.encodeUtf8
-import okio.Path.Companion.toPath
 import kotlin.time.Duration.Companion.seconds
 
 class Api(

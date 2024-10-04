@@ -4,7 +4,7 @@ import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.bin.createAppDbDriver
 import fr.acinq.lightning.bin.datadir
-import fr.acinq.lightning.bin.utils.WalletPaymentCsvWriter
+import fr.acinq.lightning.bin.csv.WalletPaymentCsvWriter
 import fr.acinq.lightning.utils.currentTimestampMillis
 import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toPath

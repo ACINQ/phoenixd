@@ -1,4 +1,4 @@
-package fr.acinq.lightning.bin.utils
+package fr.acinq.lightning.bin.csv
 
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Satoshi
@@ -9,45 +9,8 @@ import fr.acinq.lightning.utils.msat
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.sum
 import fr.acinq.lightning.utils.toMilliSatoshi
-import fr.acinq.lightning.wire.LiquidityAds
 import kotlinx.datetime.Instant
-import okio.BufferedSink
-import okio.FileSystem
 import okio.Path
-import okio.buffer
-
-open class CsvWriter(path: Path) {
-
-    private val sink: BufferedSink
-
-    init {
-        path.parent?.let { dir -> FileSystem.SYSTEM.createDirectories(dir) }
-        sink = FileSystem.SYSTEM.sink(path, mustCreate = false).buffer()
-    }
-
-    fun addRow(vararg fields: String) {
-        val cleanFields = fields.map { processField(it) }
-        sink.writeUtf8(cleanFields.joinToString(separator = ",", postfix = "\n"))
-    }
-
-    fun addRow(fields: List<String>) {
-        addRow(*fields.toTypedArray())
-    }
-
-    private fun processField(str: String): String {
-        return str.findAnyOf(listOf(",", "\"", "\n"))?.let {
-            // - field must be enclosed in double-quotes
-            // - a double-quote appearing inside the field must be
-            //   escaped by preceding it with another double quote
-            "\"${str.replace("\"", "\"\"")}\""
-        } ?: str
-    }
-
-    fun close() {
-        sink.flush()
-        sink.close()
-    }
-}
 
 class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
@@ -79,7 +42,16 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         details: Details
     ) {
         val dateStr = Instant.fromEpochMilliseconds(timestamp).toString() // ISO-8601 format
-        addRow(dateStr, details.type, details.amount.msat.toString(), details.feeCredit.msat.toString(), details.miningFee.sat.toString(), details.serviceFee.msat.toString(), details.paymentHash?.toHex() ?: "", details.txId?.toString() ?: "")
+        addRow(
+            dateStr,
+            details.type,
+            details.amount.msat.toString(),
+            details.feeCredit.msat.toString(),
+            details.miningFee.sat.toString(),
+            details.serviceFee.msat.toString(),
+            details.paymentHash?.toHex() ?: "",
+            details.txId?.toString() ?: ""
+        )
     }
 
     fun add(payment: WalletPayment) {
@@ -88,7 +60,17 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         val details: List<Details> = when (payment) {
             is IncomingPayment -> when (val origin = payment.origin) {
                 is IncomingPayment.Origin.Invoice -> extractLightningPaymentParts(payment)
-                is IncomingPayment.Origin.SwapIn -> listOf(Details("legacy_swap_in", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null))
+                is IncomingPayment.Origin.SwapIn -> listOf(
+                    Details(
+                        "legacy_swap_in",
+                        amount = payment.amount,
+                        feeCredit = 0.msat,
+                        miningFee = payment.fees.truncateToSatoshi(),
+                        serviceFee = 0.msat,
+                        paymentHash = payment.paymentHash,
+                        txId = null
+                    )
+                )
                 is IncomingPayment.Origin.OnChain -> listOf(Details("swap_in", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = origin.txId))
                 is IncomingPayment.Origin.Offer -> extractLightningPaymentParts(payment)
             }
@@ -102,7 +84,17 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             is SpliceOutgoingPayment -> listOf(Details("splice_out", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is ChannelCloseOutgoingPayment -> listOf(Details("channel_close", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = 0.msat, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is InboundLiquidityOutgoingPayment -> listOf(Details("liquidity", amount = 0.msat, feeCredit = -payment.feeCreditUsed, miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId))
+            is InboundLiquidityOutgoingPayment -> listOf(
+                Details(
+                    "liquidity",
+                    amount = 0.msat,
+                    feeCredit = -payment.feeCreditUsed,
+                    miningFee = payment.miningFees,
+                    serviceFee = payment.serviceFees.toMilliSatoshi(),
+                    paymentHash = null,
+                    txId = payment.txId
+                )
+            )
         }
 
         details.forEach { addRow(timestamp, it) }

@@ -69,6 +69,9 @@ val buildVersionsTask by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("generated/kotlin/"))
 }
 
+val currentOs = org.gradle.internal.os.OperatingSystem.current()
+val arch = System.getProperty("os.arch")
+
 kotlin {
     jvm {
         withJava()
@@ -86,9 +89,6 @@ kotlin {
             }
         }
     }
-
-    val currentOs = org.gradle.internal.os.OperatingSystem.current()
-    val arch = System.getProperty("os.arch")
 
     if (currentOs.isLinux && arch != "aarch64") {
         // there is no kotlin native toolchain for linux arm64 yet, but we can still build for the JVM
@@ -164,41 +164,6 @@ kotlin {
             }
         }
     }
-
-    fun Zip.configureZip(dir: String, classifier: String) {
-        group = "package"
-        description = "build and package $dir release executables"
-        archiveBaseName = "phoenix"
-        archiveClassifier = classifier
-
-        from("$projectDir/build/bin/$dir/phoenixdReleaseExecutable") {
-            include("*.kexe")
-            rename("phoenixd.kexe", "phoenixd")
-        }
-        from("$projectDir/build/bin/$dir/phoenix-cliReleaseExecutable") {
-            include("*.kexe")
-            rename("phoenix-cli.kexe", "phoenix-cli")
-        }
-        into("${archiveBaseName.get()}-${archiveVersion.get()}-${archiveClassifier.get()}")
-    }
-
-    if (currentOs.isLinux) {
-        val packageLinuxX64 by tasks.register("packageLinuxX64", Zip::class) {
-            dependsOn(":linuxX64Binaries")
-            configureZip("linuxX64", "linux-x64")
-        }
-    }
-
-    if (currentOs.isMacOsX) {
-        val packageMacosX64 by tasks.register("packageMacosX64", Zip::class) {
-            dependsOn(":macosX64Binaries")
-            configureZip("macosX64", "macos-x64")
-        }
-        val packageMacosArm by tasks.register("packageMacosArm64", Zip::class) {
-            dependsOn(":macosArm64Binaries")
-            configureZip("macosArm64", "macos-arm64")
-        }
-    }
 }
 
 application {
@@ -220,6 +185,34 @@ distributions {
     main {
         distributionBaseName = "phoenix"
         distributionClassifier = "jvm"
+    }
+    fun Distribution.configureNativeDistribution(buildTask: String, dir: String, classifier: String) {
+        distributionBaseName = "phoenix"
+        distributionClassifier = classifier
+        contents {
+            from(tasks[buildTask])
+            from("$projectDir/build/bin/$dir/phoenixdReleaseExecutable") {
+                include("*.kexe")
+                rename("phoenixd.kexe", "phoenixd")
+            }
+            from("$projectDir/build/bin/$dir/phoenix-cliReleaseExecutable") {
+                include("*.kexe")
+                rename("phoenix-cli.kexe", "phoenix-cli")
+            }
+        }
+    }
+    if (currentOs.isLinux) {
+        create("linuxX64") {
+            configureNativeDistribution("linuxX64Binaries", "linuxX64", "linux-x64")
+        }
+    }
+    if (currentOs.isMacOsX) {
+        create("macosX64") {
+            configureNativeDistribution("macosX64Binaries", "macosX64", "macos-x64")
+        }
+        create("macosArm64") {
+            configureNativeDistribution("macosArm64Binaries", "macosArm64", "macos-arm64")
+        }
     }
 }
 

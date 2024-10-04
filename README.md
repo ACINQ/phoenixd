@@ -15,17 +15,17 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.
 
 ```shell
-./gradlew packageLinuxX64
+./gradlew linuxX64DistZip
 ```
 
 ### Native MacOS x64
 ```shell
-./gradlew packageMacOSX64
+./gradlew macosX64DistZip
 ```
 
 ### Native MacOS arm64
 ```shell
-./gradlew packageMacOSArm64
+./gradlew macosArm64DistZip
 ```
 
 ### JVM

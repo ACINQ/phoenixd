@@ -86,7 +86,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = 0.msat, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is InboundLiquidityOutgoingPayment -> listOf(
                 Details(
-                    "liquidity",
+                    "liquidity_purchase",
                     amount = 0.msat,
                     feeCredit = -payment.feeCreditUsed,
                     miningFee = payment.miningFees,
@@ -106,8 +106,8 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             when (it) {
                 is IncomingPayment.ReceivedWith.LightningPayment -> Details("lightning_received", amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
                 is IncomingPayment.ReceivedWith.AddedToFeeCredit -> Details("fee_credit", amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
-                is IncomingPayment.ReceivedWith.NewChannel -> Details("pay_to_open", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = null)
-                is IncomingPayment.ReceivedWith.SpliceIn -> Details("pay_to_splice", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.NewChannel -> Details("pay_to_open", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
+                is IncomingPayment.ReceivedWith.SpliceIn -> Details("pay_to_splice", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
                 else -> error("unexpected receivedWith part $it")
             }
         }

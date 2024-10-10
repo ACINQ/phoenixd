@@ -244,6 +244,7 @@ class Phoenixd : CliktCommand() {
             maxAbsoluteFee = liquidityOptions.maxMiningFee,
             maxRelativeFeeBasisPoints = liquidityOptions.maxRelativeFeeBasisPoints,
             skipAbsoluteFeeCheck = false,
+            considerOnlyMiningFeeForAbsoluteFeeCheck = true,
             maxAllowedFeeCredit = liquidityOptions.maxFeeCredit
         )
         val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)

@@ -33,6 +33,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
         database.transaction {
            queries.insert(
                id = payment.id.toString(),
+               // We store the full mining fee in the database, for compatibility reasons. See comment in the mapper below for details.
                mining_fees_sat = payment.miningFees.sat,
                channel_id = payment.channelId.toByteArray(),
                tx_id = payment.txId.value.toByteArray(),
@@ -89,12 +90,16 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
             confirmed_at: Long?,
             locked_at: Long?
         ): InboundLiquidityOutgoingPayment {
+            val purchase = PurchaseData.decodeAsCanonical(lease_type, lease_blob)
             return InboundLiquidityOutgoingPayment(
                 id = UUID.fromString(id),
-                miningFees = mining_fees_sat.sat,
+                // Attention! With the new OTF and lightning-kmp#710, the liquidity mining fee is split between `localMiningFee` and `purchase.miningFee`.
+                // However, for compatibility reasons with legacy lease data, we keep storing the "merged" mining fee in the mining_fee_sat column.
+                // It means that to retrieve the `localMiningFee`, we must subtract `purchase.miningFee` from the `mining_fee_sat` column.
+                localMiningFees = mining_fees_sat.sat - purchase.fees.miningFee,
                 channelId = channel_id.toByteVector32(),
                 txId = TxId(tx_id),
-                purchase = PurchaseData.decodeAsCanonical(lease_type, lease_blob),
+                purchase = purchase,
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at

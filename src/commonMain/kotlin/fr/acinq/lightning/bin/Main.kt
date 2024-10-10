@@ -1,6 +1,5 @@
 package fr.acinq.lightning.bin
 
-import app.cash.sqldelight.EnumColumnAdapter
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
@@ -32,7 +31,7 @@ import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
-import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
+import fr.acinq.lightning.bin.db.createPhoenixDb
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
 import fr.acinq.lightning.bin.logs.TimestampFormatter
@@ -257,24 +256,7 @@ class Phoenixd : CliktCommand() {
         consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id).first}"))
 
         val driver = createAppDbDriver(datadir, chain, nodeParams.nodeId)
-        val database = PhoenixDatabase(
-            driver = driver,
-            lightning_outgoing_payment_partsAdapter = Lightning_outgoing_payment_parts.Adapter(
-                part_routeAdapter = LightningOutgoingQueries.hopDescAdapter,
-                part_status_typeAdapter = EnumColumnAdapter()
-            ),
-            lightning_outgoing_paymentsAdapter = Lightning_outgoing_payments.Adapter(
-                status_typeAdapter = EnumColumnAdapter(),
-                details_typeAdapter = EnumColumnAdapter()
-            ),
-            incoming_paymentsAdapter = Incoming_payments.Adapter(
-                origin_typeAdapter = EnumColumnAdapter(),
-                received_with_typeAdapter = EnumColumnAdapter()
-            ),
-            channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
-                closing_info_typeAdapter = EnumColumnAdapter()
-            ),
-        )
+        val database = createPhoenixDb(driver)
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)
 

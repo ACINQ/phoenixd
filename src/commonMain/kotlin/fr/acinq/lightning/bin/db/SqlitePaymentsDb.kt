@@ -19,16 +19,14 @@ package fr.acinq.lightning.bin.db
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.TxId
-import fr.acinq.bitcoin.utils.Either
+import fr.acinq.lightning.bin.db.csvexport.CsvExportQueries
 import fr.acinq.lightning.bin.db.payments.*
-import fr.acinq.lightning.bin.db.payments.LinkTxToPaymentQueries
-import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
-import fr.acinq.lightning.channel.ChannelException
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.FinalFailure
-import fr.acinq.lightning.utils.*
-import fr.acinq.lightning.wire.FailureMessage
-import fr.acinq.phoenix.db.*
+import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.currentTimestampMillis
+import fr.acinq.lightning.utils.toByteVector32
+import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,6 +40,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     private val linkTxToPaymentQueries = LinkTxToPaymentQueries(database)
     private val inboundLiquidityQueries = InboundLiquidityQueries(database)
     val metadataQueries = PaymentsMetadataQueries(database)
+    val csvExportQueries = CsvExportQueries(database)
 
     override suspend fun addOutgoingLightningParts(
         parentId: UUID,
@@ -287,6 +286,44 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             } else {
                 lightningOutgoingQueries.listSuccessfulOrPendingPayments(from, to, limit, offset)
             }
+        }
+    }
+
+    private suspend fun listSuccessfulPayments(from: Long, to: Long, limit: Long, offset: Long): List<WalletPayment> {
+        return withContext(Dispatchers.Default) {
+            csvExportQueries.listSuccessfulPaymentIds(from, to, limit, offset).mapNotNull { paymentId ->
+                when (paymentId) {
+                    is WalletPaymentId.IncomingPaymentId -> {
+                        inQueries.getIncomingPayment(paymentHash = paymentId.paymentHash)
+                    }
+                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> {
+                        inboundLiquidityQueries.get(paymentId.id)
+                    }
+                    is WalletPaymentId.LightningOutgoingPaymentId -> {
+                        lightningOutgoingQueries.getPayment(paymentId.id)
+                    }
+                    is WalletPaymentId.SpliceOutgoingPaymentId -> {
+                        spliceOutQueries.getSpliceOutPayment(paymentId.id)
+                    }
+                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> {
+                        cpfpQueries.getCpfp(paymentId.id)
+                    }
+                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> {
+                        channelCloseQueries.getChannelCloseOutgoingPayment(paymentId.id)
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun processSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32, process: (WalletPayment) -> Unit) {
+        var batchOffset = 0L
+        var fetching = true
+        while (fetching) {
+            val results = listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset)
+            results.forEach { process(it) }
+            fetching = results.isNotEmpty()
+            batchOffset += results.size
         }
     }
 }

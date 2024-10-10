@@ -12,6 +12,16 @@ import fr.acinq.lightning.utils.toMilliSatoshi
 import kotlinx.datetime.Instant
 import okio.Path
 
+/**
+ * Exports a payments db items to a csv file.
+ *
+ * The three main columns are:
+ * - `type`: can be any of [Type].
+ * - `amount_msat`: positive or negative, will be non-zero for all types except [Type.fee_credit]. Summing this value over all rows results in the current balance.
+ * - `fee_credit_msat`: positive or negative, will be zero for all types except [Type.fee_credit]. Summing this value over all rows results in the current fee credit.
+ *
+ * Other columns are metadata (timestamp, payment hash, txid, fee details).
+ */
 class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
     private val FIELD_DATE = "date"
@@ -27,8 +37,24 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         addRow(FIELD_DATE, FIELD_TYPE, FIELD_AMOUNT_MSAT, FIELD_FEE_CREDIT_MSAT, FIELD_MINING_FEE_SAT, FIELD_SERVICE_FEE_MSAT, FIELD_PAYMENT_HASH, FIELD_TX_ID)
     }
 
+    @Suppress("EnumEntryName")
+    enum class Type {
+        legacy_swap_in,
+        legacy_swap_out,
+        legacy_pay_to_open,
+        legacy_pay_to_splice,
+        swap_in,
+        swap_out,
+        fee_bumping,
+        fee_credit,
+        lightning_received,
+        lightning_sent,
+        liquidity_purchase,
+        channel_close,
+    }
+
     data class Details(
-        val type: String,
+        val type: Type,
         val amount: MilliSatoshi,
         val feeCredit: MilliSatoshi,
         val miningFee: Satoshi,
@@ -44,7 +70,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         val dateStr = Instant.fromEpochMilliseconds(timestamp).toString() // ISO-8601 format
         addRow(
             dateStr,
-            details.type,
+            details.type.toString(),
             details.amount.msat.toString(),
             details.feeCredit.msat.toString(),
             details.miningFee.sat.toString(),
@@ -62,7 +88,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
                 is IncomingPayment.Origin.Invoice -> extractLightningPaymentParts(payment)
                 is IncomingPayment.Origin.SwapIn -> listOf(
                     Details(
-                        "legacy_swap_in",
+                        type = Type.legacy_swap_in,
                         amount = payment.amount,
                         feeCredit = 0.msat,
                         miningFee = payment.fees.truncateToSatoshi(),
@@ -71,22 +97,22 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
                         txId = null
                     )
                 )
-                is IncomingPayment.Origin.OnChain -> listOf(Details("swap_in", amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = origin.txId))
+                is IncomingPayment.Origin.OnChain -> listOf(Details(Type.swap_in, amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = origin.txId))
                 is IncomingPayment.Origin.Offer -> extractLightningPaymentParts(payment)
             }
 
             is LightningOutgoingPayment -> when (val details = payment.details) {
-                is LightningOutgoingPayment.Details.Normal -> listOf(Details("lightning_sent", amount = -payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
-                is LightningOutgoingPayment.Details.SwapOut -> listOf(Details("legacy_swap_out", amount = -payment.amount, feeCredit = 0.msat, miningFee = details.swapOutFee, serviceFee = 0.msat, paymentHash = null, txId = null))
-                is LightningOutgoingPayment.Details.Blinded -> listOf(Details("lightning_sent", amount = -payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
+                is LightningOutgoingPayment.Details.Normal -> listOf(Details(Type.lightning_sent, amount = -payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
+                is LightningOutgoingPayment.Details.SwapOut -> listOf(Details(Type.legacy_swap_out, amount = -payment.amount, feeCredit = 0.msat, miningFee = details.swapOutFee, serviceFee = 0.msat, paymentHash = null, txId = null))
+                is LightningOutgoingPayment.Details.Blinded -> listOf(Details(Type.lightning_sent, amount = -payment.amount, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = payment.fees, paymentHash = payment.paymentHash, txId = null))
             }
 
-            is SpliceOutgoingPayment -> listOf(Details("splice_out", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is ChannelCloseOutgoingPayment -> listOf(Details("channel_close", amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is SpliceCpfpOutgoingPayment -> listOf(Details("fee_bumping", amount = 0.msat, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is SpliceOutgoingPayment -> listOf(Details(Type.swap_out, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is ChannelCloseOutgoingPayment -> listOf(Details(Type.channel_close, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
+            is SpliceCpfpOutgoingPayment -> listOf(Details(Type.fee_bumping, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is InboundLiquidityOutgoingPayment -> listOf(
                 Details(
-                    "liquidity_purchase",
+                    Type.liquidity_purchase,
                     amount = 0.msat,
                     feeCredit = -payment.feeCreditUsed,
                     miningFee = payment.miningFees,
@@ -104,10 +130,10 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
     private fun extractLightningPaymentParts(payment: IncomingPayment): List<Details> = payment.received?.receivedWith.orEmpty()
         .map {
             when (it) {
-                is IncomingPayment.ReceivedWith.LightningPayment -> Details("lightning_received", amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
-                is IncomingPayment.ReceivedWith.AddedToFeeCredit -> Details("fee_credit", amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
-                is IncomingPayment.ReceivedWith.NewChannel -> Details("pay_to_open", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
-                is IncomingPayment.ReceivedWith.SpliceIn -> Details("pay_to_splice", amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
+                is IncomingPayment.ReceivedWith.LightningPayment -> Details(Type.lightning_received, amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.AddedToFeeCredit -> Details(Type.fee_credit, amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is IncomingPayment.ReceivedWith.NewChannel -> Details(Type.legacy_pay_to_open, amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
+                is IncomingPayment.ReceivedWith.SpliceIn -> Details(Type.legacy_pay_to_splice, amount = it.amountReceived, feeCredit = 0.msat, miningFee = it.miningFee, serviceFee = it.serviceFee, paymentHash = payment.paymentHash, txId = it.txId)
                 else -> error("unexpected receivedWith part $it")
             }
         }

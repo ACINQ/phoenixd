@@ -1,5 +1,6 @@
 .gradle
 build/
+out/
 .cxx
 
 # this file is local to the dev environment and must not be pushed!

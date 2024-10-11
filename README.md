@@ -32,3 +32,11 @@ Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc
 ```shell
 ./gradlew distZip
 ```
+
+## Build with Docker
+
+### Native Linux/WSL
+
+```shell
+DOCKER_BUILDKIT=1 docker build --file .docker/linux-release.Dockerfile --output type=local,dest=./out .
+```

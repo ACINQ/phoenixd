@@ -193,8 +193,8 @@ class Api(
                         description == null && descriptionHash != null -> Either.Right(descriptionHash)
                         else -> badRequest("Must provide either a description or descriptionHash")
                     }
-                    val expirySeconds = formParameters.getOptionalLong("expirySeconds")
-                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), eitherDesc, expirySeconds)
+                    val expiry = formParameters.getOptionalLong("expirySeconds")?.seconds
+                    val invoice = peer.createInvoice(randomBytes32(), amount?.toMilliSatoshi(), eitherDesc, expiry)
                     val externalId = formParameters["externalId"]
                     val webhookUrl = formParameters.getOptionalUrl("webhookUrl")
                     if (externalId != null || webhookUrl != null) {

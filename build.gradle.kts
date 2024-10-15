@@ -71,6 +71,7 @@ val buildVersionsTask by tasks.registering(Sync::class) {
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 val arch = System.getProperty("os.arch")
+println("architecture=$arch")
 
 kotlin {
     jvm {

@@ -413,7 +413,7 @@ class Api(
                             return@post
                         }
                         if (cpfpFeerate == targetFeerate) {
-                            call.respondText("cpfp is useless")
+                            call.respondText("either the tx is already confirmed or has a higher feerate")
                             return@post
                         }
                         when (val r = peer.spliceCpfp(channel.channelId, cpfpFeerate)) {

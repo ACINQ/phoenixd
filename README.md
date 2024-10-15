@@ -10,7 +10,7 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ## Build
 
-### Native Linux/WSL
+### Native Linux/WSL x64
 
 Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.
 

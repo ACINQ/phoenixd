@@ -201,7 +201,7 @@ distributions {
             }
         }
     }
-    if (currentOs.isLinux) {
+    if (currentOs.isLinux && arch != "aarch64") {
         create("linuxX64") {
             configureNativeDistribution("linuxX64Binaries", "linuxX64", "linux-x64")
         }

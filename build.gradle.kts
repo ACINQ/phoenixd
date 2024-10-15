@@ -71,7 +71,6 @@ val buildVersionsTask by tasks.registering(Sync::class) {
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 val arch = System.getProperty("os.arch")
-println("architecture=$arch")
 
 kotlin {
     jvm {
@@ -202,7 +201,7 @@ distributions {
             }
         }
     }
-    if (currentOs.isLinux) {
+    if (currentOs.isLinux && arch != "aarch64") {
         create("linuxX64") {
             configureNativeDistribution("linuxX64Binaries", "linuxX64", "linux-x64")
         }

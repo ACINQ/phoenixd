@@ -67,6 +67,7 @@ fun main(args: Array<String>) =
             SendToAddress(),
             BumpFee(),
             CloseChannel(),
+            ExportCsv()
         )
         .main(args)
 
@@ -325,9 +326,9 @@ class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", prin
     private val amountSat by option("--amountSat").long()
     private val lnurl by option("--lnurl").required()
         .check("not a valid lnurl-pay link") {
-        val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
-        url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
-    }
+            val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
+            url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
+        }
     private val message by option("--message").help { "Optional comment" }
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
@@ -414,6 +415,20 @@ class CloseChannel : PhoenixCliCommand(name = "closechannel", help = "Close chan
                 append("channelId", channelId.toHex())
                 append("address", address)
                 append("feerateSatByte", feerateSatByte.toString())
+            }
+        )
+    }
+}
+
+class ExportCsv : PhoenixCliCommand(name = "exportcsv", help = "Export transactions to a csv file") {
+    private val from by option("--from").long().help { "start timestamp in millis since epoch" }
+    private val to by option("--to").long().help { "end timestamp in millis since epoch" }
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "export").toString(),
+            formParameters = parameters {
+                from?.let { append("from", it.toString()) }
+                to?.let { append("to", it.toString()) }
             }
         )
     }

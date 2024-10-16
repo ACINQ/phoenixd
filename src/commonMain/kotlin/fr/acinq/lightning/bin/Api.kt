@@ -8,12 +8,11 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.BuildVersions
-import fr.acinq.lightning.ChannelEvents
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
-import fr.acinq.lightning.bin.conf.LSP
+import fr.acinq.lightning.bin.csv.WalletPaymentCsvWriter
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
@@ -31,14 +30,13 @@ import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
-import fr.acinq.lightning.channel.LocalFundingStatus
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
-import fr.acinq.lightning.io.ChannelClosing
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
+import fr.acinq.lightning.logging.info
 import fr.acinq.lightning.logging.warning
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.*
@@ -438,6 +436,19 @@ class Api(
                         val channelClose = res.await()
                         call.respondText(channelClose.txId.toString())
                     }
+                }
+                post("export") {
+                    val from = call.parameters.getOptionalLong("from") ?: 0L
+                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
+                    val csvPath = datadir / "exports" / "export-${currentTimestampSeconds()}.csv"
+                    log.info { "exporting payments to $csvPath..." }
+                    val csvWriter = WalletPaymentCsvWriter(csvPath)
+                    paymentDb.processSuccessfulPayments(from, to) { payment ->
+                        csvWriter.add(payment)
+                    }
+                    csvWriter.close()
+                    log.info { "csv export completed" }
+                    call.respond("payment history has been exported to $csvPath")
                 }
             }
             route("/websocket") {

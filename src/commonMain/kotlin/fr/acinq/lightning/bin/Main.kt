@@ -92,7 +92,7 @@ class Phoenixd : CliktCommand() {
         .defaultLazy {
             when (chain) {
                 Chain.Mainnet -> MempoolSpaceClient.OfficialMempoolMainnet
-                Chain.Testnet3 -> MempoolSpaceClient.OfficialMempoolTestnet
+                Chain.Testnet3 -> MempoolSpaceClient.OfficialMempoolTestnet3
                 else -> error("unsupported chain")
             }
         }

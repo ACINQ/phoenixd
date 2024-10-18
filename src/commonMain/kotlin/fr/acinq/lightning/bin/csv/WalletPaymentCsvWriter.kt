@@ -113,7 +113,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             is InboundLiquidityOutgoingPayment -> listOf(
                 Details(
                     Type.liquidity_purchase,
-                    amount = 0.msat,
+                    amount = -payment.feePaidFromChannelBalance.total.toMilliSatoshi(),
                     feeCredit = -payment.feeCreditUsed,
                     miningFee = payment.miningFees,
                     serviceFee = payment.serviceFees.toMilliSatoshi(),

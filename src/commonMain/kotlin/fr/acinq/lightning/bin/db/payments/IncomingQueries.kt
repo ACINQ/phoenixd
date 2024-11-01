@@ -19,9 +19,12 @@ package fr.acinq.lightning.bin.db.payments
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.byteVector32
-import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.Lightning.randomBytes32
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.currentTimestampMillis
+import fr.acinq.lightning.utils.toByteVector32
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -34,32 +37,30 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     fun addIncomingPayment(
         preimage: ByteVector32,
         paymentHash: ByteVector32,
-        origin: IncomingPayment.Origin,
-        createdAt: Long
-    ) {
-        val (originType, originData) = origin.mapToDb()
+        incomingPayment: IncomingPayment) {
+        val (originType, originData) = incomingPayment.mapToDb()
         queries.insert(
             payment_hash = paymentHash.toByteArray(),
             preimage = preimage.toByteArray(),
             origin_type = originType,
             origin_blob = originData,
-            created_at = createdAt
+            created_at = incomingPayment.createdAt
         )
     }
 
     fun receivePayment(
         paymentHash: ByteVector32,
-        receivedWith: List<IncomingPayment.ReceivedWith>,
+        parts: List<LightningIncomingPayment.Received.Part>,
         receivedAt: Long
     ) {
         database.transaction {
             val paymentInDb = queries.get(
                 payment_hash = paymentHash.toByteArray(),
                 mapper = Companion::mapIncomingPayment
-            ).executeAsOneOrNull() ?: throw IncomingPaymentNotFound(paymentHash)
-            val existingReceivedWith = paymentInDb.received?.receivedWith ?: emptySet()
-            val newReceivedWith = existingReceivedWith + receivedWith
-            val (receivedWithType, receivedWithBlob) = newReceivedWith.mapToDb() ?: (null to null)
+            ).executeAsOneOrNull() as? LightningIncomingPayment ?: throw IncomingPaymentNotFound(paymentHash)
+            val existingParts = paymentInDb.received?.parts.orEmpty()
+            val newParts = existingParts + parts
+            val (receivedWithType, receivedWithBlob) = newParts.mapToDb() ?: (null to null)
             queries.updateReceived(
                 received_at = receivedAt,
                 received_with_type = receivedWithType,
@@ -75,7 +76,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                 payment_hash = paymentHash.toByteArray(),
                 mapper = Companion::mapIncomingPayment
             ).executeAsOneOrNull()
-            val newReceivedWith = paymentInDb?.received?.receivedWith?.map {
+            val newParts = paymentInDb?.received?.receivedWith?.map {
                 when (it) {
                     is IncomingPayment.ReceivedWith.NewChannel -> it.copy(lockedAt = lockedAt)
                     is IncomingPayment.ReceivedWith.SpliceIn -> it.copy(lockedAt = lockedAt)
@@ -155,10 +156,11 @@ class IncomingQueries(private val database: PhoenixDatabase) {
         }
     }
 
-    fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<IncomingPayment> {
-        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
-            val origin = it.origin
-            it.received == null && origin is IncomingPayment.Origin.Invoice && origin.paymentRequest.isExpired()
+    fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> {
+        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList()
+            .filterIsInstance<Bolt11IncomingPayment>()
+            .filter {
+            it.received == null && it.paymentRequest.isExpired()
         }
     }
 

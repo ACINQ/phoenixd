@@ -32,6 +32,7 @@ import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.
 import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.Companion.asDb
 import fr.acinq.lightning.bin.db.serializers.v1.*
 import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.db.LightningIncomingPayment
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
@@ -150,33 +151,15 @@ sealed class IncomingReceivedWithData {
 }
 
 /** Only serialize received_with into the [IncomingReceivedWithTypeVersion.MULTIPARTS_V1] type. */
-fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeVersion, ByteArray>? = map {
+fun List<LightningIncomingPayment.Received.Part>.mapToDb(): Pair<IncomingReceivedWithTypeVersion, ByteArray>? = map {
     when (it) {
-        is IncomingPayment.ReceivedWith.LightningPayment -> IncomingReceivedWithData.Part.Htlc.V1(
+        is LightningIncomingPayment.Received.Part.Htlc -> IncomingReceivedWithData.Part.Htlc.V1(
             amountReceived = it.amountReceived,
             channelId = it.channelId,
             htlcId = it.htlcId,
             fundingFee = it.fundingFee?.asDb()
         )
-        is IncomingPayment.ReceivedWith.NewChannel -> IncomingReceivedWithData.Part.NewChannel.V2(
-            amount = it.amountReceived,
-            serviceFee = it.serviceFee,
-            miningFee = it.miningFee,
-            channelId = it.channelId,
-            txId = it.txId.value,
-            confirmedAt = it.confirmedAt,
-            lockedAt = it.lockedAt,
-        )
-        is IncomingPayment.ReceivedWith.SpliceIn -> IncomingReceivedWithData.Part.SpliceIn.V0(
-            amount = it.amountReceived,
-            serviceFee = it.serviceFee,
-            miningFee = it.miningFee,
-            channelId = it.channelId,
-            txId = it.txId.value,
-            confirmedAt = it.confirmedAt,
-            lockedAt = it.lockedAt,
-        )
-        is IncomingPayment.ReceivedWith.AddedToFeeCredit -> IncomingReceivedWithData.Part.FeeCredit.V0(
+        is LightningIncomingPayment.Received.Part.FeeCredit -> IncomingReceivedWithData.Part.FeeCredit.V0(
             amount = it.amountReceived
         )
     }

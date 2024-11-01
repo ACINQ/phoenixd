@@ -19,6 +19,7 @@ package fr.acinq.lightning.bin.db
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.TxId
+import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.bin.db.csvexport.CsvExportQueries
 import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.db.*
@@ -149,33 +150,34 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     // ---- incoming payments
 
-    override suspend fun addIncomingPayment(
-        preimage: ByteVector32,
-        origin: IncomingPayment.Origin,
-        createdAt: Long
-    ): IncomingPayment {
-        val paymentHash = Crypto.sha256(preimage).toByteVector32()
-
-        return withContext(Dispatchers.Default) {
-            database.transactionWithResult {
-                inQueries.addIncomingPayment(preimage, paymentHash, origin, createdAt)
-                inQueries.getIncomingPayment(paymentHash)!!
+    override suspend fun addIncomingPayment(incomingPayment: IncomingPayment) {
+        withContext(Dispatchers.Default) {
+            database.transaction {
+                val preimage = when(incomingPayment) {
+                    is LightningIncomingPayment -> incomingPayment.paymentPreimage
+                    is OnChainIncomingPayment -> randomBytes32()
+                    is LegacySwapInIncomingPayment -> error("LegacySwapInIncomingPayment is deprecated")
+                    is LegacyPayToOpenIncomingPayment -> error("LegacyPayToOpenIncomingPayment is deprecated")
+                }
+                val paymentHash = Crypto.sha256(preimage).toByteVector32()
+                inQueries.addIncomingPayment(preimage, paymentHash, incomingPayment)
+                // if the payment is on-chain, save the tx id to the db
+                when(incomingPayment) {
+                    is OnChainIncomingPayment -> linkTxToPaymentQueries.linkTxToPayment(incomingPayment.txId, WalletPaymentId.IncomingPaymentId(paymentHash))
+                    else -> {}
+                }
             }
         }
     }
 
-    override suspend fun receivePayment(
+    override suspend fun receiveLightningPayment(
         paymentHash: ByteVector32,
-        receivedWith: List<IncomingPayment.ReceivedWith>,
+        parts: List<LightningIncomingPayment.Received.Part>,
         receivedAt: Long
     ) {
         withContext(Dispatchers.Default) {
             database.transaction {
-                inQueries.receivePayment(paymentHash, receivedWith, receivedAt)
-                // if one received-with is on-chain, save the tx id to the db
-                receivedWith.filterIsInstance<IncomingPayment.ReceivedWith.OnChainIncomingPayment>().firstOrNull()?.let {
-                    linkTxToPaymentQueries.linkTxToPayment(it.txId, WalletPaymentId.IncomingPaymentId(paymentHash))
-                }
+                inQueries.receivePayment(paymentHash, parts, receivedAt)
             }
         }
     }
@@ -238,20 +240,18 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    override suspend fun getIncomingPayment(
-        paymentHash: ByteVector32
-    ): IncomingPayment? = withContext(Dispatchers.Default) {
-        inQueries.getIncomingPayment(paymentHash)
+    override suspend fun getLightningIncomingPayment(paymentHash: ByteVector32): LightningIncomingPayment? = withContext(Dispatchers.Default) {
+        inQueries.getIncomingPayment(paymentHash) as? LightningIncomingPayment
     }
 
-    override suspend fun listExpiredPayments(
+    override suspend fun listLightningExpiredPayments(
         fromCreatedAt: Long,
         toCreatedAt: Long
-    ): List<IncomingPayment> = withContext(Dispatchers.Default) {
+    ): List<LightningIncomingPayment> = withContext(Dispatchers.Default) {
         inQueries.listExpiredPayments(fromCreatedAt, toCreatedAt)
     }
 
-    override suspend fun removeIncomingPayment(
+    override suspend fun removeLightningIncomingPayment(
         paymentHash: ByteVector32
     ): Boolean = withContext(Dispatchers.Default) {
         inQueries.deleteIncomingPayment(paymentHash)

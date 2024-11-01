@@ -27,11 +27,11 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.OutPoint
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.payments.DbTypesHelper.decodeBlob
-import fr.acinq.lightning.db.IncomingPayment
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.bin.db.serializers.v1.ByteVector32Serializer
 import fr.acinq.lightning.bin.db.serializers.v1.ByteVectorSerializer
 import fr.acinq.lightning.bin.db.serializers.v1.OutpointSerializer
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.OfferPaymentMetadata
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -83,13 +83,20 @@ sealed class IncomingOriginData {
     }
 }
 
-fun IncomingPayment.Origin.mapToDb(): Pair<IncomingOriginTypeVersion, ByteArray> = when (this) {
-    is IncomingPayment.Origin.Invoice -> IncomingOriginTypeVersion.INVOICE_V0 to
+@Suppress("DEPRECATION")
+fun IncomingPayment.mapToDb(): Pair<IncomingOriginTypeVersion, ByteArray> = when (this) {
+    is Bolt11IncomingPayment -> IncomingOriginTypeVersion.INVOICE_V0 to
             Json.encodeToString(IncomingOriginData.Invoice.V0(paymentRequest.write())).toByteArray(Charsets.UTF_8)
-    is IncomingPayment.Origin.SwapIn -> IncomingOriginTypeVersion.SWAPIN_V0 to
-            Json.encodeToString(IncomingOriginData.SwapIn.V0(address)).toByteArray(Charsets.UTF_8)
-    is IncomingPayment.Origin.OnChain -> IncomingOriginTypeVersion.ONCHAIN_V0 to
-            Json.encodeToString(IncomingOriginData.OnChain.V0(txId.value, localInputs.toList())).toByteArray(Charsets.UTF_8)
-    is IncomingPayment.Origin.Offer -> IncomingOriginTypeVersion.OFFER_V0 to
+    is Bolt12IncomingPayment -> IncomingOriginTypeVersion.OFFER_V0 to
             Json.encodeToString(IncomingOriginData.Offer.V0(metadata.encode())).toByteArray(Charsets.UTF_8)
+    is OnChainIncomingPayment -> IncomingOriginTypeVersion.ONCHAIN_V0 to
+            Json.encodeToString(IncomingOriginData.OnChain.V0(txId.value, localInputs.toList())).toByteArray(Charsets.UTF_8)
+    is LegacySwapInIncomingPayment -> IncomingOriginTypeVersion.SWAPIN_V0 to
+            Json.encodeToString(IncomingOriginData.SwapIn.V0(address)).toByteArray(Charsets.UTF_8)
+    is LegacyPayToOpenIncomingPayment -> when(val origin = this.origin) {
+        is LegacyPayToOpenIncomingPayment.Origin.Invoice -> IncomingOriginTypeVersion.INVOICE_V0 to
+                Json.encodeToString(IncomingOriginData.Invoice.V0(origin.paymentRequest.write())).toByteArray(Charsets.UTF_8)
+        is LegacyPayToOpenIncomingPayment.Origin.Offer -> IncomingOriginTypeVersion.OFFER_V0 to
+                Json.encodeToString(IncomingOriginData.Offer.V0(origin.metadata.encode())).toByteArray(Charsets.UTF_8)
+    }
 }

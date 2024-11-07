@@ -1,6 +1,7 @@
 .gradle
 build/
 .cxx
+bin
 
 # this file is local to the dev environment and must not be pushed!
 local.properties

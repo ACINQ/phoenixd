@@ -3,6 +3,7 @@ package fr.acinq.lightning.bin.db
 import app.cash.sqldelight.EnumColumnAdapter
 import app.cash.sqldelight.db.SqlDriver
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
+import fr.acinq.lightning.db.adapters.IncomingPaymentAdapter
 import fr.acinq.phoenix.db.*
 
 fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
@@ -15,10 +16,7 @@ fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
         status_typeAdapter = EnumColumnAdapter(),
         details_typeAdapter = EnumColumnAdapter()
     ),
-    incoming_paymentsAdapter = Incoming_payments.Adapter(
-        origin_typeAdapter = EnumColumnAdapter(),
-        received_with_typeAdapter = EnumColumnAdapter()
-    ),
+    incoming_paymentsAdapter = Incoming_payments.Adapter(IncomingPaymentAdapter),
     channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
         closing_info_typeAdapter = EnumColumnAdapter()
     ),

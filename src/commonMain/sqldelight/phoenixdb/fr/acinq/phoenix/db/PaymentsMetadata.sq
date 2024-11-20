@@ -1,6 +1,6 @@
 -- This table stores metadata corresponding to a payment. Does not contain critical data.
 -- * type        => the type of a payment, an int as defined in the DbType enum
--- * id          => the internal identifier of a payment, can be a payment hash (incoming) or a UUID (outgoing)
+-- * id          => uuid identifier of the payment
 -- * external_id => an arbitrary string defined by the user to track the payment in their own system
 CREATE TABLE payments_metadata (
     type INTEGER NOT NULL,

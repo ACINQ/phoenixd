@@ -33,6 +33,8 @@ import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
+import fr.acinq.lightning.db.LegacyPayToOpenIncomingPayment
+import fr.acinq.lightning.db.LightningIncomingPayment
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
@@ -196,7 +198,7 @@ class Api(
                     val externalId = formParameters["externalId"]
                     val webhookUrl = formParameters.getOptionalUrl("webhookUrl")
                     if (externalId != null || webhookUrl != null) {
-                        paymentDb.metadataQueries.insert(WalletPaymentId.IncomingPaymentId(invoice.paymentHash), externalId, webhookUrl)
+                        paymentDb.metadataQueries.insert(WalletPaymentId.IncomingPaymentId.fromPaymentHash(invoice.paymentHash), externalId, webhookUrl)
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
@@ -224,16 +226,25 @@ class Api(
                     } else {
                         paymentDb.listIncomingPaymentsForExternalId(externalId, from, to, limit, offset, listAll)
                     }.map { (payment, externalId) ->
-                        IncomingPayment(payment, externalId)
+                        when (payment) {
+                            is LightningIncomingPayment -> IncomingPayment(payment, externalId)
+                            is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, externalId)
+                            else -> {}
+                        }
                     }
                     call.respond(payments)
                 }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
-                    paymentDb.getIncomingPayment(paymentHash)?.let {
-                        val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(paymentHash))
-                        call.respond(IncomingPayment(it, metadata?.externalId))
-                    } ?: call.respond(HttpStatusCode.NotFound)
+                    val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId.fromPaymentHash(paymentHash))
+                    val payment = when (val payment = paymentDb.getIncomingPayment(paymentHash)) {
+                        is LightningIncomingPayment -> IncomingPayment(payment, metadata?.externalId)
+                        is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, metadata?.externalId)
+                        else -> null
+                    }
+                    payment
+                        ?.let { call.respond(it) }
+                        ?: call.respond(HttpStatusCode.NotFound)
                 }
                 get("payments/outgoing") {
                     val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending

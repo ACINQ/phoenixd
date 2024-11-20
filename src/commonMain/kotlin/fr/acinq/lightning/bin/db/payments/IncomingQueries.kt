@@ -19,8 +19,8 @@ package fr.acinq.lightning.bin.db.payments
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.lightning.bin.db.payments.types.*
-import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.db.*
+import fr.acinq.lightning.utils.UUID
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -30,95 +30,91 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     private val queries = database.incomingPaymentsQueries
 
     fun addIncomingPayment(
-        preimage: ByteVector32,
-        paymentHash: ByteVector32,
-        origin: IncomingPayment.Origin,
-        createdAt: Long
+        incomingPayment: IncomingPayment
     ) {
-        val (originType, originData) = origin.mapToDb()
         queries.insert(
-            payment_hash = paymentHash.toByteArray(),
-            preimage = preimage.toByteArray(),
-            origin_type = originType,
-            origin_blob = originData,
-            created_at = createdAt
+            id = incomingPayment.id.toString(),
+            payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash?.toByteArray(),
+            created_at = incomingPayment.createdAt,
+            received_at = incomingPayment.completedAt,
+            json = incomingPayment
         )
     }
 
     fun receivePayment(
         paymentHash: ByteVector32,
-        receivedWith: List<IncomingPayment.ReceivedWith>,
+        parts: List<LightningIncomingPayment.Received.Part>,
         receivedAt: Long
     ) {
         database.transaction {
-            val paymentInDb = queries.get(
-                payment_hash = paymentHash.toByteArray(),
-                mapper = Companion::mapIncomingPayment
-            ).executeAsOneOrNull() ?: throw IncomingPaymentNotFound(paymentHash)
-            val existingReceivedWith = paymentInDb.received?.receivedWith ?: emptySet()
-            val newReceivedWith = existingReceivedWith + receivedWith
-            val (receivedWithType, receivedWithBlob) = newReceivedWith.mapToDb() ?: (null to null)
-            queries.updateReceived(
-                received_at = receivedAt,
-                received_with_type = receivedWithType,
-                received_with_blob = receivedWithBlob,
-                payment_hash = paymentHash.toByteArray()
-            )
+            when (val paymentInDb = getIncomingPayment(paymentHash)) {
+                null -> error("missing payment for payment_hash=$paymentHash")
+                is LightningIncomingPayment -> {
+                    val newReceived = when (val received = paymentInDb.received) {
+                        null -> LightningIncomingPayment.Received(parts, receivedAt)
+                        else -> received.copy(parts = received.parts + parts)
+                    }
+                    val paymentInDb1 = when (paymentInDb) {
+                        is Bolt11IncomingPayment -> paymentInDb.copy(received = newReceived)
+                        is Bolt12IncomingPayment -> paymentInDb.copy(received = newReceived)
+                    }
+                    queries.updateReceived(
+                        received_at = receivedAt,
+                        json = paymentInDb1,
+                        id = paymentInDb1.id.toString()
+                    )
+                }
+                else -> error("unexpected type: $paymentInDb")
+            }
         }
     }
 
-    fun setLocked(paymentHash: ByteVector32, lockedAt: Long) {
+    fun setLocked(id: UUID, lockedAt: Long) {
         database.transaction {
-            val paymentInDb = queries.get(
-                payment_hash = paymentHash.toByteArray(),
-                mapper = Companion::mapIncomingPayment
-            ).executeAsOneOrNull()
-            val newReceivedWith = paymentInDb?.received?.receivedWith?.map {
-                when (it) {
-                    is IncomingPayment.ReceivedWith.NewChannel -> it.copy(lockedAt = lockedAt)
-                    is IncomingPayment.ReceivedWith.SpliceIn -> it.copy(lockedAt = lockedAt)
-                    else -> it
+            when (val paymentInDb = getIncomingPayment(id)) {
+                null -> {}
+                is OnChainIncomingPayment -> {
+                    val paymentInDb1 = when (paymentInDb) {
+                        is NewChannelIncomingPayment -> paymentInDb.copy(lockedAt = lockedAt)
+                        is SpliceInIncomingPayment -> paymentInDb.copy(lockedAt = lockedAt)
+                    }
+                    queries.updateReceived(
+                        received_at = lockedAt,
+                        json = paymentInDb1,
+                        id = paymentInDb1.id.toString()
+                    )
                 }
+                else -> error("unexpected type: $paymentInDb")
             }
-            val (newReceivedWithType, newReceivedWithBlob) = newReceivedWith?.mapToDb()
-                ?: (null to null)
-            queries.updateReceived(
-                // we override the previous received_at timestamp to trigger a refresh of the payment's cache data
-                // because the list-all query feeding the cache uses `received_at` for incoming payments
-                received_at = lockedAt,
-                received_with_type = newReceivedWithType,
-                received_with_blob = newReceivedWithBlob,
-                payment_hash = paymentHash.toByteArray()
-            )
         }
     }
 
-    fun setConfirmed(paymentHash: ByteVector32, confirmedAt: Long) {
+    fun setConfirmed(id: UUID, confirmedAt: Long) {
         database.transaction {
-            val paymentInDb = queries.get(
-                payment_hash = paymentHash.toByteArray(),
-                mapper = Companion::mapIncomingPayment
-            ).executeAsOneOrNull()
-            val newReceivedWith = paymentInDb?.received?.receivedWith?.map {
-                when (it) {
-                    is IncomingPayment.ReceivedWith.NewChannel -> it.copy(confirmedAt = confirmedAt)
-                    is IncomingPayment.ReceivedWith.SpliceIn -> it.copy(confirmedAt = confirmedAt)
-                    else -> it
+            when (val paymentInDb = getIncomingPayment(id)) {
+                null -> {}
+                is OnChainIncomingPayment -> {
+                    val paymentInDb1 = when (paymentInDb) {
+                        is NewChannelIncomingPayment -> paymentInDb.copy(confirmedAt = confirmedAt)
+                        is SpliceInIncomingPayment -> paymentInDb.copy(confirmedAt = confirmedAt)
+                    }
+                    queries.updateReceived(
+                        received_at = paymentInDb1.lockedAt, // keep the existing value
+                        json = paymentInDb1,
+                        id = paymentInDb1.id.toString()
+                    )
                 }
+                else -> error("unexpected type: $paymentInDb")
             }
-            val (newReceivedWithType, newReceivedWithBlob) = newReceivedWith?.mapToDb()
-                ?: (null to null)
-            queries.updateReceived(
-                received_at = paymentInDb?.received?.receivedAt,
-                received_with_type = newReceivedWithType,
-                received_with_blob = newReceivedWithBlob,
-                payment_hash = paymentHash.toByteArray()
-            )
         }
+    }
+
+    fun getIncomingPayment(id: UUID): IncomingPayment? {
+        return queries.get(id = id.toString()).executeAsOneOrNull()?.json
     }
 
     fun getIncomingPayment(paymentHash: ByteVector32): IncomingPayment? {
-        return queries.get(payment_hash = paymentHash.toByteArray(), Companion::mapIncomingPayment).executeAsOneOrNull()
+        return queries.getByPaymentHash(payment_hash = paymentHash.toByteArray()).executeAsOneOrNull()?.json
     }
 
     fun getOldestReceivedDate(): Long? {
@@ -126,38 +122,29 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     }
 
     fun listAllNotConfirmed(): Flow<List<IncomingPayment>> {
-        return queries.listAllNotConfirmed(Companion::mapIncomingPayment).asFlow().mapToList(Dispatchers.IO)
+        return queries.listAllNotConfirmed().asFlow().mapToList(Dispatchers.IO)
     }
 
     fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map {
-            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
-        }
+        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map { it.json to it.external_id }
     }
 
     fun listPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
-            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
-        }
+        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.json to it.external_id }
     }
 
     fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map {
-            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
-        }
+        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map { it.json to it.external_id }
     }
 
     fun listReceivedPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map {
-            mapIncomingPayment(it.payment_hash, it.preimage, it.created_at, it.origin_type, it.origin_blob, it.received_amount_msat, it.received_at, it.received_with_type, it.received_with_blob) to it.external_id
-        }
+        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.json to it.external_id }
     }
 
-    fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<IncomingPayment> {
-        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt, Companion::mapIncomingPayment).executeAsList().filter {
-            val origin = it.origin
-            it.received == null && origin is IncomingPayment.Origin.Invoice && origin.paymentRequest.isExpired()
-        }
+    fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> {
+        return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt).executeAsList()
+            .filterIsInstance<Bolt11IncomingPayment>()
+            .filter { it.received == null && it.paymentRequest.isExpired() }
     }
 
     /** Try to delete an incoming payment ; return true if an element was deleted, false otherwise. */
@@ -167,51 +154,4 @@ class IncomingQueries(private val database: PhoenixDatabase) {
             queries.changes().executeAsOne() != 0L
         }
     }
-
-    companion object {
-        fun mapIncomingPayment(
-            @Suppress("UNUSED_PARAMETER") payment_hash: ByteArray,
-            preimage: ByteArray,
-            created_at: Long,
-            origin_type: IncomingOriginTypeVersion,
-            origin_blob: ByteArray,
-            @Suppress("UNUSED_PARAMETER") received_amount_msat: Long?,
-            received_at: Long?,
-            received_with_type: IncomingReceivedWithTypeVersion?,
-            received_with_blob: ByteArray?,
-        ): IncomingPayment {
-            return IncomingPayment(
-                preimage = ByteVector32(preimage),
-                origin = IncomingOriginData.deserialize(origin_type, origin_blob),
-                received = mapIncomingReceived(received_at, received_with_type, received_with_blob),
-                createdAt = created_at
-            )
-        }
-
-        private fun mapIncomingReceived(
-            received_at: Long?,
-            received_with_type: IncomingReceivedWithTypeVersion?,
-            received_with_blob: ByteArray?,
-        ): IncomingPayment.Received? {
-            return when {
-                received_at == null && received_with_type == null && received_with_blob == null -> null
-                received_at != null && received_with_type != null && received_with_blob != null -> {
-                    IncomingPayment.Received(
-                        receivedWith = IncomingReceivedWithData.deserialize(received_with_type, received_with_blob),
-                        receivedAt = received_at
-                    )
-                }
-                received_at != null -> {
-                    IncomingPayment.Received(
-                        receivedWith = emptyList(),
-                        receivedAt = received_at
-                    )
-                }
-                else -> throw UnreadableIncomingReceivedWith(received_at, received_with_type, received_with_blob)
-            }
-        }
-    }
 }
-class IncomingPaymentNotFound(paymentHash: ByteVector32) : RuntimeException("missing payment for payment_hash=$paymentHash")
-class UnreadableIncomingReceivedWith(receivedAt: Long?, receivedWithTypeVersion: IncomingReceivedWithTypeVersion?, receivedWithBlob: ByteArray?) :
-    RuntimeException("unreadable received with data [ receivedAt=$receivedAt, receivedWithTypeVersion=$receivedWithTypeVersion, receivedWithBlob=$receivedWithBlob ]")

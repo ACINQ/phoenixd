@@ -149,34 +149,22 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     // ---- incoming payments
 
-    override suspend fun addIncomingPayment(
-        preimage: ByteVector32,
-        origin: IncomingPayment.Origin,
-        createdAt: Long
-    ): IncomingPayment {
-        val paymentHash = Crypto.sha256(preimage).toByteVector32()
-
+    override suspend fun addIncomingPayment(incomingPayment: IncomingPayment) {
         return withContext(Dispatchers.Default) {
-            database.transactionWithResult {
-                inQueries.addIncomingPayment(preimage, paymentHash, origin, createdAt)
-                inQueries.getIncomingPayment(paymentHash)!!
+            database.transaction {
+                inQueries.addIncomingPayment(incomingPayment)
+                // if the payment is on-chain, save the tx id link to the db
+                when (incomingPayment) {
+                    is OnChainIncomingPayment -> linkTxToPaymentQueries.linkTxToPayment(incomingPayment.txId, WalletPaymentId.IncomingPaymentId(incomingPayment.id))
+                    else -> {}
+                }
             }
         }
     }
 
-    override suspend fun receivePayment(
-        paymentHash: ByteVector32,
-        receivedWith: List<IncomingPayment.ReceivedWith>,
-        receivedAt: Long
-    ) {
+    override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Received.Part>, receivedAt: Long) {
         withContext(Dispatchers.Default) {
-            database.transaction {
-                inQueries.receivePayment(paymentHash, receivedWith, receivedAt)
-                // if one received-with is on-chain, save the tx id to the db
-                receivedWith.filterIsInstance<IncomingPayment.ReceivedWith.OnChainIncomingPayment>().firstOrNull()?.let {
-                    linkTxToPaymentQueries.linkTxToPayment(it.txId, WalletPaymentId.IncomingPaymentId(paymentHash))
-                }
-            }
+            inQueries.receivePayment(paymentHash, parts, receivedAt)
         }
     }
 
@@ -187,7 +175,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
                 when (walletPaymentId) {
                     is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.setLocked(walletPaymentId.paymentHash, lockedAt)
+                       inQueries.setLocked(walletPaymentId.id, lockedAt)
                     }
                     is WalletPaymentId.LightningOutgoingPaymentId -> {
                         // LN payments need not be locked
@@ -216,7 +204,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
                 when (walletPaymentId) {
                     is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.setConfirmed(walletPaymentId.paymentHash, confirmedAt)
+                       inQueries.setConfirmed(walletPaymentId.id, confirmedAt)
                     }
                     is WalletPaymentId.LightningOutgoingPaymentId -> {
                         // LN payments need not be confirmed
@@ -238,22 +226,20 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    override suspend fun getIncomingPayment(
-        paymentHash: ByteVector32
-    ): IncomingPayment? = withContext(Dispatchers.Default) {
+    override suspend fun getLightningIncomingPayment(paymentHash: ByteVector32): LightningIncomingPayment? = withContext(Dispatchers.Default) {
+        inQueries.getIncomingPayment(paymentHash) as? LightningIncomingPayment
+    }
+
+    /** Useful for backwards compatibility because [[getLightningIncomingPayment]] does not return [[LegacyPayToOpenIncomingPayment]] */
+    suspend fun getIncomingPayment(paymentHash: ByteVector32): IncomingPayment? = withContext(Dispatchers.Default) {
         inQueries.getIncomingPayment(paymentHash)
     }
 
-    override suspend fun listExpiredPayments(
-        fromCreatedAt: Long,
-        toCreatedAt: Long
-    ): List<IncomingPayment> = withContext(Dispatchers.Default) {
+    override suspend fun listLightningExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> = withContext(Dispatchers.Default) {
         inQueries.listExpiredPayments(fromCreatedAt, toCreatedAt)
     }
 
-    override suspend fun removeIncomingPayment(
-        paymentHash: ByteVector32
-    ): Boolean = withContext(Dispatchers.Default) {
+    override suspend fun removeLightningIncomingPayment(paymentHash: ByteVector32): Boolean = withContext(Dispatchers.Default) {
         inQueries.deleteIncomingPayment(paymentHash)
     }
 
@@ -294,7 +280,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             csvExportQueries.listSuccessfulPaymentIds(from, to, limit, offset).mapNotNull { paymentId ->
                 when (paymentId) {
                     is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.getIncomingPayment(paymentHash = paymentId.paymentHash)
+                        inQueries.getIncomingPayment(paymentId.id)
                     }
                     is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> {
                         inboundLiquidityQueries.get(paymentId.id)

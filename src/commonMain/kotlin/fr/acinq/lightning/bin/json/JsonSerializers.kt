@@ -24,7 +24,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
-import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
@@ -91,12 +91,12 @@ sealed class ApiType {
     @Serializable
     @SerialName("payment_received")
     data class PaymentReceived(@SerialName("amountSat") val amount: Satoshi, val paymentHash: ByteVector32, val externalId: String?, val payerNote: String?, val payerKey: PublicKey?, @Transient val webhookUrl: Url? = null) : ApiEvent() {
-        constructor(event: fr.acinq.lightning.PaymentEvents.PaymentReceived, incomingPayment: fr.acinq.lightning.db.IncomingPayment?, metadata: PaymentMetadata?) : this(
-            amount = event.amount.truncateToSatoshi(),
-            paymentHash = event.paymentHash,
+        constructor(payment: LightningIncomingPayment, metadata: PaymentMetadata?) : this(
+            amount = payment.amount.truncateToSatoshi(),
+            paymentHash = payment.paymentHash,
             externalId = metadata?.externalId,
-            payerNote = ((incomingPayment?.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
-            payerKey = ((incomingPayment?.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
+            payerKey = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
             webhookUrl = metadata?.webhookUrl
         )
     }
@@ -123,17 +123,32 @@ sealed class ApiType {
     @Serializable
     @SerialName("incoming_payment")
     data class IncomingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long) {
-        constructor(payment: fr.acinq.lightning.db.IncomingPayment, externalId: String?) : this (
+        constructor(payment: LightningIncomingPayment, externalId: String?) : this (
             paymentHash = payment.paymentHash,
-            preimage = payment.preimage,
+            preimage = payment.paymentPreimage,
             externalId = externalId,
-            description = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.description,
-            invoice = (payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
+            description = (payment as? Bolt11IncomingPayment)?.paymentRequest?.description,
+            invoice = (payment as? Bolt11IncomingPayment)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
-            payerNote = ((payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
-            payerKey = ((payment.origin as? fr.acinq.lightning.db.IncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
+            payerKey = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            completedAt = payment.completedAt,
+            createdAt = payment.createdAt,
+        )
+        @Suppress("DEPRECATION")
+        constructor(payment: LegacyPayToOpenIncomingPayment, externalId: String?) : this (
+            paymentHash = payment.paymentHash,
+            preimage = payment.paymentPreimage,
+            externalId = externalId,
+            description = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.description,
+            invoice = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
+            isPaid = payment.completedAt != null,
+            receivedSat = payment.amount.truncateToSatoshi(),
+            fees = payment.fees,
+            payerNote = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
+            payerKey = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )

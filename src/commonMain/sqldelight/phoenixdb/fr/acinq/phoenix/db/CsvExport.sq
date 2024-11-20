@@ -57,7 +57,7 @@ UNION ALL
         received_at              AS completed_at
     FROM incoming_payments
     WHERE incoming_payments.received_at BETWEEN :startDate AND :endDate
-    AND   incoming_payments.received_with_blob IS NOT NULL
+    AND   incoming_payments.received_at IS NOT NULL
 ) combined_payments
 ORDER BY COALESCE(combined_payments.completed_at, combined_payments.created_at)
 LIMIT :limit OFFSET :offset;

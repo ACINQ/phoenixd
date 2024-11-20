@@ -111,7 +111,7 @@ kotlin {
         commonMain {
             kotlin.srcDir(buildVersionsTask.map { it.destinationDir })
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp:${Versions.lightningKmp}")
+                implementation("fr.acinq.lightning:lightning-kmp-core:${Versions.lightningKmp}")
                 // ktor serialization
                 implementation(ktor("serialization-kotlinx-json"))
                 // ktor server

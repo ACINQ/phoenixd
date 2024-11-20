@@ -6,6 +6,7 @@ import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_DATADIR
 import fr.acinq.phoenix.db.PhoenixDatabase
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
+import fr.acinq.lightning.bin.db.migrations.m3.AfterVersion3
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import okio.Path
@@ -23,7 +24,11 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         is Chain.Testnet3 -> "testnet"
         else -> chain.name.lowercase()
     }
-    return NativeSqliteDriver(PhoenixDatabase.Schema, "phoenix.$chainName.${nodeId.toHex().take(6)}.db",
-        onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) }
+    return NativeSqliteDriver(
+        schema = PhoenixDatabase.Schema,
+        name = "phoenix.$chainName.${nodeId.toHex().take(6)}.db",
+        maxReaderConnections = 1,
+        onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) },
+        AfterVersion3,
     )
 }

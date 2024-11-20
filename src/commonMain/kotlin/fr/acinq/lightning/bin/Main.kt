@@ -275,10 +275,14 @@ class Phoenixd : CliktCommand() {
                     nodeParams.nodeEvents
                         .collect {
                             when {
-                                it is PaymentEvents.PaymentReceived && it.amount > 0.msat -> {
-                                    val incomingPayment = paymentsDb.getIncomingPayment(it.paymentHash)
-                                    val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(it.paymentHash))
-                                    emit(ApiType.PaymentReceived(it, incomingPayment, metadata))
+                                it is PaymentEvents.PaymentReceived && it.payment.amount > 0.msat -> {
+                                    when(val payment = it.payment) {
+                                        is LightningIncomingPayment -> {
+                                            val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId.fromPaymentHash(payment.paymentHash))
+                                            emit(ApiType.PaymentReceived(payment, metadata))
+                                        }
+                                        else -> {}
+                                    }
                                 }
                                 else -> {}
                             }
@@ -304,10 +308,13 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<PaymentEvents>()
                     .collect {
                         when (it) {
-                            is PaymentEvents.PaymentReceived -> {
-                                val fee = it.receivedWith.filterIsInstance<IncomingPayment.ReceivedWith.LightningPayment>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
-                                val type = it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }
-                                consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
+                            is PaymentEvents.PaymentReceived -> when(val payment = it.payment) {
+                                is LightningIncomingPayment -> {
+                                    val fee = payment.parts.filterIsInstance<LightningIncomingPayment.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
+                                    val type = payment.parts.joinToString { part -> part::class.simpleName.toString().lowercase() }
+                                    consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
+                                }
+                                else -> {}
                             }
                             is PaymentEvents.PaymentSent ->
                                 when (val payment = it.payment) {

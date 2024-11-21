@@ -19,12 +19,12 @@ package fr.acinq.lightning.bin.db.payments
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.bitcoin.byteVector32
+import fr.acinq.lightning.bin.db.payments.types.IncomingReceivedWithData
+import fr.acinq.lightning.bin.db.payments.types.IncomingReceivedWithTypeVersion
+import fr.acinq.lightning.bin.db.payments.types.mapToDb
 import fr.acinq.lightning.db.IncomingPayment
-import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 
 class IncomingQueries(private val database: PhoenixDatabase) {

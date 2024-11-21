@@ -1,4 +1,4 @@
-import fr.acinq.lightning.bin.db.payments.IncomingOriginTypeVersion;
+import fr.acinq.lightning.bin.db.payments.types.IncomingOriginTypeVersion;
 import fr.acinq.lightning.bin.db.payments.types.IncomingReceivedWithTypeVersion;
 
 -- incoming payments

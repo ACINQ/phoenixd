@@ -20,7 +20,7 @@
     ByteVectorSerializer::class,
 )
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.payments.types
 
 import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.ByteVector32
@@ -60,12 +60,12 @@ sealed class IncomingOriginData {
 
     sealed class OnChain : IncomingOriginData() {
         @Serializable
-        data class V0(@Serializable val txId: ByteVector32, val outpoints: List<@Serializable OutPoint>) : SwapIn()
+        data class V0(val txId: ByteVector32, val outpoints: List<OutPoint>) : SwapIn()
     }
 
     sealed class Offer : IncomingOriginData() {
         @Serializable
-        data class V0(@Serializable val encodedMetadata: ByteVector) : Offer()
+        data class V0(val encodedMetadata: ByteVector) : Offer()
     }
 
 

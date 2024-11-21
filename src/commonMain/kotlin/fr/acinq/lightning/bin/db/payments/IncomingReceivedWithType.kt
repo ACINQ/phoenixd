@@ -36,6 +36,7 @@ import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.json.Json
 
 
 enum class IncomingReceivedWithTypeVersion {
@@ -104,9 +105,9 @@ sealed class IncomingReceivedWithData {
         fun deserialize(
             typeVersion: IncomingReceivedWithTypeVersion,
             blob: ByteArray,
-        ): List<IncomingPayment.ReceivedWith> = DbTypesHelper.decodeBlob(blob) { json, _ ->
+        ): List<IncomingPayment.ReceivedWith> =
             when (typeVersion) {
-                IncomingReceivedWithTypeVersion.MULTIPARTS_V1 -> DbTypesHelper.polymorphicFormat.decodeFromString(SetSerializer(PolymorphicSerializer(Part::class)), json).map {
+                IncomingReceivedWithTypeVersion.MULTIPARTS_V1 -> Json.decodeFromString(SetSerializer(Part.serializer()), String(bytes = blob, charset = Charsets.UTF_8)).map {
                     @Suppress("DEPRECATION")
                     when (it) {
                         is Part.Htlc.V0 -> IncomingPayment.ReceivedWith.LightningPayment(
@@ -146,7 +147,6 @@ sealed class IncomingReceivedWithData {
                 }
             }
         }
-    }
 }
 
 /** Only serialize received_with into the [IncomingReceivedWithTypeVersion.MULTIPARTS_V1] type. */
@@ -181,7 +181,7 @@ fun List<IncomingPayment.ReceivedWith>.mapToDb(): Pair<IncomingReceivedWithTypeV
         )
     }
 }.takeIf { it.isNotEmpty() }?.toSet()?.let {
-    IncomingReceivedWithTypeVersion.MULTIPARTS_V1 to DbTypesHelper.polymorphicFormat.encodeToString(
+    IncomingReceivedWithTypeVersion.MULTIPARTS_V1 to Json.encodeToString(
         SetSerializer(PolymorphicSerializer(IncomingReceivedWithData.Part::class)), it
     ).toByteArray(Charsets.UTF_8)
 }

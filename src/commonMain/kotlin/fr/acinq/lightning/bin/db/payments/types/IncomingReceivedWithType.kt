@@ -21,7 +21,7 @@
     UUIDSerializer::class,
 )
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.payments.types
 
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Satoshi
@@ -50,13 +50,15 @@ sealed class IncomingReceivedWithData {
         sealed class Htlc : Part() {
             @Deprecated("Replaced by [Htlc.V1], which supports the liquidity ads funding fee")
             @Serializable
+            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.Htlc.V0")
             data class V0(
-                @Serializable val amount: MilliSatoshi,
-                @Serializable val channelId: ByteVector32,
+                val amount: MilliSatoshi,
+                val channelId: ByteVector32,
                 val htlcId: Long
             ) : Htlc()
 
             @Serializable
+            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.Htlc.V1")
             data class V1(
                 val amountReceived: MilliSatoshi,
                 val channelId: ByteVector32,
@@ -68,32 +70,35 @@ sealed class IncomingReceivedWithData {
         sealed class NewChannel : Part() {
             /** V2 supports dual funding. New fields: service/miningFees, channel id, funding tx id, and the confirmation/lock timestamps. Id is removed. */
             @Serializable
+            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.NewChannel.V2")
             data class V2(
-                @Serializable val amount: MilliSatoshi,
-                @Serializable val serviceFee: MilliSatoshi,
-                @Serializable val miningFee: Satoshi,
-                @Serializable val channelId: ByteVector32,
-                @Serializable val txId: ByteVector32,
-                @Serializable val confirmedAt: Long?,
-                @Serializable val lockedAt: Long?,
+                val amount: MilliSatoshi,
+                val serviceFee: MilliSatoshi,
+                val miningFee: Satoshi,
+                val channelId: ByteVector32,
+                val txId: ByteVector32,
+                val confirmedAt: Long?,
+                val lockedAt: Long?,
             ) : NewChannel()
         }
 
         sealed class SpliceIn : Part() {
             @Serializable
+            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.SpliceIn.V0")
             data class V0(
-                @Serializable val amount: MilliSatoshi,
-                @Serializable val serviceFee: MilliSatoshi,
-                @Serializable val miningFee: Satoshi,
-                @Serializable val channelId: ByteVector32,
-                @Serializable val txId: ByteVector32,
-                @Serializable val confirmedAt: Long?,
-                @Serializable val lockedAt: Long?,
+                val amount: MilliSatoshi,
+                val serviceFee: MilliSatoshi,
+                val miningFee: Satoshi,
+                val channelId: ByteVector32,
+                val txId: ByteVector32,
+                val confirmedAt: Long?,
+                val lockedAt: Long?,
             ) : SpliceIn()
         }
 
         sealed class FeeCredit : Part() {
             @Serializable
+            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.FeeCredit.V0")
             data class V0(
                 val amount: MilliSatoshi
             ) : FeeCredit()

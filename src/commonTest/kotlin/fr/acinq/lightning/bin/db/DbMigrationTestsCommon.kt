@@ -4,6 +4,7 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.bin.createAppDbDriver
+import fr.acinq.lightning.db.IncomingPayment
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import okio.FileSystem
@@ -31,7 +32,8 @@ class DbMigrationTestsCommon {
         val database = createPhoenixDb(driver)
         val paymentsDb = SqlitePaymentsDb(database)
         val payments = paymentsDb.listIncomingPayments(0, Long.MAX_VALUE, Long.MAX_VALUE, 0, true)
-        payments.forEach { println("${it.first.paymentHash} ${it.first.received?.receivedWith}") }
+        payments.forEach { println("${it.first.paymentHash} ${it.first.origin} ${it.first.received?.receivedWith}") }
+        assert(payments.size == 2150)
     }
 
 

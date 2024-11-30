@@ -1,0 +1,15 @@
+#requirements mkdir ./dot.phoenix directory in local to store seed and chmod 0700 -R
+version: "3"
+services:
+  phoenixd:
+    build:
+      context: ./
+      dockerfile: .docker/Dockerfile
+    image: phoenixd:latest
+    container_name: phoenixd
+    volumes:
+      - ./dot.phoenix:/phoenix/.phoenix
+    expose:
+      - 9740
+    ports:
+      - 9740:9740

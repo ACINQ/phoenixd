@@ -33,6 +33,7 @@ import fr.acinq.lightning.bin.db.serializers.v1.*
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
+import fr.acinq.lightning.wire.LiquidityAds
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.SerialName
@@ -161,6 +162,28 @@ private sealed class IncomingOriginData {
     }
 }
 
+private fun mapLightningIncomingPaymentPart(part: IncomingReceivedWithData.Part): LightningIncomingPayment.Received.Part = when (part) {
+    is IncomingReceivedWithData.Part.Htlc.V0 -> LightningIncomingPayment.Received.Part.Htlc(
+        amountReceived = part.amount,
+        channelId = part.channelId,
+        htlcId = part.htlcId,
+        fundingFee = null
+    )
+    is IncomingReceivedWithData.Part.Htlc.V1 -> LightningIncomingPayment.Received.Part.Htlc(
+        amountReceived = part.amountReceived,
+        channelId = part.channelId,
+        htlcId = part.htlcId,
+        fundingFee = when (part.fundingFee) {
+            is FundingFeeData.V0 -> LiquidityAds.FundingFee(part.fundingFee.amount, part.fundingFee.fundingTxId)
+            null -> null
+        }
+    )
+    is IncomingReceivedWithData.Part.FeeCredit.V0 -> LightningIncomingPayment.Received.Part.FeeCredit(
+        amountReceived = part.amount
+    )
+    else -> error("unexpected part=$part")
+}
+
 @Suppress("DEPRECATION")
 fun mapIncomingPaymentFromV3(
     @Suppress("UNUSED_PARAMETER") payment_hash: ByteArray,
@@ -198,7 +221,7 @@ fun mapIncomingPaymentFromV3(
                 preimage = ByteVector32(preimage),
                 paymentRequest = Bolt11Invoice.read(origin.paymentRequest).get(),
                 received = LightningIncomingPayment.Received(
-                    parts = emptyList(),
+                    parts = parts.map { mapLightningIncomingPaymentPart(it) },
                     receivedAt = received_at
                 )
             )
@@ -207,7 +230,7 @@ fun mapIncomingPaymentFromV3(
                 preimage = ByteVector32(preimage),
                 metadata = OfferPaymentMetadata.decode(origin.encodedMetadata),
                 received = LightningIncomingPayment.Received(
-                    parts = emptyList(),
+                    parts = parts.map { mapLightningIncomingPaymentPart(it) },
                     receivedAt = received_at
                 )
             )

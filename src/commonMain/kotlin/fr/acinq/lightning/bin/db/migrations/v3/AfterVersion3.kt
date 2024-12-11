@@ -7,7 +7,7 @@ import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.LegacyPayToOpenIncomingPayment
 import fr.acinq.lightning.db.LightningIncomingPayment
-import fr.acinq.lightning.db.adapters.IncomingPaymentAdapter
+import fr.acinq.lightning.serialization.payment.Serialization
 
 val AfterVersion3 = AfterVersion(3) { driver ->
 
@@ -47,7 +47,7 @@ val AfterVersion3 = AfterVersion(3) { driver ->
                     payment_hash BLOB,
                     created_at INTEGER NOT NULL,
                     received_at INTEGER DEFAULT NULL,
-                    json TEXT NOT NULL
+                    data BLOB NOT NULL
                 )
             """.trimIndent(),
             "CREATE INDEX incoming_payments_payment_hash_idx ON incoming_payments(payment_hash)",
@@ -59,7 +59,7 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             .forEach { payment ->
                 driver.execute(
                     identifier = null,
-                    sql = "INSERT INTO incoming_payments (id, payment_hash, created_at, received_at, json) VALUES (?, ?, ?, ?, ?)",
+                    sql = "INSERT INTO incoming_payments (id, payment_hash, created_at, received_at, data) VALUES (?, ?, ?, ?, ?)",
                     parameters = 5
                 ) {
                     when (payment) {
@@ -77,7 +77,7 @@ val AfterVersion3 = AfterVersion(3) { driver ->
                     }
                     bindLong(2, payment.createdAt)
                     bindLong(3, payment.completedAt)
-                    bindString(4, IncomingPaymentAdapter.encode(payment))
+                    bindBytes(4, Serialization.serialize(payment))
                 }
             }
 

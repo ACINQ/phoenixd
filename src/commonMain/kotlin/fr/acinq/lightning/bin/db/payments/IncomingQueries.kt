@@ -37,7 +37,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
             payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash?.toByteArray(),
             created_at = incomingPayment.createdAt,
             received_at = incomingPayment.completedAt,
-            json = incomingPayment
+            data_ = incomingPayment
         )
     }
 
@@ -60,7 +60,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     }
                     queries.updateReceived(
                         received_at = receivedAt,
-                        json = paymentInDb1,
+                        data_ = paymentInDb1,
                         id = paymentInDb1.id.toString()
                     )
                 }
@@ -80,7 +80,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     }
                     queries.updateReceived(
                         received_at = lockedAt,
-                        json = paymentInDb1,
+                        data_ = paymentInDb1,
                         id = paymentInDb1.id.toString()
                     )
                 }
@@ -100,7 +100,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     }
                     queries.updateReceived(
                         received_at = paymentInDb1.lockedAt, // keep the existing value
-                        json = paymentInDb1,
+                        data_ = paymentInDb1,
                         id = paymentInDb1.id.toString()
                     )
                 }
@@ -110,11 +110,11 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     }
 
     fun getIncomingPayment(id: UUID): IncomingPayment? {
-        return queries.get(id = id.toString()).executeAsOneOrNull()?.json
+        return queries.get(id = id.toString()).executeAsOneOrNull()?.data_
     }
 
     fun getIncomingPayment(paymentHash: ByteVector32): IncomingPayment? {
-        return queries.getByPaymentHash(payment_hash = paymentHash.toByteArray()).executeAsOneOrNull()?.json
+        return queries.getByPaymentHash(payment_hash = paymentHash.toByteArray()).executeAsOneOrNull()?.data_
     }
 
     fun getOldestReceivedDate(): Long? {
@@ -126,19 +126,19 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     }
 
     fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map { it.json to it.external_id }
+        return queries.listCreatedWithin(from = from, to = to, limit, offset).executeAsList().map { it.data_ to it.external_id }
     }
 
     fun listPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.json to it.external_id }
+        return queries.listCreatedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.data_ to it.external_id }
     }
 
     fun listReceivedPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map { it.json to it.external_id }
+        return queries.listReceivedWithin(from = from, to = to, limit, offset).executeAsList().map { it.data_ to it.external_id }
     }
 
     fun listReceivedPaymentsForExternalId(externalId: String, from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {
-        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.json to it.external_id }
+        return queries.listReceivedForExternalIdWithin(externalId, from, to, limit, offset).executeAsList().map { it.data_ to it.external_id }
     }
 
     fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> {

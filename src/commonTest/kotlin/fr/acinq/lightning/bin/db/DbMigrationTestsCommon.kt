@@ -10,6 +10,7 @@ import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class DbMigrationTestsCommon {
 
@@ -28,10 +29,12 @@ class DbMigrationTestsCommon {
         }
         val driver = createAppDbDriver(testdir, Chain.Testnet3, PublicKey.fromHex("03be9f16ffcfe10ec7381506601b1b75c9638d5e5aa8c4e7a546573ee09bc68fa2"))
         val database = createPhoenixDb(driver)
-        val paymentsDb = SqlitePaymentsDb(database)
-        val payments = paymentsDb.listIncomingPayments(0, Long.MAX_VALUE, Long.MAX_VALUE, 0, true)
-        payments.forEach { println("${it.first.id} ${it.first}") }
-        assert(payments.size == 2150)
+        val payments = database.paymentsQueries
+            .list()
+            .executeAsList()
+            .map { WalletPaymentAdapter.decode(it) }
+        payments.forEach { println("$it") }
+        assertEquals(2188, payments.size)
     }
 
 

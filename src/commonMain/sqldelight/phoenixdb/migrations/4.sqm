@@ -1,0 +1,33 @@
+-- Migration: v4 -> v5
+--
+-- There is also a code migration, see AfterVersion4.kt
+
+CREATE TABLE outgoing_payments (
+    id BLOB NOT NULL PRIMARY KEY,
+    payment_hash BLOB,
+    tx_id BLOB UNIQUE,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER DEFAULT NULL,
+    data BLOB AS OutgoingPayment NOT NULL
+);
+
+CREATE INDEX outgoing_payments_payment_hash_idx ON outgoing_payments(payment_hash);
+CREATE INDEX outgoing_payments_tx_id_idx ON outgoing_payments(tx_id);
+
+-- rename previous index
+DROP INDEX outgoing_payments_filter_idx;
+CREATE INDEX lightning_outgoing_payments_filter_idx ON lightning_outgoing_payments(completed_at);
+
+-- Create indexes to optimize the queries in AggregatedQueries.
+-- Tip: Use "explain query plan" to ensure they're actually being used.
+CREATE INDEX outgoing_payments_filter_idx ON outgoing_payments(completed_at) WHERE completed_at IS NOT NULL;
+
+CREATE VIEW payments
+AS SELECT data
+FROM (
+    SELECT data
+    FROM incoming_payments
+UNION ALL
+    SELECT data
+    FROM outgoing_payments
+);

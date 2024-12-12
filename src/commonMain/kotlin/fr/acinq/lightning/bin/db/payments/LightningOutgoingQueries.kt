@@ -183,7 +183,7 @@ class LightningOutgoingQueries(val database: PhoenixDatabase) {
 
     /** Get a payment without its failed/pending parts. */
     private fun filterUselessParts(payment: LightningOutgoingPayment): LightningOutgoingPayment = when (payment.status) {
-        is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain -> {
+        is LightningOutgoingPayment.Status.Completed.Succeeded -> {
             payment.copy(parts = payment.parts.filter {
                 it.status is LightningOutgoingPayment.Part.Status.Succeeded
             })

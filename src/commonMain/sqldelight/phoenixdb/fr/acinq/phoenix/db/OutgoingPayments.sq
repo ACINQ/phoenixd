@@ -1,0 +1,57 @@
+import fr.acinq.lightning.db.OutgoingPayment;
+
+CREATE TABLE outgoing_payments (
+    id BLOB NOT NULL PRIMARY KEY,
+    payment_hash BLOB,
+    tx_id BLOB UNIQUE,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER DEFAULT NULL,
+    data BLOB AS OutgoingPayment NOT NULL
+);
+
+CREATE INDEX outgoing_payments_payment_hash_idx ON outgoing_payments(payment_hash);
+CREATE INDEX outgoing_payments_tx_id_idx ON outgoing_payments(tx_id);
+
+-- Create indexes to optimize the queries in AggregatedQueries.
+-- Tip: Use "explain query plan" to ensure they're actually being used.
+CREATE INDEX outgoing_payments_filter_idx ON outgoing_payments(completed_at) WHERE completed_at IS NOT NULL;
+
+-- queries
+
+insert:
+INSERT INTO outgoing_payments (
+            id,
+            payment_hash,
+            tx_id,
+            created_at,
+            completed_at,
+            data)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateCompleted:
+UPDATE outgoing_payments
+SET    completed_at=?,
+       data=?
+WHERE  id = ?;
+
+get:
+SELECT *
+FROM   outgoing_payments
+WHERE  id=?;
+
+getByPaymentHash:
+SELECT *
+FROM   outgoing_payments
+WHERE  payment_hash=?;
+
+deleteByPaymentHash:
+DELETE FROM outgoing_payments
+WHERE payment_hash = ?;
+
+list:
+SELECT *
+FROM  payments;
+
+-- use this in a `transaction` block to know how many rows were changed after an UPDATE
+changes:
+SELECT changes();

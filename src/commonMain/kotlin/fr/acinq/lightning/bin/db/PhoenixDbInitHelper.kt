@@ -5,6 +5,7 @@ import app.cash.sqldelight.EnumColumnAdapter
 import app.cash.sqldelight.db.SqlDriver
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.db.WalletPayment
 import fr.acinq.lightning.serialization.payment.Serialization
 import fr.acinq.phoenix.db.*
 
@@ -27,4 +28,10 @@ fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
     channel_close_outgoing_paymentsAdapter = Channel_close_outgoing_payments.Adapter(
         closing_info_typeAdapter = EnumColumnAdapter()
     ),
+    paymentsAdapter = Payments.Adapter(object : ColumnAdapter<WalletPayment, ByteArray> {
+        override fun decode(databaseValue: ByteArray): WalletPayment = Serialization.deserialize(databaseValue).get()
+
+        override fun encode(value: WalletPayment): ByteArray = Serialization.serialize(value)
+
+    })
 )

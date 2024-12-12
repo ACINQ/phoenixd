@@ -6,7 +6,8 @@ import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_DATADIR
 import fr.acinq.phoenix.db.PhoenixDatabase
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
-import fr.acinq.lightning.bin.db.migrations.m3.AfterVersion3
+import fr.acinq.lightning.bin.db.migrations.v3.AfterVersion3
+import fr.acinq.lightning.bin.db.migrations.v4.AfterVersion4
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import okio.Path
@@ -30,5 +31,6 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         maxReaderConnections = 1,
         onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) },
         AfterVersion3,
+        AfterVersion4
     )
 }

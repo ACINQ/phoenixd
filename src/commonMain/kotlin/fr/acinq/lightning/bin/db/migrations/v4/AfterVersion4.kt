@@ -1,0 +1,66 @@
+@file:Suppress("DEPRECATION")
+
+package fr.acinq.lightning.bin.db.migrations.v4
+
+import app.cash.sqldelight.TransacterImpl
+import app.cash.sqldelight.db.AfterVersion
+import app.cash.sqldelight.db.QueryResult
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
+import fr.acinq.lightning.bin.deriveUUID
+import fr.acinq.lightning.db.*
+import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
+import fr.acinq.lightning.serialization.payment.Serialization
+
+val AfterVersion4 = AfterVersion(4) { driver ->
+
+    val transacter = object : TransacterImpl(driver) {}
+
+    fun insertPayment(payment: WalletPayment) {
+        driver.execute(
+            identifier = null,
+            sql = "INSERT INTO payments (id, payment_hash, tx_id, created_at, completed_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+            parameters = 6
+        ) {
+            // TODO: use standard Uuid once migrated to kotlin 2
+            val id = ByteArrayOutput().run {
+                writeUuid(payment.id)
+                toByteArray()
+            }
+            val (paymentHash, txId) = when (payment) {
+                is LightningIncomingPayment -> payment.paymentHash to null
+                is OnChainIncomingPayment -> null to payment.txId
+                is LegacyPayToOpenIncomingPayment -> payment.paymentHash to null
+                is LegacySwapInIncomingPayment -> null to null
+                is LightningOutgoingPayment -> payment.paymentHash to null
+                is OnChainOutgoingPayment -> null to payment.txId
+            }
+            bindBytes(0, id)
+            bindBytes(1, paymentHash?.toByteArray())
+            bindBytes(2, txId?.value?.toByteArray())
+            bindLong(3, payment.createdAt)
+            bindLong(4, payment.completedAt)
+            bindBytes(5, Serialization.serialize(payment))
+        }
+    }
+
+    transacter.transaction {
+        driver.executeQuery(
+            identifier = null,
+            sql = "SELECT data FROM incoming_payments",
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    insertPayment(Serialization.deserialize(cursor.getBytes(0)!!).get())
+                }
+                QueryResult.Unit
+            }
+        )
+
+        listOf(
+            "DROP TABLE incoming_payments",
+        ).forEach { sql ->
+            driver.execute(identifier = null, sql = sql, parameters = 0)
+        }
+    }
+}

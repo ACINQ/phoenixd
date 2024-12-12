@@ -8,6 +8,7 @@ import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.db.payments.InboundLiquidityQueries
+import fr.acinq.lightning.bin.db.payments.SpliceCpfpOutgoingQueries
 import fr.acinq.lightning.bin.db.payments.SpliceOutgoingQueries
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
@@ -107,10 +108,32 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             }
         )
 
+        driver.executeQuery(
+            identifier = null,
+            sql = "SELECT id, mining_fees_sat, channel_id, tx_id, created_at, confirmed_at, locked_at FROM splice_cpfp_outgoing_payments",
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    val payment = SpliceCpfpOutgoingQueries.mapCpfp(
+                        id = cursor.getString(0)!!,
+                        mining_fees_sat = cursor.getLong(1)!!,
+                        channel_id = cursor.getBytes(2)!!,
+                        tx_id = cursor.getBytes(3)!!,
+                        created_at = cursor.getLong(4)!!,
+                        confirmed_at = cursor.getLong(5),
+                        locked_at = cursor.getLong(6)
+                    )
+                    insertPayment(payment)
+                }
+                QueryResult.Unit
+            }
+        )
+
         listOf(
             "DROP TABLE incoming_payments",
             "DROP TABLE inbound_liquidity_outgoing_payments",
             "DROP TABLE splice_outgoing_payments",
+            "DROP TABLE splice_cpfp_outgoing_payments",
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

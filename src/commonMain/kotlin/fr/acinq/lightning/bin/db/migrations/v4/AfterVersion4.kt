@@ -7,9 +7,7 @@ import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
-import fr.acinq.lightning.bin.db.payments.InboundLiquidityQueries
-import fr.acinq.lightning.bin.db.payments.SpliceCpfpOutgoingQueries
-import fr.acinq.lightning.bin.db.payments.SpliceOutgoingQueries
+import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
@@ -129,11 +127,38 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             }
         )
 
+        driver.executeQuery(
+            identifier = null,
+            sql = "SELECT id, recipient_amount_sat, address, is_default_address, mining_fees_sat, tx_id, created_at, confirmed_at, locked_at, channel_id, closing_info_type, closing_info_blob FROM channel_close_outgoing_payments",
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    val payment = ChannelCloseOutgoingQueries.mapChannelCloseOutgoingPayment(
+                        id = cursor.getString(0)!!,
+                        amount_sat = cursor.getLong(1)!!,
+                        address = cursor.getString(2)!!,
+                        mining_fees_sat = cursor.getLong(3)!!,
+                        is_default_address = cursor.getLong(4)!!,
+                        tx_id = cursor.getBytes(5)!!,
+                        created_at = cursor.getLong(6)!!,
+                        confirmed_at = cursor.getLong(7),
+                        locked_at = cursor.getLong(8),
+                        channel_id = cursor.getBytes(9)!!,
+                        closing_info_type = ClosingInfoTypeVersion.valueOf(cursor.getString(10)!!),
+                        closing_info_blob = cursor.getBytes(11)!!
+                    )
+                    insertPayment(payment)
+                }
+                QueryResult.Unit
+            }
+        )
+
         listOf(
             "DROP TABLE incoming_payments",
             "DROP TABLE inbound_liquidity_outgoing_payments",
             "DROP TABLE splice_outgoing_payments",
             "DROP TABLE splice_cpfp_outgoing_payments",
+            "DROP TABLE channel_close_outgoing_payments",
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

@@ -2,7 +2,7 @@ import fr.acinq.lightning.db.WalletPayment;
 
 CREATE TABLE payments (
     id BLOB NOT NULL PRIMARY KEY,
-    payment_hash BLOB UNIQUE,
+    payment_hash BLOB,
     tx_id BLOB UNIQUE,
     created_at INTEGER NOT NULL,
     completed_at INTEGER DEFAULT NULL,

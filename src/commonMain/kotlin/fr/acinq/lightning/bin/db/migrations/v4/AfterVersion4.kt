@@ -8,10 +8,12 @@ import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.db.payments.*
+import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries.Companion.hopDescAdapter
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
 import fr.acinq.lightning.serialization.payment.Serialization
+import fr.acinq.phoenix.db.LightningOutgoingPaymentsQueries
 import fr.acinq.phoenix.db.SpliceOutgoingPaymentsQueries
 
 val AfterVersion4 = AfterVersion(4) { driver ->
@@ -54,6 +56,58 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             mapper = { cursor ->
                 while (cursor.next().value) {
                     insertPayment(Serialization.deserialize(cursor.getBytes(0)!!).get())
+                }
+                QueryResult.Unit
+            }
+        )
+
+        driver.executeQuery(
+            identifier = null,
+            sql = """
+    |SELECT parent.id,
+    |       parent.recipient_amount_msat,
+    |       parent.recipient_node_id,
+    |       parent.payment_hash,
+    |       parent.details_type,
+    |       parent.details_blob,
+    |       parent.created_at,
+    |       parent.completed_at,
+    |       parent.status_type,
+    |       parent.status_blob,
+    |       -- lightning parts
+    |       lightning_parts.part_id AS lightning_part_id,
+    |       lightning_parts.part_amount_msat AS lightning_part_amount_msat,
+    |       lightning_parts.part_route AS lightning_part_route,
+    |       lightning_parts.part_created_at AS lightning_part_created_at,
+    |       lightning_parts.part_completed_at AS lightning_part_completed_at,
+    |       lightning_parts.part_status_type AS lightning_part_status_type,
+    |       lightning_parts.part_status_blob AS lightning_part_status_blob
+    |FROM lightning_outgoing_payments AS parent
+    |LEFT OUTER JOIN lightning_outgoing_payment_parts AS lightning_parts ON lightning_parts.part_parent_id = parent.id
+    """.trimMargin(),
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    val payment = LightningOutgoingQueries.mapLightningOutgoingPayment(
+                        cursor.getString(0)!!,
+                        cursor.getLong(1)!!,
+                        cursor.getString(2)!!,
+                        cursor.getBytes(3)!!,
+                        LightningOutgoingDetailsTypeVersion.valueOf(cursor.getString(4)!!),
+                        cursor.getBytes(5)!!,
+                        cursor.getLong(6)!!,
+                        cursor.getLong(7),
+                        cursor.getString(8)?.let { LightningOutgoingStatusTypeVersion.valueOf(it) },
+                        cursor.getBytes(9),
+                        cursor.getString(10),
+                        cursor.getLong(11),
+                        cursor.getString(12)?.let { hopDescAdapter.decode(it) },
+                        cursor.getLong(13),
+                        cursor.getLong(14),
+                        cursor.getString(15)?.let { LightningOutgoingPartStatusTypeVersion.valueOf(it) },
+                        cursor.getBytes(16)
+                    )
+                    insertPayment(payment)
                 }
                 QueryResult.Unit
             }
@@ -155,6 +209,8 @@ val AfterVersion4 = AfterVersion(4) { driver ->
 
         listOf(
             "DROP TABLE incoming_payments",
+            "DROP TABLE lightning_outgoing_payments",
+            "DROP TABLE lightning_outgoing_payment_parts",
             "DROP TABLE inbound_liquidity_outgoing_payments",
             "DROP TABLE splice_outgoing_payments",
             "DROP TABLE splice_cpfp_outgoing_payments",

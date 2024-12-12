@@ -31,7 +31,7 @@ class DbMigrationTestsCommon {
         val database = createPhoenixDb(driver)
         val payments = database.paymentsQueries.list().executeAsList()
         payments.forEach { println("${it.data_}") }
-        assertEquals(2158, payments.size)
+        assertEquals(2188, payments.size)
     }
 
 

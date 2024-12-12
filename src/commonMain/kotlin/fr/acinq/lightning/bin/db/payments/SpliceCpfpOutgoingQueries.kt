@@ -59,7 +59,7 @@ class SpliceCpfpOutgoingQueries(val database: PhoenixDatabase) {
         }
     }
 
-    private companion object {
+    companion object {
         fun mapCpfp(
             id: String,
             mining_fees_sat: Long,

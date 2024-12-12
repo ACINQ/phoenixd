@@ -25,7 +25,7 @@ CREATE TABLE lightning_outgoing_payments (
 
 -- Create indexes to optimize the queries in AggregatedQueries.
 -- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX outgoing_payments_filter_idx
+CREATE INDEX lightning_outgoing_payments_filter_idx
     ON lightning_outgoing_payments(completed_at);
 
 -- Stores the lightning parts that make up a lightning payment

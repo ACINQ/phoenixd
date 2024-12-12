@@ -109,7 +109,7 @@ sealed class ApiType {
             event.payment.routingFee.truncateToSatoshi(),
             event.request.paymentId,
             event.payment.paymentHash,
-            (event.payment.status as LightningOutgoingPayment.Status.Completed.Succeeded.OffChain).preimage
+            (event.payment.status as LightningOutgoingPayment.Status.Completed.Succeeded).preimage
         )
     }
 
@@ -160,9 +160,9 @@ sealed class ApiType {
         constructor(payment: LightningOutgoingPayment) : this(
             paymentId = payment.id.toString(),
             paymentHash = payment.paymentHash,
-            preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded.OffChain)?.preimage,
+            preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded)?.preimage,
             invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
-            isPaid = payment.status is LightningOutgoingPayment.Status.Completed.Succeeded.OffChain,
+            isPaid = payment.status is LightningOutgoingPayment.Status.Completed.Succeeded,
             sent = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             completedAt = payment.completedAt,

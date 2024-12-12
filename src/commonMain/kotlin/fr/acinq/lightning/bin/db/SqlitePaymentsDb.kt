@@ -93,7 +93,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         completedAt: Long
     ) {
         withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Succeeded.OffChain(preimage, completedAt))
+            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Succeeded(preimage, completedAt))
         }
     }
 

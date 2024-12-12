@@ -1,0 +1,15 @@
+CREATE VIEW payments
+AS SELECT data
+FROM (
+    SELECT data
+    FROM incoming_payments
+UNION ALL
+    SELECT data
+    FROM outgoing_payments
+);
+
+list:
+SELECT data
+FROM payments;
+
+

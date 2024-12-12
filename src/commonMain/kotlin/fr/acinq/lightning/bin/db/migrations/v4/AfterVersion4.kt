@@ -8,10 +8,12 @@ import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.db.payments.InboundLiquidityQueries
+import fr.acinq.lightning.bin.db.payments.SpliceOutgoingQueries
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
 import fr.acinq.lightning.serialization.payment.Serialization
+import fr.acinq.phoenix.db.SpliceOutgoingPaymentsQueries
 
 val AfterVersion4 = AfterVersion(4) { driver ->
 
@@ -82,9 +84,33 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             }
         )
 
+        driver.executeQuery(
+            identifier = null,
+            sql = "SELECT id, recipient_amount_sat, address, mining_fees_sat, tx_id, channel_id, created_at, confirmed_at, locked_at FROM splice_outgoing_payments",
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    val payment = SpliceOutgoingQueries.mapSpliceOutgoingPayment(
+                        id = cursor.getString(0)!!,
+                        recipient_amount_sat = cursor.getLong(1)!!,
+                        address = cursor.getString(2)!!,
+                        mining_fees_sat = cursor.getLong(3)!!,
+                        tx_id = cursor.getBytes(4)!!,
+                        channel_id = cursor.getBytes(5)!!,
+                        created_at = cursor.getLong(6)!!,
+                        confirmed_at = cursor.getLong(7),
+                        locked_at = cursor.getLong(8)
+                    )
+                    insertPayment(payment)
+                }
+                QueryResult.Unit
+            }
+        )
+
         listOf(
             "DROP TABLE incoming_payments",
             "DROP TABLE inbound_liquidity_outgoing_payments",
+            "DROP TABLE splice_outgoing_payments",
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

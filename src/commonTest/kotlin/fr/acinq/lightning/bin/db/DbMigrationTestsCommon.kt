@@ -10,6 +10,7 @@ import okio.Path.Companion.toPath
 import okio.buffer
 import okio.use
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class DbMigrationTestsCommon {
 
@@ -30,7 +31,7 @@ class DbMigrationTestsCommon {
         val database = createPhoenixDb(driver)
         val payments = database.paymentsQueries.list().executeAsList()
         payments.forEach { println("${it.data_}") }
-        assert(payments.size == 2150)
+        assertEquals(2151, payments.size)
     }
 
 

@@ -77,7 +77,7 @@ class InboundLiquidityQueries(val database: PhoenixDatabase) {
         }
     }
 
-    private companion object {
+    companion object {
         fun mapPayment(
             id: String,
             mining_fees_sat: Long,

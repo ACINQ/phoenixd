@@ -7,6 +7,7 @@ import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
+import fr.acinq.lightning.bin.db.payments.InboundLiquidityQueries
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
@@ -57,8 +58,33 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             }
         )
 
+        driver.executeQuery(
+            identifier = null,
+            sql = "SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, created_at, confirmed_at, locked_at FROM inbound_liquidity_outgoing_payments",
+            parameters = 0,
+            mapper = { cursor ->
+                while (cursor.next().value) {
+                    val payment = InboundLiquidityQueries.mapPayment(
+                        id = cursor.getString(0)!!,
+                        mining_fees_sat = cursor.getLong(1)!!,
+                        channel_id = cursor.getBytes(2)!!,
+                        tx_id = cursor.getBytes(3)!!,
+                        lease_type = cursor.getString(4)!!,
+                        lease_blob = cursor.getBytes(5)!!,
+                        payment_details_type = cursor.getString(6),
+                        created_at = cursor.getLong(7)!!,
+                        confirmed_at = cursor.getLong(8),
+                        locked_at = cursor.getLong(9)
+                    )
+                    insertPayment(payment)
+                }
+                QueryResult.Unit
+            }
+        )
+
         listOf(
             "DROP TABLE incoming_payments",
+            "DROP TABLE inbound_liquidity_outgoing_payments",
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

@@ -19,10 +19,7 @@ fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
         details_typeAdapter = EnumColumnAdapter()
     ),
     incoming_paymentsAdapter = Incoming_payments.Adapter(object : ColumnAdapter<IncomingPayment, ByteArray> {
-        override fun decode(databaseValue: ByteArray): IncomingPayment = when (val res = Serialization.deserialize(databaseValue)) {
-            is Serialization.DeserializationResult.Success -> res.data as IncomingPayment
-            is Serialization.DeserializationResult.UnknownVersion -> error("unknown data version ${res.version}")
-        }
+        override fun decode(databaseValue: ByteArray): IncomingPayment = Serialization.deserialize(databaseValue).get() as IncomingPayment
 
         override fun encode(value: IncomingPayment): ByteArray = Serialization.serialize(value)
 

@@ -310,8 +310,8 @@ class Phoenixd : CliktCommand() {
                         when (it) {
                             is PaymentEvents.PaymentReceived -> when(val payment = it.payment) {
                                 is LightningIncomingPayment -> {
-                                    val fee = payment.received?.parts.orEmpty().filterIsInstance<LightningIncomingPayment.Received.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
-                                    val type = payment.received?.parts.orEmpty().joinToString { part -> part::class.simpleName.toString().lowercase() }
+                                    val fee = payment.parts.filterIsInstance<LightningIncomingPayment.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
+                                    val type = payment.parts.joinToString { part -> part::class.simpleName.toString().lowercase() }
                                     consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
                                 }
                                 else -> {}

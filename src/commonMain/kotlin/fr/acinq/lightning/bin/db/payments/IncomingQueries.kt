@@ -20,6 +20,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.LightningIncomingPayment.Companion.addReceivedParts
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
@@ -43,23 +44,15 @@ class IncomingQueries(private val database: PhoenixDatabase) {
 
     fun receivePayment(
         paymentHash: ByteVector32,
-        parts: List<LightningIncomingPayment.Received.Part>,
-        receivedAt: Long
+        parts: List<LightningIncomingPayment.Part>
     ) {
         database.transaction {
             when (val paymentInDb = getIncomingPayment(paymentHash)) {
                 null -> error("missing payment for payment_hash=$paymentHash")
                 is LightningIncomingPayment -> {
-                    val newReceived = when (val received = paymentInDb.received) {
-                        null -> LightningIncomingPayment.Received(parts, receivedAt)
-                        else -> received.copy(parts = received.parts + parts)
-                    }
-                    val paymentInDb1 = when (paymentInDb) {
-                        is Bolt11IncomingPayment -> paymentInDb.copy(received = newReceived)
-                        is Bolt12IncomingPayment -> paymentInDb.copy(received = newReceived)
-                    }
+                    val paymentInDb1 = paymentInDb.addReceivedParts(parts)
                     queries.updateReceived(
-                        received_at = receivedAt,
+                        received_at = paymentInDb1.completedAt,
                         data_ = paymentInDb1,
                         id = paymentInDb1.id.toString()
                     )
@@ -144,7 +137,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     fun listExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> {
         return queries.listCreatedWithinNoPaging(fromCreatedAt, toCreatedAt).executeAsList()
             .filterIsInstance<Bolt11IncomingPayment>()
-            .filter { it.received == null && it.paymentRequest.isExpired() }
+            .filter { it.parts.isEmpty() && it.paymentRequest.isExpired() }
     }
 
     /** Try to delete an incoming payment ; return true if an element was deleted, false otherwise. */

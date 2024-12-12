@@ -127,11 +127,11 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
     }
 
-    private fun extractLightningPaymentParts(payment: LightningIncomingPayment): List<Details> = payment.received?.parts.orEmpty()
+    private fun extractLightningPaymentParts(payment: LightningIncomingPayment): List<Details> = payment.parts
         .map {
             when (it) {
-                is LightningIncomingPayment.Received.Part.Htlc -> Details(Type.lightning_received, amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
-                is LightningIncomingPayment.Received.Part.FeeCredit -> Details(Type.fee_credit, amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is LightningIncomingPayment.Part.Htlc -> Details(Type.lightning_received, amount = it.amountReceived, feeCredit = 0.msat, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
+                is LightningIncomingPayment.Part.FeeCredit -> Details(Type.fee_credit, amount = 0.msat, feeCredit = it.amountReceived, miningFee = 0.sat, serviceFee = 0.msat, paymentHash = payment.paymentHash, txId = null)
             }
         }
         .groupBy { it.type }

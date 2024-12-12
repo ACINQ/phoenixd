@@ -162,9 +162,9 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Received.Part>, receivedAt: Long) {
+    override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Part>) {
         withContext(Dispatchers.Default) {
-            inQueries.receivePayment(paymentHash, parts, receivedAt)
+            inQueries.receivePayment(paymentHash, parts)
         }
     }
 

@@ -162,24 +162,27 @@ private sealed class IncomingOriginData {
     }
 }
 
-private fun mapLightningIncomingPaymentPart(part: IncomingReceivedWithData.Part): LightningIncomingPayment.Received.Part = when (part) {
-    is IncomingReceivedWithData.Part.Htlc.V0 -> LightningIncomingPayment.Received.Part.Htlc(
+private fun mapLightningIncomingPaymentPart(part: IncomingReceivedWithData.Part, receivedAt: Long): LightningIncomingPayment.Part = when (part) {
+    is IncomingReceivedWithData.Part.Htlc.V0 -> LightningIncomingPayment.Part.Htlc(
         amountReceived = part.amount,
         channelId = part.channelId,
         htlcId = part.htlcId,
-        fundingFee = null
+        fundingFee = null,
+        receivedAt = receivedAt
     )
-    is IncomingReceivedWithData.Part.Htlc.V1 -> LightningIncomingPayment.Received.Part.Htlc(
+    is IncomingReceivedWithData.Part.Htlc.V1 -> LightningIncomingPayment.Part.Htlc(
         amountReceived = part.amountReceived,
         channelId = part.channelId,
         htlcId = part.htlcId,
         fundingFee = when (part.fundingFee) {
             is FundingFeeData.V0 -> LiquidityAds.FundingFee(part.fundingFee.amount, part.fundingFee.fundingTxId)
             null -> null
-        }
+        },
+        receivedAt = receivedAt
     )
-    is IncomingReceivedWithData.Part.FeeCredit.V0 -> LightningIncomingPayment.Received.Part.FeeCredit(
-        amountReceived = part.amount
+    is IncomingReceivedWithData.Part.FeeCredit.V0 -> LightningIncomingPayment.Part.FeeCredit(
+        amountReceived = part.amount,
+        receivedAt = receivedAt
     )
     else -> error("unexpected part=$part")
 }
@@ -206,33 +209,27 @@ fun mapIncomingPaymentFromV3(
             Bolt11IncomingPayment(
                 preimage = ByteVector32(preimage),
                 paymentRequest = Bolt11Invoice.read(origin.paymentRequest).get(),
-                received = null,
+                parts = emptyList(),
                 createdAt = created_at
             )
         received_at == null && origin is IncomingOriginData.Offer.V0 ->
             Bolt12IncomingPayment(
                 preimage = ByteVector32(preimage),
                 metadata = OfferPaymentMetadata.decode(origin.encodedMetadata),
-                received = null,
+                parts = emptyList(),
                 createdAt = created_at
             )
         received_at != null && origin is IncomingOriginData.Invoice.V0 && parts.all { it is IncomingReceivedWithData.Part.Htlc || it is IncomingReceivedWithData.Part.FeeCredit } ->
             Bolt11IncomingPayment(
                 preimage = ByteVector32(preimage),
                 paymentRequest = Bolt11Invoice.read(origin.paymentRequest).get(),
-                received = LightningIncomingPayment.Received(
-                    parts = parts.map { mapLightningIncomingPaymentPart(it) },
-                    receivedAt = received_at
-                )
+                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) }
             )
         received_at != null && origin is IncomingOriginData.Offer.V0 && parts.all { it is IncomingReceivedWithData.Part.Htlc || it is IncomingReceivedWithData.Part.FeeCredit } ->
             Bolt12IncomingPayment(
                 preimage = ByteVector32(preimage),
                 metadata = OfferPaymentMetadata.decode(origin.encodedMetadata),
-                received = LightningIncomingPayment.Received(
-                    parts = parts.map { mapLightningIncomingPaymentPart(it) },
-                    receivedAt = received_at
-                )
+                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) }
             )
         received_at != null && (origin is IncomingOriginData.Invoice || origin is IncomingOriginData.Offer) && parts.any { it is IncomingReceivedWithData.Part.SpliceIn || it is IncomingReceivedWithData.Part.NewChannel } ->
             LegacyPayToOpenIncomingPayment(

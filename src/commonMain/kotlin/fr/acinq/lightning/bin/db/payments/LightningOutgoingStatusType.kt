@@ -57,10 +57,10 @@ sealed class LightningOutgoingStatusData {
             @Suppress("DEPRECATION")
             when (typeVersion) {
                 LightningOutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 -> format.decodeFromString<SucceededOffChain.V0>(json).let {
-                    LightningOutgoingPayment.Status.Completed.Succeeded(it.preimage, completedAt)
+                    LightningOutgoingPayment.Status.Succeeded(it.preimage, completedAt)
                 }
                 LightningOutgoingStatusTypeVersion.FAILED_V0 -> format.decodeFromString<Failed.V0>(json).let {
-                    LightningOutgoingPayment.Status.Completed.Failed(deserializeFinalFailure(it.reason), completedAt)
+                    LightningOutgoingPayment.Status.Failed(deserializeFinalFailure(it.reason), completedAt)
                 }
             }
         }
@@ -86,8 +86,8 @@ sealed class LightningOutgoingStatusData {
 }
 
 fun LightningOutgoingPayment.Status.Completed.mapToDb(): Pair<LightningOutgoingStatusTypeVersion, ByteArray> = when (this) {
-    is LightningOutgoingPayment.Status.Completed.Succeeded -> LightningOutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 to
+    is LightningOutgoingPayment.Status.Succeeded -> LightningOutgoingStatusTypeVersion.SUCCEEDED_OFFCHAIN_V0 to
             Json.encodeToString(LightningOutgoingStatusData.SucceededOffChain.V0(preimage)).toByteArray(Charsets.UTF_8)
-    is LightningOutgoingPayment.Status.Completed.Failed -> LightningOutgoingStatusTypeVersion.FAILED_V0 to
+    is LightningOutgoingPayment.Status.Failed -> LightningOutgoingStatusTypeVersion.FAILED_V0 to
             Json.encodeToString(LightningOutgoingStatusData.Failed.V0(LightningOutgoingStatusData.serializeFinalFailure(reason))).toByteArray(Charsets.UTF_8)
 }

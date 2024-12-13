@@ -109,7 +109,7 @@ sealed class ApiType {
             event.payment.routingFee.truncateToSatoshi(),
             event.request.paymentId,
             event.payment.paymentHash,
-            (event.payment.status as LightningOutgoingPayment.Status.Completed.Succeeded).preimage
+            (event.payment.status as LightningOutgoingPayment.Status.Succeeded).preimage
         )
     }
 
@@ -156,13 +156,26 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val paymentId: String, val paymentHash: ByteVector32, val preimage: ByteVector32?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
+    data class OutgoingPayment(val paymentId: String, val paymentHash: ByteVector32?, val preimage: ByteVector32?, val txId: TxId?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
         constructor(payment: LightningOutgoingPayment) : this(
             paymentId = payment.id.toString(),
             paymentHash = payment.paymentHash,
-            preimage = (payment.status as? LightningOutgoingPayment.Status.Completed.Succeeded)?.preimage,
+            preimage = (payment.status as? LightningOutgoingPayment.Status.Succeeded)?.preimage,
+            txId = null,
             invoice = (payment.details as? LightningOutgoingPayment.Details.Normal)?.paymentRequest?.write(),
-            isPaid = payment.status is LightningOutgoingPayment.Status.Completed.Succeeded,
+            isPaid = payment.status is LightningOutgoingPayment.Status.Succeeded,
+            sent = payment.amount.truncateToSatoshi(),
+            fees = payment.fees,
+            completedAt = payment.completedAt,
+            createdAt = payment.createdAt,
+        )
+        constructor(payment: OnChainOutgoingPayment) : this(
+            paymentId = payment.id.toString(),
+            paymentHash = null,
+            preimage = null,
+            txId = payment.txId,
+            invoice = null,
+            isPaid = true,
             sent = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             completedAt = payment.completedAt,

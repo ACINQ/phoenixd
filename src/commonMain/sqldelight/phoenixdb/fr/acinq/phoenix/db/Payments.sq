@@ -1,57 +1,15 @@
-import fr.acinq.lightning.db.WalletPayment;
-
-CREATE TABLE payments (
-    id BLOB NOT NULL PRIMARY KEY,
-    payment_hash BLOB,
-    tx_id BLOB UNIQUE,
-    created_at INTEGER NOT NULL,
-    completed_at INTEGER DEFAULT NULL,
-    data BLOB AS WalletPayment NOT NULL
+CREATE VIEW payments
+AS SELECT data
+FROM (
+    SELECT data
+    FROM incoming_payments
+UNION ALL
+    SELECT data
+    FROM outgoing_payments
 );
 
-CREATE INDEX payments_payment_hash_idx ON payments(payment_hash);
-CREATE INDEX payments_tx_id_idx ON payments(tx_id);
-
--- Create indexes to optimize the queries in AggregatedQueries.
--- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX payments_filter_idx ON payments(completed_at) WHERE completed_at IS NOT NULL;
-
--- queries
-
-insert:
-INSERT INTO payments (
-            id,
-            payment_hash,
-            tx_id,
-            created_at,
-            completed_at,
-            data)
-VALUES (?, ?, ?, ?, ?, ?);
-
-updateCompleted:
-UPDATE payments
-SET    completed_at=?,
-       data=?
-WHERE  id = ?;
-
-get:
-SELECT *
-FROM   payments
-WHERE  id=?;
-
-getByPaymentHash:
-SELECT *
-FROM   payments
-WHERE  payment_hash=?;
-
-deleteByPaymentHash:
-DELETE FROM payments
-WHERE payment_hash = ?;
-
 list:
-SELECT *
-FROM  payments;
+SELECT data
+FROM payments;
 
--- use this in a `transaction` block to know how many rows were changed after an UPDATE
-changes:
-SELECT changes();
+

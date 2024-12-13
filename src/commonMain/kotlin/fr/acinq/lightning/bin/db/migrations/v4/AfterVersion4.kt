@@ -6,15 +6,11 @@ import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.io.ByteArrayOutput
-import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries.Companion.hopDescAdapter
-import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
 import fr.acinq.lightning.serialization.payment.Serialization
-import fr.acinq.phoenix.db.LightningOutgoingPaymentsQueries
-import fr.acinq.phoenix.db.SpliceOutgoingPaymentsQueries
 
 val AfterVersion4 = AfterVersion(4) { driver ->
 
@@ -23,7 +19,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     fun insertPayment(payment: WalletPayment) {
         driver.execute(
             identifier = null,
-            sql = "INSERT INTO payments (id, payment_hash, tx_id, created_at, completed_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+            sql = "INSERT INTO outgoing_payments (id, payment_hash, tx_id, created_at, completed_at, data) VALUES (?, ?, ?, ?, ?, ?)",
             parameters = 6
         ) {
             // TODO: use standard Uuid once migrated to kotlin 2
@@ -49,18 +45,6 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     }
 
     transacter.transaction {
-        driver.executeQuery(
-            identifier = null,
-            sql = "SELECT data FROM incoming_payments",
-            parameters = 0,
-            mapper = { cursor ->
-                while (cursor.next().value) {
-                    insertPayment(Serialization.deserialize(cursor.getBytes(0)!!).get())
-                }
-                QueryResult.Unit
-            }
-        )
-
         driver.executeQuery(
             identifier = null,
             sql = """
@@ -208,7 +192,6 @@ val AfterVersion4 = AfterVersion(4) { driver ->
         )
 
         listOf(
-            "DROP TABLE incoming_payments",
             "DROP TABLE lightning_outgoing_payments",
             "DROP TABLE lightning_outgoing_payment_parts",
             "DROP TABLE inbound_liquidity_outgoing_payments",

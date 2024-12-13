@@ -5,11 +5,10 @@ package fr.acinq.lightning.bin.db.migrations.v4
 import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
-import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries.Companion.hopDescAdapter
+import fr.acinq.lightning.bin.toByteArray
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.serialization.OutputExtensions.writeUuid
 import fr.acinq.lightning.serialization.payment.Serialization
 
 val AfterVersion4 = AfterVersion(4) { driver ->
@@ -22,11 +21,6 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             sql = "INSERT INTO outgoing_payments (id, payment_hash, tx_id, created_at, completed_at, data) VALUES (?, ?, ?, ?, ?, ?)",
             parameters = 6
         ) {
-            // TODO: use standard Uuid once migrated to kotlin 2
-            val id = ByteArrayOutput().run {
-                writeUuid(payment.id)
-                toByteArray()
-            }
             val (paymentHash, txId) = when (payment) {
                 is LightningIncomingPayment -> payment.paymentHash to null
                 is OnChainIncomingPayment -> null to payment.txId
@@ -35,7 +29,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                 is LightningOutgoingPayment -> payment.paymentHash to null
                 is OnChainOutgoingPayment -> null to payment.txId
             }
-            bindBytes(0, id)
+            bindBytes(0, payment.id.toByteArray())
             bindBytes(1, paymentHash?.toByteArray())
             bindBytes(2, txId?.value?.toByteArray())
             bindLong(3, payment.createdAt)

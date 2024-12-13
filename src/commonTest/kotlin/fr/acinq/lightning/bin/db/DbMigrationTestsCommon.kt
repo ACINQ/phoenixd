@@ -29,10 +29,7 @@ class DbMigrationTestsCommon {
         }
         val driver = createAppDbDriver(testdir, Chain.Testnet3, PublicKey.fromHex("03be9f16ffcfe10ec7381506601b1b75c9638d5e5aa8c4e7a546573ee09bc68fa2"))
         val database = createPhoenixDb(driver)
-        val payments = database.paymentsQueries
-            .list()
-            .executeAsList()
-            .map { WalletPaymentAdapter.decode(it) }
+        val payments = SqlitePaymentsDb(database).listSuccessfulPayments()
         payments.forEach { println("$it") }
         assertEquals(2188, payments.size)
     }

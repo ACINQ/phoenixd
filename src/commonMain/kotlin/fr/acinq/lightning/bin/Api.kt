@@ -17,6 +17,8 @@ import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.Channel
+import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
+import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
 import fr.acinq.lightning.bin.payments.AddressResolver
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.PayDnsAddress
@@ -32,9 +34,7 @@ import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
-import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
-import fr.acinq.lightning.db.LegacyPayToOpenIncomingPayment
-import fr.acinq.lightning.db.LightningIncomingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
@@ -247,13 +247,17 @@ class Api(
                         ?: call.respond(HttpStatusCode.NotFound)
                 }
                 get("payments/outgoing") {
-                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending
-                    val from = call.parameters.getOptionalLong("from") ?: 0L
-                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
-                    val limit = call.parameters.getOptionalLong("limit") ?: 20
-                    val offset = call.parameters.getOptionalLong("offset") ?: 0
-                    val payments = paymentDb.listLightningOutgoingPayments(from, to, limit, offset, listAll).map {
-                        OutgoingPayment(it)
+                    val payments = paymentDb.listOutgoingPayments(
+                        from = call.parameters.getOptionalLong("from") ?: 0L,
+                        to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis(),
+                        limit = call.parameters.getOptionalLong("limit") ?: 20,
+                        offset = call.parameters.getOptionalLong("offset") ?: 0,
+                        listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending
+                    ).map {
+                        when (it) {
+                            is LightningOutgoingPayment -> OutgoingPayment(it)
+                            is OnChainOutgoingPayment -> OutgoingPayment(it)
+                        }
                     }
                     call.respond(payments)
                 }

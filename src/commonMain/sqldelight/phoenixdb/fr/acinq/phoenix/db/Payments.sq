@@ -1,15 +1,18 @@
 CREATE VIEW payments
-AS SELECT data
+AS SELECT id, created_at, completed_at, data
 FROM (
-    SELECT data
+    SELECT id, created_at, received_at AS completed_at, data
     FROM incoming_payments
 UNION ALL
-    SELECT data
+    SELECT id, created_at, sent_at AS completed_at, data
     FROM outgoing_payments
 );
 
 list:
 SELECT data
-FROM payments;
+FROM payments
+WHERE
+    completed_at BETWEEN :completed_at_from AND :completed_at_to
+LIMIT :limit OFFSET :offset;
 
 

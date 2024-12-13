@@ -1,11 +1,13 @@
 import fr.acinq.lightning.db.OutgoingPayment;
+import fr.acinq.lightning.utils.UUID;
 
 CREATE TABLE outgoing_payments (
-    id BLOB NOT NULL PRIMARY KEY,
+    id BLOB AS UUID NOT NULL PRIMARY KEY,
     payment_hash BLOB,
-    tx_id BLOB UNIQUE,
+    tx_id BLOB,
     created_at INTEGER NOT NULL,
-    completed_at INTEGER DEFAULT NULL,
+    completed_at INTEGER DEFAULT NULL, -- a completed outgoing payment can be a success or a failure
+    sent_at INTEGER DEFAULT NULL, -- will only be set for a successful payment
     data BLOB AS OutgoingPayment NOT NULL
 );
 
@@ -16,6 +18,11 @@ CREATE INDEX outgoing_payments_tx_id_idx ON outgoing_payments(tx_id);
 -- Tip: Use "explain query plan" to ensure they're actually being used.
 CREATE INDEX outgoing_payments_filter_idx ON outgoing_payments(completed_at) WHERE completed_at IS NOT NULL;
 
+CREATE TABLE link_lightning_outgoing_payment_parts (
+    part_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    parent_id BLOB AS UUID NOT NULL
+);
+
 -- queries
 
 insert:
@@ -25,32 +32,61 @@ INSERT INTO outgoing_payments (
             tx_id,
             created_at,
             completed_at,
+            sent_at,
             data)
-VALUES (?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
-updateCompleted:
+insertPartLink:
+INSERT INTO link_lightning_outgoing_payment_parts(
+            part_id,
+            parent_id)
+VALUES (?, ?);
+
+update:
+-- this method will update the completed_at column if a non-null value is provided,
+-- otherwise it will keep the existing value
 UPDATE outgoing_payments
-SET    completed_at=?,
-       data=?
-WHERE  id = ?;
+SET    completed_at=COALESCE(:completed_at, completed_at),
+       data=:data
+WHERE  id = :id;
 
 get:
-SELECT *
+SELECT data
 FROM   outgoing_payments
 WHERE  id=?;
 
-getByPaymentHash:
-SELECT *
+getParentId:
+SELECT parent_id
+FROM   link_lightning_outgoing_payment_parts
+WHERE  part_id=?;
+
+listByPaymentHash:
+SELECT data
 FROM   outgoing_payments
 WHERE  payment_hash=?;
+
+listByTxId:
+SELECT data
+FROM   outgoing_payments
+WHERE  tx_id=?;
 
 deleteByPaymentHash:
 DELETE FROM outgoing_payments
 WHERE payment_hash = ?;
 
 list:
-SELECT *
-FROM  payments;
+SELECT data
+FROM  outgoing_payments
+WHERE
+    created_at BETWEEN :created_at_from AND :created_at_to
+LIMIT :limit OFFSET :offset;
+
+listSuccessful:
+SELECT data
+FROM  outgoing_payments
+WHERE
+    sent_at BETWEEN :sent_at_from AND :sent_at_to
+LIMIT :limit OFFSET :offset;
 
 -- use this in a `transaction` block to know how many rows were changed after an UPDATE
 changes:

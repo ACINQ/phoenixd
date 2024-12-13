@@ -16,16 +16,15 @@
 
 package fr.acinq.lightning.bin.db
 
+import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.TxId
-import fr.acinq.lightning.bin.db.csvexport.CsvExportQueries
 import fr.acinq.lightning.bin.db.payments.*
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.payment.FinalFailure
+import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setConfirmed
+import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setLocked
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.currentTimestampMillis
-import fr.acinq.lightning.utils.toByteVector32
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,23 +32,8 @@ import kotlinx.coroutines.withContext
 class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     private val inQueries = IncomingQueries(database)
-    private val lightningOutgoingQueries = LightningOutgoingQueries(database)
-    private val spliceOutQueries = SpliceOutgoingQueries(database)
-    private val channelCloseQueries = ChannelCloseOutgoingQueries(database)
-    private val cpfpQueries = SpliceCpfpOutgoingQueries(database)
     private val linkTxToPaymentQueries = LinkTxToPaymentQueries(database)
-    private val inboundLiquidityQueries = InboundLiquidityQueries(database)
     val metadataQueries = PaymentsMetadataQueries(database)
-    val csvExportQueries = CsvExportQueries(database)
-
-    override suspend fun addOutgoingLightningParts(
-        parentId: UUID,
-        parts: List<LightningOutgoingPayment.Part>
-    ) {
-        withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.addLightningParts(parentId, parts)
-        }
-    }
 
     override suspend fun addOutgoingPayment(
         outgoingPayment: OutgoingPayment
@@ -58,93 +42,119 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             database.transaction {
                 when (outgoingPayment) {
                     is LightningOutgoingPayment -> {
-                        lightningOutgoingQueries.addLightningOutgoingPayment(outgoingPayment)
+                        database.outgoingPaymentsQueries.insert(
+                            id = outgoingPayment.id,
+                            payment_hash = outgoingPayment.paymentHash.toByteArray(),
+                            tx_id = null,
+                            created_at = outgoingPayment.createdAt,
+                            completed_at = outgoingPayment.completedAt,
+                            sent_at = if (outgoingPayment.status is LightningOutgoingPayment.Status.Succeeded) outgoingPayment.completedAt else null,
+                            data_ = outgoingPayment
+                        )
                     }
-                    is SpliceOutgoingPayment -> {
-                        spliceOutQueries.addSpliceOutgoingPayment(outgoingPayment)
+                    is OnChainOutgoingPayment -> {
+                        database.outgoingPaymentsQueries.insert(
+                            id = outgoingPayment.id,
+                            payment_hash = null,
+                            tx_id = outgoingPayment.txId.value.toByteArray(),
+                            created_at = outgoingPayment.createdAt,
+                            completed_at = outgoingPayment.completedAt,
+                            sent_at = outgoingPayment.completedAt,
+                            data_ = outgoingPayment
+                        )
                         linkTxToPaymentQueries.linkTxToPayment(
                             txId = outgoingPayment.txId,
                             walletPaymentId = outgoingPayment.walletPaymentId()
                         )
-                    }
-                    is ChannelCloseOutgoingPayment -> {
-                        channelCloseQueries.addChannelCloseOutgoingPayment(outgoingPayment)
-                        linkTxToPaymentQueries.linkTxToPayment(
-                            txId = outgoingPayment.txId,
-                            walletPaymentId = outgoingPayment.walletPaymentId()
-                        )
-                    }
-                    is SpliceCpfpOutgoingPayment -> {
-                        cpfpQueries.addCpfpPayment(outgoingPayment)
-                        linkTxToPaymentQueries.linkTxToPayment(outgoingPayment.txId, outgoingPayment.walletPaymentId())
-                    }
-                    is InboundLiquidityOutgoingPayment -> {
-                        inboundLiquidityQueries.add(outgoingPayment)
-                        linkTxToPaymentQueries.linkTxToPayment(outgoingPayment.txId, outgoingPayment.walletPaymentId())
                     }
                 }
             }
         }
     }
 
-    override suspend fun completeOutgoingPaymentOffchain(
+    override suspend fun addLightningOutgoingPaymentParts(
+        parentId: UUID,
+        parts: List<LightningOutgoingPayment.Part>
+    ) {
+        withContext(Dispatchers.Default) {
+            database.transaction {
+                val payment = database.outgoingPaymentsQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment1 = payment.copy(parts = payment.parts + parts)
+                database.outgoingPaymentsQueries.update(
+                    id = parentId,
+                    data = payment1,
+                    completed_at = null,
+                )
+            }
+            parts.forEach { part ->
+                database.outgoingPaymentsQueries.insertPartLink(part_id = part.id, parent_id = parentId)
+            }
+        }
+    }
+
+    override suspend fun completeLightningOutgoingPayment(
         id: UUID,
-        preimage: ByteVector32,
-        completedAt: Long
+        status: LightningOutgoingPayment.Status.Completed
     ) {
         withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Succeeded(preimage, completedAt))
+            database.transaction {
+                val payment = database.outgoingPaymentsQueries.get(id).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment1 = payment.copy(status = status)
+                database.outgoingPaymentsQueries.update(
+                    id = id,
+                    data = payment1,
+                    completed_at = status.completedAt
+                )
+            }
         }
     }
 
-    override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
-        return withContext(Dispatchers.Default) {
-            inboundLiquidityQueries.getByTxId(fundingTxId)
-        }
-    }
-
-    override suspend fun completeOutgoingPaymentOffchain(
-        id: UUID,
-        finalFailure: FinalFailure,
-        completedAt: Long
-    ) {
-        withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.completePayment(id, LightningOutgoingPayment.Status.Completed.Failed(finalFailure, completedAt))
-        }
-    }
-
-    override suspend fun completeOutgoingLightningPart(
+    override suspend fun completeLightningOutgoingPaymentPart(
+        parentId: UUID,
         partId: UUID,
-        preimage: ByteVector32,
-        completedAt: Long
+        status: LightningOutgoingPayment.Part.Status.Completed
     ) {
         withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.updateLightningPart(partId, preimage, completedAt)
-        }
-    }
-
-    override suspend fun completeOutgoingLightningPart(
-        partId: UUID,
-        failure: LightningOutgoingPayment.Part.Status.Failure,
-        completedAt: Long
-    ) {
-        withContext(Dispatchers.Default) {
-            lightningOutgoingQueries.updateLightningPart(partId, failure, completedAt)
+            database.transaction {
+                val payment = database.outgoingPaymentsQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment1 = payment.copy(parts = payment.parts.map {
+                    when {
+                        it.id == partId -> it.copy(status = status)
+                        else -> it
+                    }
+                })
+                database.outgoingPaymentsQueries.update(
+                    id = parentId,
+                    completed_at = status.completedAt,
+                    data = payment1
+                )
+            }
         }
     }
 
     override suspend fun getLightningOutgoingPayment(id: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
-        lightningOutgoingQueries.getPayment(id)
+        database.outgoingPaymentsQueries.get(id).executeAsOneOrNull() as? LightningOutgoingPayment
     }
 
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? = withContext(Dispatchers.Default) {
-        lightningOutgoingQueries.getPaymentFromPartId(partId)
+        database.transactionWithResult {
+            val paymentId = database.outgoingPaymentsQueries.getParentId(partId).executeAsOneOrNull()!!
+            database.outgoingPaymentsQueries.get(paymentId).executeAsOneOrNull() as? LightningOutgoingPayment
+        }
     }
 
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
     ): List<LightningOutgoingPayment> = withContext(Dispatchers.Default) {
-        lightningOutgoingQueries.listPaymentsForPaymentHash(paymentHash)
+        database.outgoingPaymentsQueries.listByPaymentHash(paymentHash.toByteArray()).executeAsList().filterIsInstance<LightningOutgoingPayment>()
+    }
+
+    override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
+        return withContext(Dispatchers.Default) {
+            database.outgoingPaymentsQueries.listByTxId(fundingTxId.value.toByteArray()).executeAsList()
+                .filterIsInstance<InboundLiquidityOutgoingPayment>()
+                .firstOrNull()
+        }
     }
 
     // ---- incoming payments
@@ -175,25 +185,23 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
                 when (walletPaymentId) {
                     is WalletPaymentId.IncomingPaymentId -> {
-                       inQueries.setLocked(walletPaymentId.id, lockedAt)
+                        inQueries.setLocked(walletPaymentId.id, lockedAt)
                     }
-                    is WalletPaymentId.LightningOutgoingPaymentId -> {
-                        // LN payments need not be locked
-                    }
-                    is WalletPaymentId.SpliceOutgoingPaymentId -> {
-                        spliceOutQueries.setLocked(walletPaymentId.id, lockedAt)
-                    }
-                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> {
-                        channelCloseQueries.setLocked(walletPaymentId.id, lockedAt)
-                    }
-                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> {
-                        cpfpQueries.setLocked(walletPaymentId.id, lockedAt)
-                    }
-                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> {
-                        inboundLiquidityQueries.setLocked(walletPaymentId.id, lockedAt)
-                    }
+                    else -> {} // outgoing payments don't use the link_tx_to_payments table anymore
                 }
             }
+            database.outgoingPaymentsQueries
+                .listByTxId(txId.value.toByteArray()).executeAsList()
+                .filterIsInstance<OnChainOutgoingPayment>()
+                .forEach { paymentInDb ->
+                    // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
+                    when (val paymentInDb1 = paymentInDb.setLocked(lockedAt)) {
+                        is InboundLiquidityOutgoingPayment ->
+                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = lockedAt)
+                        else ->
+                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = null)
+                    }
+                }
         }
     }
 
@@ -204,25 +212,23 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
             linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
                 when (walletPaymentId) {
                     is WalletPaymentId.IncomingPaymentId -> {
-                       inQueries.setConfirmed(walletPaymentId.id, confirmedAt)
+                        inQueries.setConfirmed(walletPaymentId.id, confirmedAt)
                     }
-                    is WalletPaymentId.LightningOutgoingPaymentId -> {
-                        // LN payments need not be confirmed
-                    }
-                    is WalletPaymentId.SpliceOutgoingPaymentId -> {
-                        spliceOutQueries.setConfirmed(walletPaymentId.id, confirmedAt)
-                    }
-                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> {
-                        channelCloseQueries.setConfirmed(walletPaymentId.id, confirmedAt)
-                    }
-                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> {
-                        cpfpQueries.setConfirmed(walletPaymentId.id, confirmedAt)
-                    }
-                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> {
-                        inboundLiquidityQueries.setConfirmed(walletPaymentId.id, confirmedAt)
-                    }
+                    else -> {} // outgoing payments don't use the link_tx_to_payments table anymore
                 }
             }
+            database.outgoingPaymentsQueries
+                .listByTxId(txId.value.toByteArray()).executeAsList()
+                .filterIsInstance<OnChainOutgoingPayment>()
+                .forEach { paymentInDb ->
+                    // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
+                    when (val paymentInDb1 = paymentInDb.setConfirmed(confirmedAt)) {
+                        is InboundLiquidityOutgoingPayment ->
+                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = null)
+                        else ->
+                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = confirmedAt)
+                    }
+                }
         }
     }
 
@@ -265,51 +271,56 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
         }
     }
 
-    suspend fun listLightningOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<LightningOutgoingPayment> {
+    suspend fun listOutgoingPayments(from: Long = 0, to: Long = Long.MAX_VALUE, limit: Long = Long.MAX_VALUE, offset: Long = 0, listAll: Boolean = false): List<OutgoingPayment> {
         return withContext(Dispatchers.Default) {
             if (listAll) {
-                lightningOutgoingQueries.listPayments(from, to, limit, offset)
+                database.outgoingPaymentsQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset).executeAsList()
             } else {
-                lightningOutgoingQueries.listSuccessfulOrPendingPayments(from, to, limit, offset)
+                database.outgoingPaymentsQueries.listSuccessful(sent_at_from = from, sent_at_to = to, limit = limit, offset = offset).executeAsList()
             }
         }
     }
 
-    private suspend fun listSuccessfulPayments(from: Long, to: Long, limit: Long, offset: Long): List<WalletPayment> {
+    suspend fun listSuccessfulPayments(from: Long = 0, to: Long = Long.MAX_VALUE, limit: Long = Long.MAX_VALUE, offset: Long = 0): List<WalletPayment> {
         return withContext(Dispatchers.Default) {
-            csvExportQueries.listSuccessfulPaymentIds(from, to, limit, offset).mapNotNull { paymentId ->
-                when (paymentId) {
-                    is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.getIncomingPayment(paymentId.id)
-                    }
-                    is WalletPaymentId.InboundLiquidityOutgoingPaymentId -> {
-                        inboundLiquidityQueries.get(paymentId.id)
-                    }
-                    is WalletPaymentId.LightningOutgoingPaymentId -> {
-                        lightningOutgoingQueries.getPayment(paymentId.id)
-                    }
-                    is WalletPaymentId.SpliceOutgoingPaymentId -> {
-                        spliceOutQueries.getSpliceOutPayment(paymentId.id)
-                    }
-                    is WalletPaymentId.SpliceCpfpOutgoingPaymentId -> {
-                        cpfpQueries.getCpfp(paymentId.id)
-                    }
-                    is WalletPaymentId.ChannelCloseOutgoingPaymentId -> {
-                        channelCloseQueries.getChannelCloseOutgoingPayment(paymentId.id)
-                    }
-                }
-            }
+            database.paymentsQueries.list(
+                completed_at_from = from,
+                completed_at_to = to,
+                limit = limit,
+                offset = offset
+            )
+                .executeAsList()
+                .map { WalletPaymentAdapter.decode(it) }
         }
     }
 
     suspend fun processSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32, process: (WalletPayment) -> Unit) {
-        var batchOffset = 0L
-        var fetching = true
-        while (fetching) {
-            val results = listSuccessfulPayments(from, to, limit = batchSize, offset = batchOffset)
-            results.forEach { process(it) }
-            fetching = results.isNotEmpty()
-            batchOffset += results.size
+        return withContext(Dispatchers.Default) {
+            var batchOffset = 0L
+            var fetching = true
+            while (fetching) {
+                database.paymentsQueries.list(
+                    completed_at_from = from,
+                    completed_at_to = to,
+                    limit = batchSize,
+                    offset = batchOffset
+                )
+                    .execute { cursor ->
+                        var resultSize = 0
+                        while (cursor.next().value) {
+                            val data = cursor.getBytes(0)!!
+                            val walletPayment = WalletPaymentAdapter.decode(data)
+                            process(walletPayment)
+                            resultSize += 1
+                        }
+                        if (resultSize == 0) {
+                            fetching = false
+                        } else {
+                            batchOffset += resultSize
+                        }
+                        QueryResult.Unit
+                    }
+            }
         }
     }
 }

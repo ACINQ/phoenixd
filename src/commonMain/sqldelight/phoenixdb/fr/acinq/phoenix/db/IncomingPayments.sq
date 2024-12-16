@@ -59,7 +59,7 @@ LIMIT 1;
 listReceivedWithin:
 SELECT payment.*, meta.external_id
 FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE  received_at IS NOT NULL AND received_at BETWEEN :from AND :to
 ORDER BY
         coalesce(received_at, payment.created_at) DESC,
@@ -69,7 +69,7 @@ LIMIT :limit OFFSET :offset;
 listReceivedForExternalIdWithin:
 SELECT payment.*, meta.external_id
 FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE  meta.external_id = :externalId AND received_at IS NOT NULL AND received_at BETWEEN :from AND :to
 ORDER BY
         coalesce(received_at, payment.created_at) DESC,
@@ -79,7 +79,7 @@ LIMIT :limit OFFSET :offset;
 listCreatedWithin:
 SELECT payment.data, meta.external_id
 FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE  payment.created_at BETWEEN :from AND :to
 ORDER BY
        coalesce(received_at, payment.created_at) DESC,
@@ -89,7 +89,7 @@ LIMIT :limit OFFSET :offset;
 listCreatedForExternalIdWithin:
 SELECT payment.data, meta.external_id
 FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.type = 1 AND meta.id = lower(hex(payment.payment_hash))
+LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE  meta.external_id = :externalId
 AND    payment.created_at BETWEEN :from AND :to
 ORDER BY

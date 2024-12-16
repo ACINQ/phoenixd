@@ -16,7 +16,8 @@ fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
     driver = driver,
     incoming_paymentsAdapter = Incoming_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, IncomingPaymentAdapter),
     outgoing_paymentsAdapter = Outgoing_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, OutgoingPaymentAdapter),
-    link_lightning_outgoing_payment_partsAdapter = Link_lightning_outgoing_payment_parts.Adapter(UUIDAdapter, UUIDAdapter)
+    link_lightning_outgoing_payment_partsAdapter = Link_lightning_outgoing_payment_parts.Adapter(UUIDAdapter, UUIDAdapter),
+    on_chain_txsAdapter = On_chain_txs.Adapter(UUIDAdapter, TxIdAdapter)
 )
 
 object UUIDAdapter : ColumnAdapter<UUID, ByteArray> {

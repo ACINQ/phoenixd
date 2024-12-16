@@ -16,15 +16,14 @@
 
 package fr.acinq.lightning.bin.db.payments
 
-import app.cash.sqldelight.coroutines.asFlow
-import app.cash.sqldelight.coroutines.mapToList
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.Bolt11IncomingPayment
+import fr.acinq.lightning.db.IncomingPayment
+import fr.acinq.lightning.db.LightningIncomingPayment
 import fr.acinq.lightning.db.LightningIncomingPayment.Companion.addReceivedParts
+import fr.acinq.lightning.db.OnChainIncomingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.phoenix.db.PhoenixDatabase
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 
 class IncomingQueries(private val database: PhoenixDatabase) {
 
@@ -53,49 +52,9 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                 is LightningIncomingPayment -> {
                     val paymentInDb1 = paymentInDb.addReceivedParts(parts)
                     queries.updateReceived(
-                        received_at = paymentInDb1.completedAt,
-                        data_ = paymentInDb1,
-                        id = paymentInDb1.id
-                    )
-                }
-                else -> error("unexpected type: $paymentInDb")
-            }
-        }
-    }
-
-    fun setLocked(id: UUID, lockedAt: Long) {
-        database.transaction {
-            when (val paymentInDb = getIncomingPayment(id)) {
-                null -> {}
-                is OnChainIncomingPayment -> {
-                    val paymentInDb1 = when (paymentInDb) {
-                        is NewChannelIncomingPayment -> paymentInDb.copy(lockedAt = lockedAt)
-                        is SpliceInIncomingPayment -> paymentInDb.copy(lockedAt = lockedAt)
-                    }
-                    queries.updateReceived(
-                        received_at = lockedAt,
-                        data_ = paymentInDb1,
-                        id = paymentInDb1.id
-                    )
-                }
-                else -> error("unexpected type: $paymentInDb")
-            }
-        }
-    }
-
-    fun setConfirmed(id: UUID, confirmedAt: Long) {
-        database.transaction {
-            when (val paymentInDb = getIncomingPayment(id)) {
-                null -> {}
-                is OnChainIncomingPayment -> {
-                    val paymentInDb1 = when (paymentInDb) {
-                        is NewChannelIncomingPayment -> paymentInDb.copy(confirmedAt = confirmedAt)
-                        is SpliceInIncomingPayment -> paymentInDb.copy(confirmedAt = confirmedAt)
-                    }
-                    queries.updateReceived(
-                        received_at = paymentInDb1.lockedAt, // keep the existing value
-                        data_ = paymentInDb1,
-                        id = paymentInDb1.id
+                        id = paymentInDb1.id,
+                        data = paymentInDb1,
+                        receivedAt = paymentInDb1.completedAt
                     )
                 }
                 else -> error("unexpected type: $paymentInDb")
@@ -113,10 +72,6 @@ class IncomingQueries(private val database: PhoenixDatabase) {
 
     fun getOldestReceivedDate(): Long? {
         return queries.getOldestReceivedDate().executeAsOneOrNull()
-    }
-
-    fun listAllNotConfirmed(): Flow<List<IncomingPayment>> {
-        return queries.listAllNotConfirmed().asFlow().mapToList(Dispatchers.IO)
     }
 
     fun listPayments(from: Long, to: Long, limit: Long, offset: Long): List<Pair<IncomingPayment, String?>> {

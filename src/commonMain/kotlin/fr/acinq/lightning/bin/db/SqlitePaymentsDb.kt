@@ -19,8 +19,11 @@ package fr.acinq.lightning.bin.db
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.TxId
-import fr.acinq.lightning.bin.db.payments.*
+import fr.acinq.lightning.bin.db.payments.IncomingQueries
+import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.OnChainIncomingPayment.Companion.setConfirmed
+import fr.acinq.lightning.db.OnChainIncomingPayment.Companion.setLocked
 import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setConfirmed
 import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setLocked
 import fr.acinq.lightning.utils.UUID
@@ -32,7 +35,6 @@ import kotlinx.coroutines.withContext
 class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
 
     private val inQueries = IncomingQueries(database)
-    private val linkTxToPaymentQueries = LinkTxToPaymentQueries(database)
     val metadataQueries = PaymentsMetadataQueries(database)
 
     override suspend fun addOutgoingPayment(
@@ -63,9 +65,9 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                             sent_at = outgoingPayment.completedAt,
                             data_ = outgoingPayment
                         )
-                        linkTxToPaymentQueries.linkTxToPayment(
-                            txId = outgoingPayment.txId,
-                            walletPaymentId = outgoingPayment.walletPaymentId()
+                        database.onChainTransactionsQueries.insert(
+                            payment_id = outgoingPayment.id,
+                            tx_id = outgoingPayment.txId
                         )
                     }
                 }
@@ -166,7 +168,11 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                 inQueries.addIncomingPayment(incomingPayment)
                 // if the payment is on-chain, save the tx id link to the db
                 when (incomingPayment) {
-                    is OnChainIncomingPayment -> linkTxToPaymentQueries.linkTxToPayment(incomingPayment.txId, WalletPaymentId.IncomingPaymentId(incomingPayment.id))
+                    is OnChainIncomingPayment ->
+                        database.onChainTransactionsQueries.insert(
+                        payment_id = incomingPayment.id,
+                        tx_id = incomingPayment.txId
+                    )
                     else -> {}
                 }
             }
@@ -182,25 +188,31 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     override suspend fun setLocked(txId: TxId) {
         database.transaction {
             val lockedAt = currentTimestampMillis()
-            linkTxToPaymentQueries.setLocked(txId, lockedAt)
-            linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
-                when (walletPaymentId) {
-                    is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.setLocked(walletPaymentId.id, lockedAt)
-                    }
-                    else -> {} // outgoing payments don't use the link_tx_to_payments table anymore
-                }
-            }
-            database.outgoingPaymentsQueries
-                .listByTxId(txId).executeAsList()
-                .filterIsInstance<OnChainOutgoingPayment>()
-                .forEach { paymentInDb ->
-                    // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
-                    when (val paymentInDb1 = paymentInDb.setLocked(lockedAt)) {
-                        is InboundLiquidityOutgoingPayment ->
-                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = lockedAt)
-                        else ->
-                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = null)
+            database.onChainTransactionsQueries.setLocked(tx_id = txId, locked_at = lockedAt)
+            database.onChainTransactionsQueries
+                .listByTxid(txId)
+                .executeAsList()
+                .map { WalletPaymentAdapter.decode(it) }
+                .forEach { payment ->
+                    @Suppress("DEPRECATION")
+                    when (payment) {
+                        is LightningIncomingPayment -> {}
+                        is OnChainIncomingPayment -> {
+                            val payment1 = payment.setLocked(lockedAt)
+                            database.incomingPaymentsQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = lockedAt)
+                        }
+                        is LegacyPayToOpenIncomingPayment -> {}
+                        is LegacySwapInIncomingPayment -> {}
+                        is LightningOutgoingPayment -> {}
+                        is OnChainOutgoingPayment -> {
+                            // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
+                            when (val payment1 = payment.setLocked(lockedAt)) {
+                                is InboundLiquidityOutgoingPayment ->
+                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt)
+                                else ->
+                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = null)
+                            }
+                        }
                     }
                 }
         }
@@ -209,25 +221,31 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     suspend fun setConfirmed(txId: TxId) = withContext(Dispatchers.Default) {
         database.transaction {
             val confirmedAt = currentTimestampMillis()
-            linkTxToPaymentQueries.setConfirmed(txId, confirmedAt)
-            linkTxToPaymentQueries.listWalletPaymentIdsForTx(txId).forEach { walletPaymentId ->
-                when (walletPaymentId) {
-                    is WalletPaymentId.IncomingPaymentId -> {
-                        inQueries.setConfirmed(walletPaymentId.id, confirmedAt)
-                    }
-                    else -> {} // outgoing payments don't use the link_tx_to_payments table anymore
-                }
-            }
-            database.outgoingPaymentsQueries
-                .listByTxId(txId).executeAsList()
-                .filterIsInstance<OnChainOutgoingPayment>()
-                .forEach { paymentInDb ->
-                    // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
-                    when (val paymentInDb1 = paymentInDb.setConfirmed(confirmedAt)) {
-                        is InboundLiquidityOutgoingPayment ->
-                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = null)
-                        else ->
-                            database.outgoingPaymentsQueries.update(id = paymentInDb1.id, data = paymentInDb1, completed_at = confirmedAt)
+            database.onChainTransactionsQueries.setConfirmed(tx_id = txId, confirmed_at = confirmedAt)
+            database.onChainTransactionsQueries
+                .listByTxid(txId)
+                .executeAsList()
+                .map { WalletPaymentAdapter.decode(it) }
+                .forEach { payment ->
+                    @Suppress("DEPRECATION")
+                    when (payment) {
+                        is LightningIncomingPayment -> {}
+                        is OnChainIncomingPayment -> {
+                            val payment1 = payment.setConfirmed(confirmedAt)
+                            database.incomingPaymentsQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = null)
+                        }
+                        is LegacyPayToOpenIncomingPayment -> {}
+                        is LegacySwapInIncomingPayment -> {}
+                        is LightningOutgoingPayment -> {}
+                        is OnChainOutgoingPayment -> {
+                            // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
+                            when (val payment1 = payment.setConfirmed(confirmedAt)) {
+                                is InboundLiquidityOutgoingPayment ->
+                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = null)
+                                else ->
+                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = confirmedAt)
+                            }
+                        }
                     }
                 }
         }

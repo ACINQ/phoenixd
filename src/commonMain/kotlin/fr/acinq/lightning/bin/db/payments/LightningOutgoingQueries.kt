@@ -17,21 +17,15 @@
 package fr.acinq.lightning.bin.db.payments
 
 import app.cash.sqldelight.ColumnAdapter
-import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.PublicKey
-import fr.acinq.bitcoin.utils.Either
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.ShortChannelId
-import fr.acinq.lightning.channel.ChannelException
 import fr.acinq.lightning.db.HopDesc
 import fr.acinq.lightning.db.LightningOutgoingPayment
-import fr.acinq.lightning.payment.OutgoingPaymentFailure
-import fr.acinq.lightning.utils.*
-import fr.acinq.lightning.wire.FailureMessage
-import fr.acinq.phoenix.db.PhoenixDatabase
+import fr.acinq.lightning.utils.UUID
 import fr.acinq.secp256k1.Hex
 
-class LightningOutgoingQueries(val database: PhoenixDatabase) {
+class LightningOutgoingQueries {
 
     companion object {
         @Suppress("UNUSED_PARAMETER")

@@ -43,12 +43,13 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             "DROP TABLE incoming_payments",
             """
                 CREATE TABLE incoming_payments (
-                    id TEXT NOT NULL PRIMARY KEY,
-                    payment_hash BLOB,
-                    created_at INTEGER NOT NULL,
-                    received_at INTEGER DEFAULT NULL,
-                    data BLOB NOT NULL
-                )
+                id BLOB NOT NULL PRIMARY KEY,
+                payment_hash BLOB UNIQUE,
+                tx_id BLOB,
+                created_at INTEGER NOT NULL,
+                received_at INTEGER DEFAULT NULL,
+                data BLOB NOT NULL
+            )
             """.trimIndent(),
             "CREATE INDEX incoming_payments_payment_hash_idx ON incoming_payments(payment_hash)",
         ).forEach { sql ->
@@ -59,24 +60,26 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             .forEach { payment ->
                 driver.execute(
                     identifier = null,
-                    sql = "INSERT INTO incoming_payments (id, payment_hash, created_at, received_at, data) VALUES (?, ?, ?, ?, ?)",
-                    parameters = 5
+                    sql = "INSERT INTO incoming_payments (id, payment_hash, tx_id, created_at, received_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+                    parameters = 6
                 ) {
                     println("migrating incoming $payment")
                     when (payment) {
                         is LightningIncomingPayment -> {
                             bindString(0, payment.paymentHash.deriveUUID().toString())
                             bindBytes(1, payment.paymentHash.toByteArray())
+                            bindBytes(2, null)
                         }
                         is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> {
                             bindString(0, payment.paymentHash.deriveUUID().toString())
                             bindBytes(1, payment.paymentHash.toByteArray())
+                            bindBytes(2, null)
                         }
                         else -> TODO("unsupported payment=$payment")
                     }
-                    bindLong(2, payment.createdAt)
-                    bindLong(3, payment.completedAt)
-                    bindBytes(4, Serialization.serialize(payment))
+                    bindLong(3, payment.createdAt)
+                    bindLong(4, payment.completedAt)
+                    bindBytes(5, Serialization.serialize(payment))
                 }
             }
 

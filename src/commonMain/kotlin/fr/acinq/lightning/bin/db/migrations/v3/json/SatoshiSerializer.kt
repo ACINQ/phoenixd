@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.serializers.v1
+package fr.acinq.lightning.bin.db.migrations.v3.json
 
+import fr.acinq.bitcoin.Satoshi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -23,18 +24,14 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-abstract class AbstractStringSerializer<T>(
-    name: String,
-    private val toString: (T) -> String,
-    private val fromString: (String) -> T
-) : KSerializer<T> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(name, PrimitiveKind.STRING)
+object SatoshiSerializer : KSerializer<Satoshi> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Satoshi", PrimitiveKind.LONG)
 
-    override fun serialize(encoder: Encoder, value: T) {
-        encoder.encodeString(toString(value))
+    override fun serialize(encoder: Encoder, value: Satoshi) {
+        encoder.encodeLong(value.toLong())
     }
 
-    override fun deserialize(decoder: Decoder): T {
-        return fromString(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): Satoshi {
+        return Satoshi(decoder.decodeLong())
     }
 }

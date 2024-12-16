@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 ACINQ SAS
+ * Copyright 2024 ACINQ SAS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.migrations.v3.json
 
-import io.ktor.utils.io.charsets.*
-import io.ktor.utils.io.core.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
+import fr.acinq.bitcoin.OutPoint
+import fr.acinq.bitcoin.TxHash
 
-object DbTypesHelper {
-    /** Decode a byte array and apply a deserialization handler. */
-    fun <T> decodeBlob(blob: ByteArray, handler: (String, Json) -> T) = handler(String(bytes = blob, charset = Charsets.UTF_8), Json)
-}
+class OutpointSerializer : AbstractStringSerializer<OutPoint>(
+    name = "Outpoint",
+    fromString = { serialized ->
+        serialized.split(":").let {
+            OutPoint(hash = TxHash(it[0]), index = it[1].toLong())
+        }
+    },
+    toString = { outpoint -> "${outpoint.hash}:${outpoint.index}" }
+)

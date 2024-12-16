@@ -48,6 +48,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                             tx_id = null,
                             created_at = outgoingPayment.createdAt,
                             completed_at = outgoingPayment.completedAt,
+                            // outgoing lightning payments can fail, the sent_at timestamp is only set if the payment was success
                             sent_at = if (outgoingPayment.status is LightningOutgoingPayment.Status.Succeeded) outgoingPayment.completedAt else null,
                             data_ = outgoingPayment
                         )

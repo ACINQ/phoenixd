@@ -14,38 +14,44 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.migrations.v4.queries
 
 import fr.acinq.bitcoin.TxId
-import fr.acinq.lightning.db.SpliceOutgoingPayment
+import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoData
+import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion
+import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PhoenixDatabase
 
-class SpliceOutgoingQueries {
+class ChannelCloseOutgoingQueries {
     companion object {
-        fun mapSpliceOutgoingPayment(
+        fun mapChannelCloseOutgoingPayment(
             id: String,
-            recipient_amount_sat: Long,
+            amount_sat: Long,
             address: String,
+            is_default_address: Long,
             mining_fees_sat: Long,
             tx_id: ByteArray,
-            channel_id: ByteArray,
             created_at: Long,
             confirmed_at: Long?,
-            locked_at: Long?
-        ): SpliceOutgoingPayment {
-            return SpliceOutgoingPayment(
+            locked_at: Long?,
+            channel_id: ByteArray,
+            closing_info_type: ClosingInfoTypeVersion,
+            closing_info_blob: ByteArray
+        ): ChannelCloseOutgoingPayment {
+            return ChannelCloseOutgoingPayment(
                 id = UUID.fromString(id),
-                recipientAmount = recipient_amount_sat.sat,
+                recipientAmount = amount_sat.sat,
                 address = address,
+                isSentToDefaultAddress = is_default_address == 1L,
                 miningFees = mining_fees_sat.sat,
                 txId = TxId(tx_id),
-                channelId = channel_id.toByteVector32(),
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
-                lockedAt = locked_at
+                lockedAt = locked_at,
+                channelId = channel_id.toByteVector32(),
+                closingType = ClosingInfoData.deserialize(closing_info_type, closing_info_blob),
             )
         }
     }

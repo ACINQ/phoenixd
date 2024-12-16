@@ -3,11 +3,12 @@
 -- There is also a code migration, see AfterVersion4.kt
 
 CREATE TABLE outgoing_payments (
-    id BLOB NOT NULL PRIMARY KEY,
+    id BLOB AS UUID NOT NULL PRIMARY KEY,
     payment_hash BLOB,
     tx_id BLOB,
     created_at INTEGER NOT NULL,
-    completed_at INTEGER DEFAULT NULL,
+    completed_at INTEGER DEFAULT NULL, -- a completed outgoing payment can be a success or a failure
+    sent_at INTEGER DEFAULT NULL, -- will only be set for a successful payment
     data BLOB AS OutgoingPayment NOT NULL
 );
 
@@ -28,11 +29,11 @@ CREATE TABLE link_lightning_outgoing_payment_parts (
 );
 
 CREATE VIEW payments
-AS SELECT data
+AS SELECT id, created_at, completed_at, data
 FROM (
-    SELECT data
+    SELECT id, created_at, received_at AS completed_at, data
     FROM incoming_payments
 UNION ALL
-    SELECT data
+    SELECT id, created_at, sent_at AS completed_at, data
     FROM outgoing_payments
 );

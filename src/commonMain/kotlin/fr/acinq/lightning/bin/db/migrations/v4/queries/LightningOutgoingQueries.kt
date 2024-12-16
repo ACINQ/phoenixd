@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.migrations.v4.queries
 
 import app.cash.sqldelight.ColumnAdapter
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.ShortChannelId
+import fr.acinq.lightning.bin.db.migrations.v4.types.*
 import fr.acinq.lightning.db.HopDesc
 import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.utils.UUID

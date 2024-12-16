@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.serializers.v1
+package fr.acinq.lightning.bin.db.migrations.v3.json
 
 import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.ByteVector64
-import fr.acinq.lightning.bin.db.serializers.v1.AbstractStringSerializer
 
 
 object ByteVector32Serializer : AbstractStringSerializer<ByteVector32>(

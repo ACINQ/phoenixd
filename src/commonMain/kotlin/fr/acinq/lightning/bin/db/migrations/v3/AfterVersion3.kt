@@ -62,14 +62,13 @@ val AfterVersion3 = AfterVersion(3) { driver ->
                     sql = "INSERT INTO incoming_payments (id, payment_hash, created_at, received_at, data) VALUES (?, ?, ?, ?, ?)",
                     parameters = 5
                 ) {
+                    println("migrating incoming $payment")
                     when (payment) {
                         is LightningIncomingPayment -> {
-                            println("migrating ${payment.paymentHash}")
                             bindString(0, payment.paymentHash.deriveUUID().toString())
                             bindBytes(1, payment.paymentHash.toByteArray())
                         }
                         is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> {
-                            println("migrating legacy ${payment.paymentHash}")
                             bindString(0, payment.paymentHash.deriveUUID().toString())
                             bindBytes(1, payment.paymentHash.toByteArray())
                         }

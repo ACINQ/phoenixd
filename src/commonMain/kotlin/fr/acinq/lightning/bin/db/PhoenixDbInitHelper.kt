@@ -5,6 +5,7 @@ import app.cash.sqldelight.db.SqlDriver
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.toByteArray
+import fr.acinq.lightning.channel.states.PersistedChannelState
 import fr.acinq.lightning.db.IncomingPayment
 import fr.acinq.lightning.db.OutgoingPayment
 import fr.acinq.lightning.db.WalletPayment
@@ -15,12 +16,22 @@ import io.ktor.http.*
 
 fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
     driver = driver,
+    local_channelsAdapter = Local_channels.Adapter(ByteVector32Adapter, ChannelAdapter),
+    htlc_infosAdapter = Htlc_infos.Adapter(ByteVector32Adapter, ByteVector32Adapter),
     incoming_paymentsAdapter = Incoming_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, IncomingPaymentAdapter),
     outgoing_paymentsAdapter = Outgoing_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, OutgoingPaymentAdapter),
     link_lightning_outgoing_payment_partsAdapter = Link_lightning_outgoing_payment_parts.Adapter(UUIDAdapter, UUIDAdapter),
     on_chain_txsAdapter = On_chain_txs.Adapter(UUIDAdapter, TxIdAdapter),
     payments_metadataAdapter = Payments_metadata.Adapter(UUIDAdapter, UrlAdapter)
 )
+
+object ChannelAdapter : ColumnAdapter<PersistedChannelState, ByteArray> {
+    override fun decode(databaseValue: ByteArray): PersistedChannelState =
+        (fr.acinq.lightning.serialization.channel.Serialization.deserialize(databaseValue) as fr.acinq.lightning.serialization.channel.Serialization.DeserializationResult.Success).state
+
+    override fun encode(value: PersistedChannelState): ByteArray = fr.acinq.lightning.serialization.channel.Serialization.serialize(value)
+
+}
 
 object UUIDAdapter : ColumnAdapter<UUID, ByteArray> {
     override fun decode(databaseValue: ByteArray): UUID = UUID.fromBytes(databaseValue)

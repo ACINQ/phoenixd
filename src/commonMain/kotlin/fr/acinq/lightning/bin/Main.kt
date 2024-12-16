@@ -30,7 +30,6 @@ import fr.acinq.lightning.bin.conf.PhoenixSeed
 import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
-import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.db.createPhoenixDb
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
@@ -45,8 +44,6 @@ import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.*
-import fr.acinq.lightning.wire.LiquidityAds
-import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*

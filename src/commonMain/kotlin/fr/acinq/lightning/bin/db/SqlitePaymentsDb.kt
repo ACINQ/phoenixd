@@ -44,7 +44,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                     is LightningOutgoingPayment -> {
                         database.outgoingPaymentsQueries.insert(
                             id = outgoingPayment.id,
-                            payment_hash = outgoingPayment.paymentHash.toByteArray(),
+                            payment_hash = outgoingPayment.paymentHash,
                             tx_id = null,
                             created_at = outgoingPayment.createdAt,
                             completed_at = outgoingPayment.completedAt,
@@ -57,7 +57,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                         database.outgoingPaymentsQueries.insert(
                             id = outgoingPayment.id,
                             payment_hash = null,
-                            tx_id = outgoingPayment.txId.value.toByteArray(),
+                            tx_id = outgoingPayment.txId,
                             created_at = outgoingPayment.createdAt,
                             completed_at = outgoingPayment.completedAt,
                             sent_at = outgoingPayment.completedAt,
@@ -147,12 +147,12 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
     override suspend fun listLightningOutgoingPayments(
         paymentHash: ByteVector32
     ): List<LightningOutgoingPayment> = withContext(Dispatchers.Default) {
-        database.outgoingPaymentsQueries.listByPaymentHash(paymentHash.toByteArray()).executeAsList().filterIsInstance<LightningOutgoingPayment>()
+        database.outgoingPaymentsQueries.listByPaymentHash(paymentHash).executeAsList().filterIsInstance<LightningOutgoingPayment>()
     }
 
     override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
         return withContext(Dispatchers.Default) {
-            database.outgoingPaymentsQueries.listByTxId(fundingTxId.value.toByteArray()).executeAsList()
+            database.outgoingPaymentsQueries.listByTxId(fundingTxId).executeAsList()
                 .filterIsInstance<InboundLiquidityOutgoingPayment>()
                 .firstOrNull()
         }
@@ -192,7 +192,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                 }
             }
             database.outgoingPaymentsQueries
-                .listByTxId(txId.value.toByteArray()).executeAsList()
+                .listByTxId(txId).executeAsList()
                 .filterIsInstance<OnChainOutgoingPayment>()
                 .forEach { paymentInDb ->
                     // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
@@ -219,7 +219,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) : PaymentsDb {
                 }
             }
             database.outgoingPaymentsQueries
-                .listByTxId(txId.value.toByteArray()).executeAsList()
+                .listByTxId(txId).executeAsList()
                 .filterIsInstance<OnChainOutgoingPayment>()
                 .forEach { paymentInDb ->
                     // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type

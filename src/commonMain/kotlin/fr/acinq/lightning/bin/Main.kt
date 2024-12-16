@@ -278,7 +278,7 @@ class Phoenixd : CliktCommand() {
                                 it is PaymentEvents.PaymentReceived && it.payment.amount > 0.msat -> {
                                     when(val payment = it.payment) {
                                         is LightningIncomingPayment -> {
-                                            val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId.fromPaymentHash(payment.paymentHash))
+                                            val metadata = paymentsDb.metadataQueries.get(payment.paymentHash)
                                             emit(ApiType.PaymentReceived(payment, metadata))
                                         }
                                         else -> {}

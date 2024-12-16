@@ -18,64 +18,12 @@ package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData
-import fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.Companion.encodeAsDb
 import fr.acinq.lightning.db.InboundLiquidityOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.lightning.wire.LiquidityAds
-import fr.acinq.phoenix.db.PhoenixDatabase
 
-class InboundLiquidityQueries(val database: PhoenixDatabase) {
-    private val queries = database.inboundLiquidityOutgoingPaymentsQueries
-
-    fun add(payment: InboundLiquidityOutgoingPayment) {
-        database.transaction {
-           queries.insert(
-               id = payment.id.toString(),
-               // We store the full mining fee in the database, for compatibility reasons. See comment in the mapper below for details.
-               mining_fees_sat = payment.miningFees.sat,
-               channel_id = payment.channelId.toByteArray(),
-               tx_id = payment.txId.value.toByteArray(),
-               lease_type = when (payment.purchase) {
-                   is LiquidityAds.Purchase.Standard -> "STANDARD"
-                   is LiquidityAds.Purchase.WithFeeCredit -> "WITH_FEE_CREDIT"
-               },
-               lease_blob = payment.purchase.encodeAsDb(),
-               payment_details_type = when (payment.purchase.paymentDetails) {
-                   is LiquidityAds.PaymentDetails.FromChannelBalance -> "FROM_CHANNEL_BALANCE"
-                   is LiquidityAds.PaymentDetails.FromFutureHtlc -> "FROM_FUTURE_HTLC"
-                   is LiquidityAds.PaymentDetails.FromFutureHtlcWithPreimage -> "FROM_FUTURE_HTLC_WITH_PREIMAGE"
-                   is LiquidityAds.PaymentDetails.FromChannelBalanceForFutureHtlc -> "FROM_CHANNEL_BALANCE_FOR_FUTURE_HTLC"
-               },
-               created_at = payment.createdAt,
-               confirmed_at = payment.confirmedAt,
-               locked_at = payment.lockedAt,
-           )
-        }
-    }
-
-    fun get(id: UUID): InboundLiquidityOutgoingPayment? {
-        return queries.get(id = id.toString(), mapper = Companion::mapPayment)
-            .executeAsOneOrNull()
-    }
-
-    fun getByTxId(txId: TxId): InboundLiquidityOutgoingPayment? {
-        return queries.getByTxId(tx_id = txId.value.toByteArray(), mapper = Companion::mapPayment)
-            .executeAsOneOrNull()
-    }
-
-    fun setConfirmed(id: UUID, confirmedAt: Long) {
-        database.transaction {
-            queries.setConfirmed(confirmed_at = confirmedAt, id = id.toString())
-        }
-    }
-
-    fun setLocked(id: UUID, lockedAt: Long) {
-        database.transaction {
-            queries.setLocked(locked_at = lockedAt, id = id.toString())
-        }
-    }
+class InboundLiquidityQueries {
 
     companion object {
         fun mapPayment(

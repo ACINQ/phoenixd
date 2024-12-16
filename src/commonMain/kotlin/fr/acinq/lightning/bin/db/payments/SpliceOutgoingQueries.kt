@@ -23,44 +23,7 @@ import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
 import fr.acinq.phoenix.db.PhoenixDatabase
 
-class SpliceOutgoingQueries(val database: PhoenixDatabase) {
-    private val spliceOutQueries = database.spliceOutgoingPaymentsQueries
-
-    fun addSpliceOutgoingPayment(payment: SpliceOutgoingPayment) {
-        database.transaction {
-            spliceOutQueries.insertSpliceOutgoing(
-                id = payment.id.toString(),
-                recipient_amount_sat = payment.recipientAmount.sat,
-                address = payment.address,
-                mining_fees_sat = payment.miningFees.sat,
-                channel_id = payment.channelId.toByteArray(),
-                tx_id = payment.txId.value.toByteArray(),
-                created_at = payment.createdAt,
-                confirmed_at = payment.confirmedAt,
-                locked_at = payment.lockedAt
-            )
-        }
-    }
-
-    fun getSpliceOutPayment(id: UUID): SpliceOutgoingPayment? {
-        return spliceOutQueries.getSpliceOutgoing(
-            id = id.toString(),
-            mapper = Companion::mapSpliceOutgoingPayment
-        ).executeAsOneOrNull()
-    }
-
-    fun setConfirmed(id: UUID, confirmedAt: Long) {
-        database.transaction {
-            spliceOutQueries.setConfirmed(confirmed_at = confirmedAt, id = id.toString())
-        }
-    }
-
-    fun setLocked(id: UUID, lockedAt: Long) {
-        database.transaction {
-            spliceOutQueries.setLocked(locked_at = lockedAt, id = id.toString())
-        }
-    }
-
+class SpliceOutgoingQueries {
     companion object {
         fun mapSpliceOutgoingPayment(
             id: String,

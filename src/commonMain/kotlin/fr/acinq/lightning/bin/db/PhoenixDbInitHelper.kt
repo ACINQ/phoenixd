@@ -11,13 +11,15 @@ import fr.acinq.lightning.db.WalletPayment
 import fr.acinq.lightning.serialization.payment.Serialization
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.phoenix.db.*
+import io.ktor.http.*
 
 fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(
     driver = driver,
     incoming_paymentsAdapter = Incoming_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, IncomingPaymentAdapter),
     outgoing_paymentsAdapter = Outgoing_payments.Adapter(UUIDAdapter, ByteVector32Adapter, TxIdAdapter, OutgoingPaymentAdapter),
     link_lightning_outgoing_payment_partsAdapter = Link_lightning_outgoing_payment_parts.Adapter(UUIDAdapter, UUIDAdapter),
-    on_chain_txsAdapter = On_chain_txs.Adapter(UUIDAdapter, TxIdAdapter)
+    on_chain_txsAdapter = On_chain_txs.Adapter(UUIDAdapter, TxIdAdapter),
+    payments_metadataAdapter = Payments_metadata.Adapter(UUIDAdapter, UrlAdapter)
 )
 
 object UUIDAdapter : ColumnAdapter<UUID, ByteArray> {
@@ -54,6 +56,13 @@ object WalletPaymentAdapter : ColumnAdapter<WalletPayment, ByteArray> {
     override fun decode(databaseValue: ByteArray): WalletPayment = Serialization.deserialize(databaseValue).get()
 
     override fun encode(value: WalletPayment): ByteArray = Serialization.serialize(value)
+}
+
+object UrlAdapter : ColumnAdapter<Url, String> {
+    override fun decode(databaseValue: String): Url = Url(databaseValue)
+
+    override fun encode(value: Url): String = value.toString()
+
 }
 
 

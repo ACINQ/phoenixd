@@ -198,7 +198,7 @@ class Api(
                     val externalId = formParameters["externalId"]
                     val webhookUrl = formParameters.getOptionalUrl("webhookUrl")
                     if (externalId != null || webhookUrl != null) {
-                        paymentDb.metadataQueries.insert(WalletPaymentId.IncomingPaymentId.fromPaymentHash(invoice.paymentHash), externalId, webhookUrl)
+                        paymentDb.metadataQueries.insert(paymentHash = invoice.paymentHash, externalId = externalId, webhookUrl = webhookUrl)
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
@@ -236,7 +236,7 @@ class Api(
                 }
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
-                    val metadata = paymentDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId.fromPaymentHash(paymentHash))
+                    val metadata = paymentDb.metadataQueries.get(paymentHash)
                     val payment = when (val payment = paymentDb.getIncomingPayment(paymentHash)) {
                         is LightningIncomingPayment -> IncomingPayment(payment, metadata?.externalId)
                         is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, metadata?.externalId)

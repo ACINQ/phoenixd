@@ -35,9 +35,9 @@ VALUES (?, ?, ?, ?, ?, ?);
 
 updateReceived:
 UPDATE incoming_payments
-SET    received_at=?,
-       data=?
-WHERE  id = ?;
+SET    received_at=:receivedAt,
+       data=:data
+WHERE  id=:id;
 
 get:
 SELECT *
@@ -104,15 +104,6 @@ WHERE  created_at BETWEEN :from AND :to
 ORDER BY
        coalesce(received_at, created_at) DESC,
        payment_hash DESC;
-
-listAllNotConfirmed:
-SELECT data
-FROM   incoming_payments
-LEFT OUTER JOIN link_tx_to_payments
-    ON link_tx_to_payments.type = 1
-    AND link_tx_to_payments.confirmed_at IS NULL
-    AND link_tx_to_payments.id = incoming_payments.payment_hash
-WHERE received_at IS NOT NULL;
 
 scanCompleted:
 SELECT payment_hash,

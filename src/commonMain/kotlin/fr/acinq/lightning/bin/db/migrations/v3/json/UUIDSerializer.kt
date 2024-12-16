@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.serializers.v1
+package fr.acinq.lightning.bin.db.migrations.v3.json
 
-import fr.acinq.lightning.MilliSatoshi
+import fr.acinq.lightning.utils.UUID
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-object MilliSatoshiSerializer : KSerializer<MilliSatoshi> {
-    // we are using  a surrogate for legacy reasons.
+
+object UUIDSerializer : KSerializer<UUID> {
     @Serializable
-    private data class MilliSatoshiSurrogate(val msat: Long)
+    private data class UUIDSurrogate(val mostSignificantBits: Long, val leastSignificantBits: Long)
 
-    override val descriptor: SerialDescriptor = MilliSatoshiSurrogate.serializer().descriptor
+    override val descriptor: SerialDescriptor = UUIDSurrogate.serializer().descriptor
 
-    override fun serialize(encoder: Encoder, value: MilliSatoshi) {
-        val surrogate = MilliSatoshiSurrogate(msat = value.msat)
-        return encoder.encodeSerializableValue(MilliSatoshiSurrogate.serializer(), surrogate)
+    override fun serialize(encoder: Encoder, value: UUID) {
+        val surrogate = UUIDSurrogate(value.mostSignificantBits, value.leastSignificantBits)
+        return encoder.encodeSerializableValue(UUIDSurrogate.serializer(), surrogate)
     }
 
-    override fun deserialize(decoder: Decoder): MilliSatoshi {
-        val surrogate = decoder.decodeSerializableValue(MilliSatoshiSurrogate.serializer())
-        return MilliSatoshi(msat = surrogate.msat)
+    override fun deserialize(decoder: Decoder): UUID {
+        val surrogate = decoder.decodeSerializableValue(UUIDSurrogate.serializer())
+        return UUID(surrogate.mostSignificantBits, surrogate.leastSignificantBits)
     }
 }

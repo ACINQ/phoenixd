@@ -14,30 +14,34 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.migrations.v4.queries
 
 import fr.acinq.bitcoin.TxId
-import fr.acinq.lightning.db.SpliceCpfpOutgoingPayment
+import fr.acinq.lightning.db.SpliceOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
 
-class SpliceCpfpOutgoingQueries {
+class SpliceOutgoingQueries {
     companion object {
-        fun mapCpfp(
+        fun mapSpliceOutgoingPayment(
             id: String,
+            recipient_amount_sat: Long,
+            address: String,
             mining_fees_sat: Long,
-            channel_id: ByteArray,
             tx_id: ByteArray,
+            channel_id: ByteArray,
             created_at: Long,
             confirmed_at: Long?,
             locked_at: Long?
-        ): SpliceCpfpOutgoingPayment {
-            return SpliceCpfpOutgoingPayment(
+        ): SpliceOutgoingPayment {
+            return SpliceOutgoingPayment(
                 id = UUID.fromString(id),
+                recipientAmount = recipient_amount_sat.sat,
+                address = address,
                 miningFees = mining_fees_sat.sat,
-                channelId = channel_id.toByteVector32(),
                 txId = TxId(tx_id),
+                channelId = channel_id.toByteVector32(),
                 createdAt = created_at,
                 confirmedAt = confirmed_at,
                 lockedAt = locked_at

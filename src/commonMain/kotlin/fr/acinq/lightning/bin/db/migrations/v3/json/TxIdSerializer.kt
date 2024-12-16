@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.serializers.v1
+package fr.acinq.lightning.bin.db.migrations.v3.json
 
-import fr.acinq.bitcoin.OutPoint
-import fr.acinq.bitcoin.TxHash
+import fr.acinq.bitcoin.TxId
 
-class OutpointSerializer : AbstractStringSerializer<OutPoint>(
-    name = "Outpoint",
-    fromString = { serialized ->
-        serialized.split(":").let {
-            OutPoint(hash = TxHash(it[0]), index = it[1].toLong())
-        }
-    },
-    toString = { outpoint -> "${outpoint.hash}:${outpoint.index}" }
+object TxIdSerializer : AbstractStringSerializer<TxId>(
+    name = "TxId",
+    toString = TxId::toString,
+    fromString = ::TxId
 )

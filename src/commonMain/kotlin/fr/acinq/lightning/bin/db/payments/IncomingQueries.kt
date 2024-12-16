@@ -34,8 +34,9 @@ class IncomingQueries(private val database: PhoenixDatabase) {
         incomingPayment: IncomingPayment
     ) {
         queries.insert(
-            id = incomingPayment.id.toString(),
-            payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash?.toByteArray(),
+            id = incomingPayment.id,
+            payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash,
+            tx_id = (incomingPayment as? OnChainIncomingPayment)?.txId,
             created_at = incomingPayment.createdAt,
             received_at = incomingPayment.completedAt,
             data_ = incomingPayment
@@ -54,7 +55,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     queries.updateReceived(
                         received_at = paymentInDb1.completedAt,
                         data_ = paymentInDb1,
-                        id = paymentInDb1.id.toString()
+                        id = paymentInDb1.id
                     )
                 }
                 else -> error("unexpected type: $paymentInDb")
@@ -74,7 +75,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     queries.updateReceived(
                         received_at = lockedAt,
                         data_ = paymentInDb1,
-                        id = paymentInDb1.id.toString()
+                        id = paymentInDb1.id
                     )
                 }
                 else -> error("unexpected type: $paymentInDb")
@@ -94,7 +95,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
                     queries.updateReceived(
                         received_at = paymentInDb1.lockedAt, // keep the existing value
                         data_ = paymentInDb1,
-                        id = paymentInDb1.id.toString()
+                        id = paymentInDb1.id
                     )
                 }
                 else -> error("unexpected type: $paymentInDb")
@@ -103,11 +104,11 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     }
 
     fun getIncomingPayment(id: UUID): IncomingPayment? {
-        return queries.get(id = id.toString()).executeAsOneOrNull()?.data_
+        return queries.get(id = id).executeAsOneOrNull()?.data_
     }
 
     fun getIncomingPayment(paymentHash: ByteVector32): IncomingPayment? {
-        return queries.getByPaymentHash(payment_hash = paymentHash.toByteArray()).executeAsOneOrNull()?.data_
+        return queries.getByPaymentHash(payment_hash = paymentHash).executeAsOneOrNull()?.data_
     }
 
     fun getOldestReceivedDate(): Long? {
@@ -143,7 +144,7 @@ class IncomingQueries(private val database: PhoenixDatabase) {
     /** Try to delete an incoming payment ; return true if an element was deleted, false otherwise. */
     fun deleteIncomingPayment(paymentHash: ByteVector32): Boolean {
         return database.transactionWithResult {
-            queries.delete(payment_hash = paymentHash.toByteArray())
+            queries.delete(payment_hash = paymentHash)
             queries.changes().executeAsOne() != 0L
         }
     }

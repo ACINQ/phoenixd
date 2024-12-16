@@ -1,9 +1,13 @@
+import fr.acinq.bitcoin.ByteVector32;
+import fr.acinq.bitcoin.TxId;
 import fr.acinq.lightning.db.IncomingPayment;
+import fr.acinq.lightning.utils.UUID;
 
 -- incoming payments
 CREATE TABLE incoming_payments (
-    id TEXT NOT NULL PRIMARY KEY,
-    payment_hash BLOB UNIQUE,
+    id BLOB AS UUID NOT NULL PRIMARY KEY,
+    payment_hash BLOB AS ByteVector32 UNIQUE,
+    tx_id BLOB AS TxId,
     created_at INTEGER NOT NULL,
     received_at INTEGER DEFAULT NULL,
     data BLOB AS IncomingPayment NOT NULL
@@ -23,10 +27,11 @@ insert:
 INSERT INTO incoming_payments (
             id,
             payment_hash,
+            tx_id,
             created_at,
             received_at,
             data)
-VALUES (?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?);
 
 updateReceived:
 UPDATE incoming_payments

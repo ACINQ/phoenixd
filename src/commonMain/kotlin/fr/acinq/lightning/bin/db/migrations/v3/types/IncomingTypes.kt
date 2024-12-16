@@ -27,9 +27,8 @@ package fr.acinq.lightning.bin.db.migrations.v3.types
 
 import fr.acinq.bitcoin.*
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.lightning.bin.db.payments.DbTypesHelper.decodeBlob
-import fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData
-import fr.acinq.lightning.bin.db.serializers.v1.*
+import fr.acinq.lightning.bin.db.migrations.v3.json.*
+import fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads.FundingFeeData
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
@@ -151,14 +150,13 @@ private sealed class IncomingOriginData {
     }
 
     companion object {
-        fun deserialize(typeVersion: IncomingOriginTypeVersion, blob: ByteArray): IncomingOriginData = decodeBlob(blob) { json, format ->
+        fun deserialize(typeVersion: IncomingOriginTypeVersion, blob: ByteArray): IncomingOriginData =
             when (typeVersion) {
-                IncomingOriginTypeVersion.INVOICE_V0 -> format.decodeFromString<Invoice.V0>(json)
-                IncomingOriginTypeVersion.SWAPIN_V0 -> format.decodeFromString<SwapIn.V0>(json)
-                IncomingOriginTypeVersion.ONCHAIN_V0 -> format.decodeFromString<OnChain.V0>(json)
-                IncomingOriginTypeVersion.OFFER_V0 -> format.decodeFromString<Offer.V0>(json)
+                IncomingOriginTypeVersion.INVOICE_V0 -> Json.decodeFromString<Invoice.V0>(blob.decodeToString())
+                IncomingOriginTypeVersion.SWAPIN_V0 -> Json.decodeFromString<SwapIn.V0>(blob.decodeToString())
+                IncomingOriginTypeVersion.ONCHAIN_V0 -> Json.decodeFromString<OnChain.V0>(blob.decodeToString())
+                IncomingOriginTypeVersion.OFFER_V0 -> Json.decodeFromString<Offer.V0>(blob.decodeToString())
             }
-        }
     }
 }
 

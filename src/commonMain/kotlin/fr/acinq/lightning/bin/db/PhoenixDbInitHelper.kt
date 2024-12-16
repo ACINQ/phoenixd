@@ -1,9 +1,7 @@
 package fr.acinq.lightning.bin.db
 
 import app.cash.sqldelight.ColumnAdapter
-import app.cash.sqldelight.EnumColumnAdapter
 import app.cash.sqldelight.db.SqlDriver
-import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries
 import fr.acinq.lightning.bin.toByteArray
 import fr.acinq.lightning.db.IncomingPayment
 import fr.acinq.lightning.db.OutgoingPayment

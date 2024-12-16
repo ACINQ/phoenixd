@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package fr.acinq.lightning.bin.db.payments
+package fr.acinq.lightning.bin.db.migrations.v4.types
 
-import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.db.ChannelClosingType
-import io.ktor.utils.io.charsets.*
-import io.ktor.utils.io.core.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
@@ -33,16 +30,13 @@ enum class ClosingInfoTypeVersion {
 sealed class ClosingInfoData {
 
     @Serializable
+    @SerialName("fr.acinq.lightning.bin.db.payments.ClosingInfoData.V0")
     data class V0(val closingType: ChannelClosingType)
 
     companion object {
-        fun deserialize(typeVersion: ClosingInfoTypeVersion, blob: ByteArray): ChannelClosingType = DbTypesHelper.decodeBlob(blob) { json, format ->
+        fun deserialize(typeVersion: ClosingInfoTypeVersion, blob: ByteArray): ChannelClosingType =
             when (typeVersion) {
-                ClosingInfoTypeVersion.CLOSING_INFO_V0 -> format.decodeFromString<V0>(json).closingType
+                ClosingInfoTypeVersion.CLOSING_INFO_V0 -> Json.decodeFromString<V0>(blob.decodeToString()).closingType
             }
-        }
     }
 }
-
-fun ChannelCloseOutgoingPayment.mapClosingTypeToDb() = ClosingInfoTypeVersion.CLOSING_INFO_V0 to
-        Json.encodeToString(ClosingInfoData.V0(this.closingType)).toByteArray(Charsets.UTF_8)

@@ -22,15 +22,16 @@
     MilliSatoshiSerializer::class
 )
 
-package fr.acinq.lightning.bin.db.payments.liquidityads
+package fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads
 
 import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.ByteVector64
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.lightning.bin.db.serializers.v1.*
+import fr.acinq.lightning.bin.db.migrations.v3.json.*
 import fr.acinq.lightning.wire.LiquidityAds
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -42,6 +43,7 @@ enum class InboundLiquidityLeaseType {
 @Suppress("DEPRECATION_WARNING")
 @Deprecated("obsolete with the new on-the-fly channel funding that replaces lease with purchase")
 @Serializable
+@SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.LeaseV0")
 data class LeaseV0(
     val amount: Satoshi,
     val miningFees: Satoshi,

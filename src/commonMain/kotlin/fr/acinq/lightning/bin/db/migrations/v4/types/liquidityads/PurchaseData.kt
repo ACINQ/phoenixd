@@ -19,24 +19,24 @@
     MilliSatoshiSerializer::class
 )
 
-package fr.acinq.lightning.bin.db.payments.liquidityads
+package fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads
 
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.lightning.bin.db.payments.DbTypesHelper
-import fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.Companion.asCanonical
-import fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.Companion.asDb
-import fr.acinq.lightning.bin.db.serializers.v1.*
+import fr.acinq.lightning.bin.db.migrations.v3.json.MilliSatoshiSerializer
+import fr.acinq.lightning.bin.db.migrations.v3.json.SatoshiSerializer
+import fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads.PaymentDetailsData.Companion.asCanonical
 import fr.acinq.lightning.wire.LiquidityAds
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
 sealed class PurchaseData {
     sealed class Standard : PurchaseData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.Standard.V0")
         data class V0(
             val amount: Satoshi,
             val miningFees: Satoshi,
@@ -46,6 +46,7 @@ sealed class PurchaseData {
     }
     sealed class WithFeeCredit : PurchaseData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.WithFeeCredit.V0")
         data class V0(
             val amount: Satoshi,
             val miningFees: Satoshi,
@@ -70,21 +71,6 @@ sealed class PurchaseData {
             )
         }
 
-        private fun LiquidityAds.Purchase.asDb(): PurchaseData = when (val value = this) {
-            is LiquidityAds.Purchase.Standard -> Standard.V0(
-                amount = value.amount,
-                miningFees = value.fees.miningFee,
-                serviceFee = value.fees.serviceFee,
-                paymentDetails = value.paymentDetails.asDb()
-            )
-            is LiquidityAds.Purchase.WithFeeCredit -> WithFeeCredit.V0(
-                amount = value.amount, value.fees.miningFee,
-                serviceFee = value.fees.serviceFee,
-                paymentDetails = value.paymentDetails.asDb(),
-                feeCreditUsed = value.feeCreditUsed
-            )
-        }
-
         /**
          * Deserializes a json-encoded blob into a [LiquidityAds.Purchase] object.
          *
@@ -94,13 +80,10 @@ sealed class PurchaseData {
         fun decodeAsCanonical(
             typeVersion: String,
             blob: ByteArray,
-        ): LiquidityAds.Purchase = DbTypesHelper.decodeBlob(blob) { json, format ->
+        ): LiquidityAds.Purchase =
             when (typeVersion) {
-                InboundLiquidityLeaseType.LEASE_V0.name -> format.decodeFromString<LeaseV0>(json).toLiquidityAdsPurchase()
-                else -> format.decodeFromString<PurchaseData>(json).asCanonical()
+                InboundLiquidityLeaseType.LEASE_V0.name -> Json.decodeFromString<LeaseV0>(blob.decodeToString()).toLiquidityAdsPurchase()
+                else -> Json.decodeFromString<PurchaseData>(blob.decodeToString()).asCanonical()
             }
-        }
-
-        fun LiquidityAds.Purchase.encodeAsDb(): ByteArray = Json.encodeToString(this.asDb()).encodeToByteArray()
     }
 }

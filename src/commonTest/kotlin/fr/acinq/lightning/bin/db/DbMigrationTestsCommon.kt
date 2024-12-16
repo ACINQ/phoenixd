@@ -3,6 +3,7 @@ package fr.acinq.lightning.bin.db
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.bin.createAppDbDriver
+import fr.acinq.lightning.db.OutgoingPayment
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import okio.FileSystem
@@ -31,7 +32,13 @@ class DbMigrationTestsCommon {
         val database = createPhoenixDb(driver)
         val payments = SqlitePaymentsDb(database).listSuccessfulPayments()
         payments.forEach { println("$it") }
-        assertEquals(2188, payments.size)
+        val expectedLines =
+            2 + // channel_close_outgoing_payments
+                    1 + // inbound_liquidity_outgoing_payments
+                    739 + // incoming_payments
+                    24 + // lightning_outgoing_payments
+                    5 // splice_outgoing_payments
+        assertEquals(expectedLines, payments.size)
     }
 
 

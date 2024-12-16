@@ -18,11 +18,12 @@
     ByteVector32Serializer::class,
 )
 
-package fr.acinq.lightning.bin.db.payments.liquidityads
+package fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads
 
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.lightning.bin.db.serializers.v1.*
+import fr.acinq.lightning.bin.db.migrations.v3.json.ByteVector32Serializer
 import fr.acinq.lightning.wire.LiquidityAds
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -31,21 +32,25 @@ import kotlinx.serialization.UseSerializers
 sealed class PaymentDetailsData {
     sealed class ChannelBalance : PaymentDetailsData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.ChannelBalance.V0")
         data object V0 : ChannelBalance()
     }
 
     sealed class FutureHtlc : PaymentDetailsData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.FutureHtlc.V0")
         data class V0(val paymentHashes: List<ByteVector32>) : FutureHtlc()
     }
 
     sealed class FutureHtlcWithPreimage : PaymentDetailsData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.FutureHtlcWithPreimage.V0")
         data class V0(val preimages: List<ByteVector32>) : FutureHtlcWithPreimage()
     }
 
     sealed class ChannelBalanceForFutureHtlc : PaymentDetailsData() {
         @Serializable
+        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.ChannelBalanceForFutureHtlc.V0")
         data class V0(val paymentHashes: List<ByteVector32>) : ChannelBalanceForFutureHtlc()
     }
 
@@ -55,13 +60,6 @@ sealed class PaymentDetailsData {
             is FutureHtlc.V0 -> LiquidityAds.PaymentDetails.FromFutureHtlc(this.paymentHashes)
             is FutureHtlcWithPreimage.V0 -> LiquidityAds.PaymentDetails.FromFutureHtlcWithPreimage(this.preimages)
             is ChannelBalanceForFutureHtlc.V0 -> LiquidityAds.PaymentDetails.FromChannelBalanceForFutureHtlc(this.paymentHashes)
-        }
-
-        fun LiquidityAds.PaymentDetails.asDb(): PaymentDetailsData = when (this) {
-            is LiquidityAds.PaymentDetails.FromChannelBalance -> ChannelBalance.V0
-            is LiquidityAds.PaymentDetails.FromFutureHtlc -> FutureHtlc.V0(this.paymentHashes)
-            is LiquidityAds.PaymentDetails.FromFutureHtlcWithPreimage -> FutureHtlcWithPreimage.V0(this.preimages)
-            is LiquidityAds.PaymentDetails.FromChannelBalanceForFutureHtlc -> ChannelBalanceForFutureHtlc.V0(this.paymentHashes)
         }
     }
 }

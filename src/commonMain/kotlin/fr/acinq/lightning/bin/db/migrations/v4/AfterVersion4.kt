@@ -5,36 +5,44 @@ package fr.acinq.lightning.bin.db.migrations.v4
 import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
-import fr.acinq.lightning.bin.db.payments.*
-import fr.acinq.lightning.bin.db.payments.LightningOutgoingQueries.Companion.hopDescAdapter
+import fr.acinq.lightning.bin.db.migrations.v4.queries.*
+import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.Companion.hopDescAdapter
+import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion
+import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingDetailsTypeVersion
+import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingPartStatusTypeVersion
+import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingStatusTypeVersion
 import fr.acinq.lightning.bin.toByteArray
-import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.OnChainOutgoingPayment
+import fr.acinq.lightning.db.OutgoingPayment
 import fr.acinq.lightning.serialization.payment.Serialization
 
 val AfterVersion4 = AfterVersion(4) { driver ->
 
     val transacter = object : TransacterImpl(driver) {}
 
-    fun insertPayment(payment: WalletPayment) {
+    fun insertPayment(payment: OutgoingPayment) {
         driver.execute(
             identifier = null,
-            sql = "INSERT INTO outgoing_payments (id, payment_hash, tx_id, created_at, completed_at, data) VALUES (?, ?, ?, ?, ?, ?)",
-            parameters = 6
+            sql = "INSERT INTO outgoing_payments (id, payment_hash, tx_id, created_at, completed_at, sent_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            parameters = 7
         ) {
+            println("migrating outgoing $payment")
             val (paymentHash, txId) = when (payment) {
-                is LightningIncomingPayment -> payment.paymentHash to null
-                is OnChainIncomingPayment -> null to payment.txId
-                is LegacyPayToOpenIncomingPayment -> payment.paymentHash to null
-                is LegacySwapInIncomingPayment -> null to null
                 is LightningOutgoingPayment -> payment.paymentHash to null
                 is OnChainOutgoingPayment -> null to payment.txId
+            }
+            val sentAt = when(payment) {
+                is LightningOutgoingPayment -> if (payment.status is LightningOutgoingPayment.Status.Succeeded) payment.completedAt else null
+                is OnChainOutgoingPayment -> payment.completedAt
             }
             bindBytes(0, payment.id.toByteArray())
             bindBytes(1, paymentHash?.toByteArray())
             bindBytes(2, txId?.value?.toByteArray())
             bindLong(3, payment.createdAt)
             bindLong(4, payment.completedAt)
-            bindBytes(5, Serialization.serialize(payment))
+            bindLong(5, sentAt)
+            bindBytes(6, Serialization.serialize(payment))
         }
     }
 

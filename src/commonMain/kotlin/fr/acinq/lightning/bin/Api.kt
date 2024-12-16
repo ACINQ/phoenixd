@@ -14,7 +14,6 @@ import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.bin.api.WebsocketProtocolAuthenticationProvider
 import fr.acinq.lightning.bin.csv.WalletPaymentCsvWriter
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
-import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.Channel
 import fr.acinq.lightning.bin.json.ApiType.IncomingPayment

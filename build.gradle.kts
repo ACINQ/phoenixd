@@ -225,6 +225,7 @@ tasks.withType<JavaExec> {
 sqldelight {
     databases {
         create("PhoenixDatabase") {
+            dialect("app.cash.sqldelight:sqlite-3-24-dialect:${Versions.sqlDelight}")
             packageName.set("fr.acinq.phoenix.db")
             srcDirs.from("src/commonMain/sqldelight/phoenixdb")
         }

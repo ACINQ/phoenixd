@@ -21,47 +21,8 @@ import fr.acinq.lightning.db.ChannelCloseOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PhoenixDatabase
 
-class ChannelCloseOutgoingQueries(val database: PhoenixDatabase) {
-    private val channelCloseQueries = database.channelCloseOutgoingPaymentsQueries
-
-    fun getChannelCloseOutgoingPayment(id: UUID): ChannelCloseOutgoingPayment? {
-        return channelCloseQueries.getChannelCloseOutgoing(id.toString(), Companion::mapChannelCloseOutgoingPayment).executeAsOneOrNull()
-    }
-
-    fun addChannelCloseOutgoingPayment(payment: ChannelCloseOutgoingPayment) {
-        val (closingInfoType, closingInfoBlob) = payment.mapClosingTypeToDb()
-        database.transaction {
-            channelCloseQueries.insertChannelCloseOutgoing(
-                id = payment.id.toString(),
-                recipient_amount_sat = payment.recipientAmount.sat,
-                address = payment.address,
-                is_default_address = if (payment.isSentToDefaultAddress) 1 else 0,
-                mining_fees_sat = payment.miningFees.sat,
-                tx_id = payment.txId.value.toByteArray(),
-                created_at = payment.createdAt,
-                confirmed_at = payment.confirmedAt,
-                locked_at = payment.lockedAt,
-                channel_id = payment.channelId.toByteArray(),
-                closing_info_type = closingInfoType,
-                closing_info_blob = closingInfoBlob,
-            )
-        }
-    }
-
-    fun setConfirmed(id: UUID, confirmedAt: Long) {
-        database.transaction {
-            channelCloseQueries.setConfirmed(confirmed_at = confirmedAt, id = id.toString())
-        }
-    }
-
-    fun setLocked(id: UUID, lockedAt: Long) {
-        database.transaction {
-            channelCloseQueries.setLocked(locked_at = lockedAt, id = id.toString())
-        }
-    }
-
+class ChannelCloseOutgoingQueries {
     companion object {
         fun mapChannelCloseOutgoingPayment(
             id: String,

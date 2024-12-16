@@ -21,44 +21,8 @@ import fr.acinq.lightning.db.SpliceCpfpOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
-import fr.acinq.phoenix.db.PhoenixDatabase
 
-class SpliceCpfpOutgoingQueries(val database: PhoenixDatabase) {
-    private val cpfpQueries = database.spliceCpfpOutgoingPaymentsQueries
-
-    fun addCpfpPayment(payment: SpliceCpfpOutgoingPayment) {
-        database.transaction {
-            cpfpQueries.insertCpfp(
-                id = payment.id.toString(),
-                mining_fees_sat = payment.miningFees.sat,
-                channel_id = payment.channelId.toByteArray(),
-                tx_id = payment.txId.value.toByteArray(),
-                created_at = payment.createdAt,
-                confirmed_at = payment.confirmedAt,
-                locked_at = payment.lockedAt
-            )
-        }
-    }
-
-    fun getCpfp(id: UUID): SpliceCpfpOutgoingPayment? {
-        return cpfpQueries.getCpfp(
-            id = id.toString(),
-            mapper = Companion::mapCpfp
-        ).executeAsOneOrNull()
-    }
-
-    fun setConfirmed(id: UUID, confirmedAt: Long) {
-        database.transaction {
-            cpfpQueries.setConfirmed(confirmed_at = confirmedAt, id = id.toString())
-        }
-    }
-
-    fun setLocked(id: UUID, lockedAt: Long) {
-        database.transaction {
-            cpfpQueries.setLocked(locked_at = lockedAt, id = id.toString())
-        }
-    }
-
+class SpliceCpfpOutgoingQueries {
     companion object {
         fun mapCpfp(
             id: String,

@@ -22,6 +22,7 @@
     UUIDSerializer::class,
     OutpointSerializer::class,
 )
+@file:Suppress("DEPRECATION")
 
 package fr.acinq.lightning.bin.db.migrations.v3.types
 

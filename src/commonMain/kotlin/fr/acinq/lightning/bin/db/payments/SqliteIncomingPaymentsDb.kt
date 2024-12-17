@@ -43,7 +43,7 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
                 when (val paymentInDb = database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment) {
                     is LightningIncomingPayment -> {
                         val paymentInDb1 = paymentInDb.addReceivedParts(parts)
-                        database.paymentsIncomingQueries.updateReceived(
+                        database.paymentsIncomingQueries.update(
                             id = paymentInDb1.id,
                             data = paymentInDb1,
                             receivedAt = paymentInDb1.completedAt

@@ -45,10 +45,11 @@ INSERT INTO link_lightning_outgoing_payment_parts(
 VALUES (?, ?);
 
 update:
--- this method will update the completed_at column if a non-null value is provided,
+-- this method will update the completed_at/sent_at columns if a non-null value is provided,
 -- otherwise it will keep the existing value
 UPDATE payments_outgoing
 SET    completed_at=COALESCE(:completed_at, completed_at),
+       sent_at=COALESCE(:sent_at, sent_at),
        data=:data
 WHERE  id = :id;
 

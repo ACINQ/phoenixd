@@ -53,19 +53,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setLocked(lockedAt)
-                            database.paymentsIncomingQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = lockedAt)
+                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = lockedAt)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
                         is LightningOutgoingPayment -> {}
                         is OnChainOutgoingPayment -> {
-                            // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
-                            when (val payment1 = payment.setLocked(lockedAt)) {
-                                is InboundLiquidityOutgoingPayment ->
-                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt)
-                                else ->
-                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null)
-                            }
+                            val payment1 = payment.setLocked(lockedAt)
+                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt, sent_at = lockedAt)
                         }
                     }
                 }
@@ -86,19 +81,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setConfirmed(confirmedAt)
-                            database.paymentsIncomingQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = null)
+                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = null)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
                         is LightningOutgoingPayment -> {}
                         is OnChainOutgoingPayment -> {
-                            // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
-                            when (val payment1 = payment.setConfirmed(confirmedAt)) {
-                                is InboundLiquidityOutgoingPayment ->
-                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null)
-                                else ->
-                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = confirmedAt)
-                            }
+                            val payment1 = payment.setConfirmed(confirmedAt)
+                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null, sent_at = null)
                         }
                     }
                 }
@@ -113,7 +103,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
 
     // ---- list payments with filter
 
-    suspend fun listIncomingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean, externalId: String?): List<Pair<IncomingPayment, String?>> {
+    suspend fun listIncomingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean, externalId: String? = null): List<Pair<IncomingPayment, String?>> {
         return withContext(Dispatchers.Default) {
             if (listAll) {
                 database.paymentsIncomingQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset, externalId = externalId) { data, externalId -> data to externalId }

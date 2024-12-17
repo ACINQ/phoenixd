@@ -34,7 +34,7 @@ INSERT INTO payments_incoming (
             data)
 VALUES (?, ?, ?, ?, ?, ?);
 
-updateReceived:
+update:
 UPDATE payments_incoming
 SET    received_at=:receivedAt,
        data=:data

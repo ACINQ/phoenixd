@@ -18,6 +18,7 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                     id = parentId,
                     data = payment1,
                     completed_at = null,
+                    sent_at = null
                 )
             }
             parts.forEach { part ->
@@ -70,7 +71,8 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                 database.paymentsOutgoingQueries.update(
                     id = id,
                     data = payment1,
-                    completed_at = status.completedAt
+                    completed_at = status.completedAt,
+                    sent_at = if (status is LightningOutgoingPayment.Status.Succeeded) status.completedAt else null,
                 )
             }
         }
@@ -88,8 +90,9 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                 })
                 database.paymentsOutgoingQueries.update(
                     id = parentId,
-                    completed_at = status.completedAt,
-                    data = payment1
+                    data = payment1,
+                    completed_at = null, // parts do not update parent timestamps
+                    sent_at = null
                 )
             }
         }

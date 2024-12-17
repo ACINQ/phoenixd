@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package fr.acinq.lightning.bin.csv
 
 import fr.acinq.bitcoin.ByteVector32

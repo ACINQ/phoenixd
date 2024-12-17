@@ -24,7 +24,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     fun insertPayment(payment: OutgoingPayment) {
         driver.execute(
             identifier = null,
-            sql = "INSERT INTO outgoing_payments (id, payment_hash, tx_id, created_at, completed_at, sent_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            sql = "INSERT INTO payments_outgoing (id, payment_hash, tx_id, created_at, completed_at, sent_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
             parameters = 7
         ) {
             println("migrating outgoing $payment")

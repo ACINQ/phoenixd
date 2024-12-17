@@ -12,16 +12,16 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
     override suspend fun addLightningOutgoingPaymentParts(parentId: UUID, parts: List<LightningOutgoingPayment.Part>) {
         withContext(Dispatchers.Default) {
             database.transaction {
-                val payment = database.outgoingPaymentsQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment = database.paymentsOutgoingQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
                 val payment1 = payment.copy(parts = payment.parts + parts)
-                database.outgoingPaymentsQueries.update(
+                database.paymentsOutgoingQueries.update(
                     id = parentId,
                     data = payment1,
                     completed_at = null,
                 )
             }
             parts.forEach { part ->
-                database.outgoingPaymentsQueries.insertPartLink(part_id = part.id, parent_id = parentId)
+                database.paymentsOutgoingQueries.insertPartLink(part_id = part.id, parent_id = parentId)
             }
         }
     }
@@ -31,7 +31,7 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
             database.transaction {
                 when (outgoingPayment) {
                     is LightningOutgoingPayment -> {
-                        database.outgoingPaymentsQueries.insert(
+                        database.paymentsOutgoingQueries.insert(
                             id = outgoingPayment.id,
                             payment_hash = outgoingPayment.paymentHash,
                             tx_id = null,
@@ -43,7 +43,7 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                         )
                     }
                     is OnChainOutgoingPayment -> {
-                        database.outgoingPaymentsQueries.insert(
+                        database.paymentsOutgoingQueries.insert(
                             id = outgoingPayment.id,
                             payment_hash = null,
                             tx_id = outgoingPayment.txId,
@@ -65,9 +65,9 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
     override suspend fun completeLightningOutgoingPayment(id: UUID, status: LightningOutgoingPayment.Status.Completed) {
         withContext(Dispatchers.Default) {
             database.transaction {
-                val payment = database.outgoingPaymentsQueries.get(id).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment = database.paymentsOutgoingQueries.get(id).executeAsOneOrNull() as LightningOutgoingPayment
                 val payment1 = payment.copy(status = status)
-                database.outgoingPaymentsQueries.update(
+                database.paymentsOutgoingQueries.update(
                     id = id,
                     data = payment1,
                     completed_at = status.completedAt
@@ -79,14 +79,14 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
     override suspend fun completeLightningOutgoingPaymentPart(parentId: UUID, partId: UUID, status: LightningOutgoingPayment.Part.Status.Completed) {
         withContext(Dispatchers.Default) {
             database.transaction {
-                val payment = database.outgoingPaymentsQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
+                val payment = database.paymentsOutgoingQueries.get(parentId).executeAsOneOrNull() as LightningOutgoingPayment
                 val payment1 = payment.copy(parts = payment.parts.map {
                     when {
                         it.id == partId -> it.copy(status = status)
                         else -> it
                     }
                 })
-                database.outgoingPaymentsQueries.update(
+                database.paymentsOutgoingQueries.update(
                     id = parentId,
                     completed_at = status.completedAt,
                     data = payment1
@@ -97,7 +97,7 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
 
     override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
         return withContext(Dispatchers.Default) {
-            database.outgoingPaymentsQueries.listByTxId(fundingTxId).executeAsList()
+            database.paymentsOutgoingQueries.listByTxId(fundingTxId).executeAsList()
                 .filterIsInstance<InboundLiquidityOutgoingPayment>()
                 .firstOrNull()
         }
@@ -105,20 +105,22 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
 
     override suspend fun getLightningOutgoingPayment(id: UUID): LightningOutgoingPayment? {
         return withContext(Dispatchers.Default) {
-            database.outgoingPaymentsQueries.get(id).executeAsOneOrNull() as? LightningOutgoingPayment
+            database.paymentsOutgoingQueries.get(id).executeAsOneOrNull() as? LightningOutgoingPayment
         }
     }
 
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? {
-        return database.transactionWithResult {
-            val paymentId = database.outgoingPaymentsQueries.getParentId(partId).executeAsOneOrNull()!!
-            database.outgoingPaymentsQueries.get(paymentId).executeAsOneOrNull() as? LightningOutgoingPayment
+        return withContext(Dispatchers.Default) {
+        database.transactionWithResult {
+            val paymentId = database.paymentsOutgoingQueries.getParentId(partId).executeAsOneOrNull()!!
+            database.paymentsOutgoingQueries.get(paymentId).executeAsOneOrNull() as? LightningOutgoingPayment
         }
+            }
     }
 
     override suspend fun listLightningOutgoingPayments(paymentHash: ByteVector32): List<LightningOutgoingPayment> {
         return withContext(Dispatchers.Default) {
-            database.outgoingPaymentsQueries.listByPaymentHash(paymentHash).executeAsList().filterIsInstance<LightningOutgoingPayment>()
+            database.paymentsOutgoingQueries.listByPaymentHash(paymentHash).executeAsList().filterIsInstance<LightningOutgoingPayment>()
         }
     }
 }

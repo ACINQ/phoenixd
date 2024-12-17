@@ -11,7 +11,7 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
     override suspend fun addIncomingPayment(incomingPayment: IncomingPayment) {
         return withContext(Dispatchers.Default) {
             database.transaction {
-                database.incomingPaymentsQueries.insert(
+                database.paymentsIncomingQueries.insert(
                     id = incomingPayment.id,
                     payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash,
                     tx_id = (incomingPayment as? OnChainIncomingPayment)?.txId,
@@ -34,16 +34,16 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
 
     override suspend fun getLightningIncomingPayment(paymentHash: ByteVector32): LightningIncomingPayment? =
         withContext(Dispatchers.Default) {
-            database.incomingPaymentsQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment
+            database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment
         }
 
     override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Part>) {
         withContext(Dispatchers.Default) {
             database.transaction {
-                when (val paymentInDb = database.incomingPaymentsQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment) {
+                when (val paymentInDb = database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment) {
                     is LightningIncomingPayment -> {
                         val paymentInDb1 = paymentInDb.addReceivedParts(parts)
-                        database.incomingPaymentsQueries.updateReceived(
+                        database.paymentsIncomingQueries.updateReceived(
                             id = paymentInDb1.id,
                             data = paymentInDb1,
                             receivedAt = paymentInDb1.completedAt
@@ -56,14 +56,18 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
     }
 
     override suspend fun listLightningExpiredPayments(fromCreatedAt: Long, toCreatedAt: Long): List<LightningIncomingPayment> =
-        database.incomingPaymentsQueries.list(created_at_from = fromCreatedAt, created_at_to = toCreatedAt, externalId = null, offset = 0, limit = Long.MAX_VALUE)
-            .executeAsList()
-            .filterIsInstance<Bolt11IncomingPayment>()
-            .filter { it.parts.isEmpty() && it.paymentRequest.isExpired() }
+        withContext(Dispatchers.Default) {
+            database.paymentsIncomingQueries.list(created_at_from = fromCreatedAt, created_at_to = toCreatedAt, externalId = null, offset = 0, limit = Long.MAX_VALUE)
+                .executeAsList()
+                .filterIsInstance<Bolt11IncomingPayment>()
+                .filter { it.parts.isEmpty() && it.paymentRequest.isExpired() }
+        }
 
     override suspend fun removeLightningIncomingPayment(paymentHash: ByteVector32): Boolean =
-        database.transactionWithResult {
-            database.incomingPaymentsQueries.delete(payment_hash = paymentHash)
-            database.incomingPaymentsQueries.changes().executeAsOne() != 0L
-    }
+        withContext(Dispatchers.Default) {
+            database.transactionWithResult {
+                database.paymentsIncomingQueries.delete(payment_hash = paymentHash)
+                database.paymentsIncomingQueries.changes().executeAsOne() != 0L
+            }
+        }
 }

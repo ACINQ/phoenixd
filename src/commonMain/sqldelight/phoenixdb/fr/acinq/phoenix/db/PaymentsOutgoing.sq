@@ -3,7 +3,7 @@ import fr.acinq.bitcoin.TxId;
 import fr.acinq.lightning.db.OutgoingPayment;
 import fr.acinq.lightning.utils.UUID;
 
-CREATE TABLE outgoing_payments (
+CREATE TABLE payments_outgoing (
     id BLOB AS UUID NOT NULL PRIMARY KEY,
     payment_hash BLOB AS ByteVector32,
     tx_id BLOB AS TxId,
@@ -13,12 +13,12 @@ CREATE TABLE outgoing_payments (
     data BLOB AS OutgoingPayment NOT NULL
 );
 
-CREATE INDEX outgoing_payments_payment_hash_idx ON outgoing_payments(payment_hash);
-CREATE INDEX outgoing_payments_tx_id_idx ON outgoing_payments(tx_id);
+CREATE INDEX payments_outgoing_payment_hash_idx ON payments_outgoing(payment_hash);
+CREATE INDEX payments_outgoing_tx_id_idx ON payments_outgoing(tx_id);
 
 -- Create indexes to optimize the queries in AggregatedQueries.
 -- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX outgoing_payments_filter_idx ON outgoing_payments(completed_at) WHERE completed_at IS NOT NULL;
+CREATE INDEX payments_outgoing_filter_idx ON payments_outgoing(completed_at) WHERE completed_at IS NOT NULL;
 
 CREATE TABLE link_lightning_outgoing_payment_parts (
     part_id BLOB AS UUID NOT NULL PRIMARY KEY,
@@ -28,7 +28,7 @@ CREATE TABLE link_lightning_outgoing_payment_parts (
 -- queries
 
 insert:
-INSERT INTO outgoing_payments (
+INSERT INTO payments_outgoing (
             id,
             payment_hash,
             tx_id,
@@ -47,14 +47,14 @@ VALUES (?, ?);
 update:
 -- this method will update the completed_at column if a non-null value is provided,
 -- otherwise it will keep the existing value
-UPDATE outgoing_payments
+UPDATE payments_outgoing
 SET    completed_at=COALESCE(:completed_at, completed_at),
        data=:data
 WHERE  id = :id;
 
 get:
 SELECT data
-FROM   outgoing_payments
+FROM   payments_outgoing
 WHERE  id=?;
 
 getParentId:
@@ -64,28 +64,28 @@ WHERE  part_id=?;
 
 listByPaymentHash:
 SELECT data
-FROM   outgoing_payments
+FROM   payments_outgoing
 WHERE  payment_hash=?;
 
 listByTxId:
 SELECT data
-FROM   outgoing_payments
+FROM   payments_outgoing
 WHERE  tx_id=?;
 
 deleteByPaymentHash:
-DELETE FROM outgoing_payments
+DELETE FROM payments_outgoing
 WHERE payment_hash = ?;
 
 list:
 SELECT data
-FROM  outgoing_payments
+FROM  payments_outgoing
 WHERE
     created_at BETWEEN :created_at_from AND :created_at_to
 LIMIT :limit OFFSET :offset;
 
 listSuccessful:
 SELECT data
-FROM  outgoing_payments
+FROM  payments_outgoing
 WHERE
     sent_at BETWEEN :sent_at_from AND :sent_at_to
 LIMIT :limit OFFSET :offset;

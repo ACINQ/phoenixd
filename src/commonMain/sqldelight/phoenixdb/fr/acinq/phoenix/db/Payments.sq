@@ -2,10 +2,10 @@ CREATE VIEW payments
 AS SELECT id, created_at, completed_at, data
 FROM (
     SELECT id, created_at, received_at AS completed_at, data
-    FROM incoming_payments
+    FROM payments_incoming
 UNION ALL
     SELECT id, created_at, sent_at AS completed_at, data
-    FROM outgoing_payments
+    FROM payments_outgoing
 );
 
 list:

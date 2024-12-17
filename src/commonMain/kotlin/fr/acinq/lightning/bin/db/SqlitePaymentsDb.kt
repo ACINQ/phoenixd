@@ -53,7 +53,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setLocked(lockedAt)
-                            database.incomingPaymentsQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = lockedAt)
+                            database.paymentsIncomingQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = lockedAt)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
@@ -62,9 +62,9 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                             // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
                             when (val payment1 = payment.setLocked(lockedAt)) {
                                 is InboundLiquidityOutgoingPayment ->
-                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt)
+                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt)
                                 else ->
-                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = null)
+                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null)
                             }
                         }
                     }
@@ -86,7 +86,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setConfirmed(confirmedAt)
-                            database.incomingPaymentsQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = null)
+                            database.paymentsIncomingQueries.updateReceived(id = payment1.id, data = payment1, receivedAt = null)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
@@ -95,9 +95,9 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                             // NB: the completed status uses either the locked or confirmed timestamp, depending on the on-chain payment type
                             when (val payment1 = payment.setConfirmed(confirmedAt)) {
                                 is InboundLiquidityOutgoingPayment ->
-                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = null)
+                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null)
                                 else ->
-                                    database.outgoingPaymentsQueries.update(id = payment1.id, data = payment1, completed_at = confirmedAt)
+                                    database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = confirmedAt)
                             }
                         }
                     }
@@ -108,7 +108,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
     /** Will return either [LightningIncomingPayment] or [LegacyPayToOpenIncomingPayment] (useful for backward compatibility). */
     suspend fun getIncomingPayment(paymentHash: ByteVector32): IncomingPayment? =
         withContext(Dispatchers.Default) {
-            database.incomingPaymentsQueries.getByPaymentHash(paymentHash).executeAsOneOrNull()
+            database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull()
         }
 
     // ---- list payments with filter
@@ -116,10 +116,10 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
     suspend fun listIncomingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean, externalId: String?): List<Pair<IncomingPayment, String?>> {
         return withContext(Dispatchers.Default) {
             if (listAll) {
-                database.incomingPaymentsQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset, externalId = externalId) { data, externalId -> data to externalId }
+                database.paymentsIncomingQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset, externalId = externalId) { data, externalId -> data to externalId }
                     .executeAsList()
             } else {
-                database.incomingPaymentsQueries.listSuccessful(received_at_from = from, received_at_to = to, limit = limit, offset = offset, externalId = externalId) { data, externalId -> data to externalId }
+                database.paymentsIncomingQueries.listSuccessful(received_at_from = from, received_at_to = to, limit = limit, offset = offset, externalId = externalId) { data, externalId -> data to externalId }
                     .executeAsList()
             }
         }
@@ -128,9 +128,9 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
     suspend fun listOutgoingPayments(from: Long, to: Long, limit: Long, offset: Long, listAll: Boolean): List<OutgoingPayment> {
         return withContext(Dispatchers.Default) {
             if (listAll) {
-                database.outgoingPaymentsQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset).executeAsList()
+                database.paymentsOutgoingQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset).executeAsList()
             } else {
-                database.outgoingPaymentsQueries.listSuccessful(sent_at_from = from, sent_at_to = to, limit = limit, offset = offset).executeAsList()
+                database.paymentsOutgoingQueries.listSuccessful(sent_at_from = from, sent_at_to = to, limit = limit, offset = offset).executeAsList()
             }
         }
     }

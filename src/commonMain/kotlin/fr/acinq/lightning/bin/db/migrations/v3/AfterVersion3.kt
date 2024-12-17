@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package fr.acinq.lightning.bin.db.migrations.v3
 
 import app.cash.sqldelight.TransacterImpl
@@ -39,28 +41,13 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             }
         ).value
 
-        listOf(
-            "DROP TABLE incoming_payments",
-            """
-                CREATE TABLE incoming_payments (
-                id BLOB NOT NULL PRIMARY KEY,
-                payment_hash BLOB UNIQUE,
-                tx_id BLOB,
-                created_at INTEGER NOT NULL,
-                received_at INTEGER DEFAULT NULL,
-                data BLOB NOT NULL
-            )
-            """.trimIndent(),
-            "CREATE INDEX incoming_payments_payment_hash_idx ON incoming_payments(payment_hash)",
-        ).forEach { sql ->
-            driver.execute(identifier = null, sql = sql, parameters = 0)
-        }
+        driver.execute(identifier = null, sql = "DROP TABLE incoming_payments", parameters = 0)
 
         payments
             .forEach { payment ->
                 driver.execute(
                     identifier = null,
-                    sql = "INSERT INTO incoming_payments (id, payment_hash, tx_id, created_at, received_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+                    sql = "INSERT INTO payments_incoming (id, payment_hash, tx_id, created_at, received_at, data) VALUES (?, ?, ?, ?, ?, ?)",
                     parameters = 6
                 ) {
                     println("migrating incoming $payment")
@@ -88,7 +75,7 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             sql = """
                 SELECT payments.id, lower(hex(payments.payment_hash))
                 FROM link_tx_to_payments link
-                JOIN incoming_payments payments ON link.id=lower(hex(payments.payment_hash))
+                JOIN payments_incoming payments ON link.id=lower(hex(payments.payment_hash))
                 WHERE link.type=1
             """.trimIndent(),
             parameters = 0,
@@ -125,7 +112,7 @@ val AfterVersion3 = AfterVersion(3) { driver ->
             sql = """
                 SELECT payments.id, lower(hex(payments.payment_hash))
                 FROM payments_metadata meta
-                JOIN incoming_payments payments ON meta.id=lower(hex(payments.payment_hash))
+                JOIN payments_incoming payments ON meta.id=lower(hex(payments.payment_hash))
                 WHERE meta.type=1
             """.trimIndent(),
             parameters = 0,

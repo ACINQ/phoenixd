@@ -4,7 +4,7 @@ import fr.acinq.lightning.db.IncomingPayment;
 import fr.acinq.lightning.utils.UUID;
 
 -- incoming payments
-CREATE TABLE incoming_payments (
+CREATE TABLE payments_incoming (
     id BLOB AS UUID NOT NULL PRIMARY KEY,
     payment_hash BLOB AS ByteVector32 UNIQUE,
     tx_id BLOB AS TxId,
@@ -13,18 +13,19 @@ CREATE TABLE incoming_payments (
     data BLOB AS IncomingPayment NOT NULL
 );
 
-CREATE INDEX incoming_payments_payment_hash_idx ON incoming_payments(payment_hash);
+CREATE INDEX payments_incoming_payment_hash_idx ON payments_incoming(payment_hash);
+CREATE INDEX payments_incoming_tx_id_idx ON payments_incoming(tx_id);
 
 -- Create indexes to optimize the queries in AggregatedQueries.
 -- Tip: Use "explain query plan" to ensure they're actually being used.
-CREATE INDEX incoming_payments_filter_idx
-    ON incoming_payments(received_at)
+CREATE INDEX payments_incoming_filter_idx
+    ON payments_incoming(received_at)
  WHERE received_at IS NOT NULL;
 
 -- queries
 
 insert:
-INSERT INTO incoming_payments (
+INSERT INTO payments_incoming (
             id,
             payment_hash,
             tx_id,
@@ -34,31 +35,31 @@ INSERT INTO incoming_payments (
 VALUES (?, ?, ?, ?, ?, ?);
 
 updateReceived:
-UPDATE incoming_payments
+UPDATE payments_incoming
 SET    received_at=:receivedAt,
        data=:data
 WHERE  id=:id;
 
 get:
 SELECT data
-FROM   incoming_payments
+FROM   payments_incoming
 WHERE  id=?;
 
 getByPaymentHash:
 SELECT data
-FROM   incoming_payments
+FROM   payments_incoming
 WHERE  payment_hash=?;
 
 getOldestReceivedDate:
 SELECT   received_at
-FROM     incoming_payments AS r
+FROM     payments_incoming AS r
 WHERE    received_at IS NOT NULL
 ORDER BY r.received_at ASC
 LIMIT 1;
 
 list:
 SELECT payment.data, meta.external_id
-FROM   incoming_payments AS payment
+FROM   payments_incoming AS payment
 LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE
     (:externalId IS NULL OR meta.external_id=:externalId)
@@ -68,7 +69,7 @@ LIMIT :limit OFFSET :offset;
 
 listSuccessful:
 SELECT payment.data, meta.external_id
-FROM   incoming_payments AS payment
+FROM   payments_incoming AS payment
 LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
 WHERE
     (:externalId IS NULL OR meta.external_id=:externalId)
@@ -77,7 +78,7 @@ ORDER BY payment.received_at DESC
 LIMIT :limit OFFSET :offset;
 
 delete:
-DELETE FROM incoming_payments
+DELETE FROM payments_incoming
 WHERE payment_hash = ?;
 
 -- use this in a `transaction` block to know how many rows were changed after an UPDATE

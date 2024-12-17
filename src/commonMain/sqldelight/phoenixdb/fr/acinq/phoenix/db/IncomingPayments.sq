@@ -40,12 +40,12 @@ SET    received_at=:receivedAt,
 WHERE  id=:id;
 
 get:
-SELECT *
+SELECT data
 FROM   incoming_payments
 WHERE  id=?;
 
 getByPaymentHash:
-SELECT *
+SELECT data
 FROM   incoming_payments
 WHERE  payment_hash=?;
 
@@ -56,60 +56,25 @@ WHERE    received_at IS NOT NULL
 ORDER BY r.received_at ASC
 LIMIT 1;
 
-listReceivedWithin:
-SELECT payment.*, meta.external_id
-FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
-WHERE  received_at IS NOT NULL AND received_at BETWEEN :from AND :to
-ORDER BY
-        coalesce(received_at, payment.created_at) DESC,
-        payment_hash DESC
-LIMIT :limit OFFSET :offset;
-
-listReceivedForExternalIdWithin:
-SELECT payment.*, meta.external_id
-FROM   incoming_payments AS payment
-LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
-WHERE  meta.external_id = :externalId AND received_at IS NOT NULL AND received_at BETWEEN :from AND :to
-ORDER BY
-        coalesce(received_at, payment.created_at) DESC,
-        payment_hash DESC
-LIMIT :limit OFFSET :offset;
-
-listCreatedWithin:
+list:
 SELECT payment.data, meta.external_id
 FROM   incoming_payments AS payment
 LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
-WHERE  payment.created_at BETWEEN :from AND :to
-ORDER BY
-       coalesce(received_at, payment.created_at) DESC,
-       payment_hash DESC
+WHERE
+    (:externalId IS NULL OR meta.external_id=:externalId)
+    AND payment.created_at BETWEEN :created_at_from AND :created_at_to
+ORDER BY payment.created_at DESC
 LIMIT :limit OFFSET :offset;
 
-listCreatedForExternalIdWithin:
+listSuccessful:
 SELECT payment.data, meta.external_id
 FROM   incoming_payments AS payment
 LEFT OUTER JOIN payments_metadata AS meta ON meta.id = payment.id
-WHERE  meta.external_id = :externalId
-AND    payment.created_at BETWEEN :from AND :to
-ORDER BY
-       coalesce(received_at, payment.created_at) DESC,
-       payment_hash DESC
+WHERE
+    (:externalId IS NULL OR meta.external_id=:externalId)
+    AND payment.received_at BETWEEN :received_at_from AND :received_at_to
+ORDER BY payment.received_at DESC
 LIMIT :limit OFFSET :offset;
-
-listCreatedWithinNoPaging:
-SELECT data
-FROM   incoming_payments
-WHERE  created_at BETWEEN :from AND :to
-ORDER BY
-       coalesce(received_at, created_at) DESC,
-       payment_hash DESC;
-
-scanCompleted:
-SELECT payment_hash,
-       received_at
-FROM   incoming_payments
-WHERE  received_at IS NOT NULL;
 
 delete:
 DELETE FROM incoming_payments

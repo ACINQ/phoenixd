@@ -213,18 +213,14 @@ class Api(
                     }
                 }
                 get("payments/incoming") {
-                    val listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list incoming payments that have been received
-                    val externalId = call.parameters["externalId"] // may filter incoming payments by an external id
-                    val from = call.parameters.getOptionalLong("from") ?: 0L
-                    val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
-                    val limit = call.parameters.getOptionalLong("limit") ?: 20
-                    val offset = call.parameters.getOptionalLong("offset") ?: 0
-
-                    val payments = if (externalId.isNullOrBlank()) {
-                        paymentDb.listIncomingPayments(from, to, limit, offset, listAll)
-                    } else {
-                        paymentDb.listIncomingPaymentsForExternalId(externalId, from, to, limit, offset, listAll)
-                    }.map { (payment, externalId) ->
+                    val payments = paymentDb.listIncomingPayments(
+                        from = call.parameters.getOptionalLong("from") ?: 0L,
+                        to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis(),
+                        limit = call.parameters.getOptionalLong("limit") ?: 20,
+                        offset = call.parameters.getOptionalLong("offset") ?: 0,
+                        listAll = call.parameters["all"]?.toBoolean() ?: false, // by default, only list incoming payments that have been received
+                        externalId = call.parameters["externalId"] // may filter incoming payments by an external id
+                    ).map { (payment, externalId) ->
                         when (payment) {
                             is LightningIncomingPayment -> IncomingPayment(payment, externalId)
                             is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, externalId)

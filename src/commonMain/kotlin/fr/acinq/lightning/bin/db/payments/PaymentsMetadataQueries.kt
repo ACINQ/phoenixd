@@ -12,7 +12,7 @@ class PaymentsMetadataQueries(private val database: PhoenixDatabase) {
     private val queries = database.paymentsMetadataQueries
 
     fun insert(paymentHash: ByteVector32, externalId: String?, webhookUrl: Url?) {
-        queries.insert(id = paymentHash.deriveUUID(), external_id = externalId, webhook_url = webhookUrl, created_at = currentTimestampMillis())
+        queries.insert(payment_id = paymentHash.deriveUUID(), external_id = externalId, webhook_url = webhookUrl, created_at = currentTimestampMillis())
     }
 
     fun get(paymentHash: ByteVector32): PaymentMetadata? {

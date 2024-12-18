@@ -5,6 +5,7 @@ package fr.acinq.lightning.bin.db.migrations.v4
 import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
+import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.bin.db.migrations.v4.queries.*
 import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.Companion.hopDescAdapter
 import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion
@@ -16,6 +17,8 @@ import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.db.OnChainOutgoingPayment
 import fr.acinq.lightning.db.OutgoingPayment
 import fr.acinq.lightning.serialization.payment.Serialization
+import fr.acinq.lightning.utils.UUID
+import io.ktor.http.*
 
 val AfterVersion4 = AfterVersion(4) { driver ->
 
@@ -193,6 +196,43 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             }
         )
 
+        val metadataLinks = driver.executeQuery(
+            identifier = null,
+            sql = """
+                SELECT id, external_id, webhook_url, created_at
+                FROM payments_metadata_old
+            """.trimIndent(),
+            parameters = 0,
+            mapper = { cursor ->
+                val result = buildList {
+                    while (cursor.next().value) {
+                        val paymentId = UUID.fromString(cursor.getString(0)!!)
+                        val externalId = cursor.getString(1)
+                        val webhookUrl = cursor.getString(2)?.let { Url(it) }
+                        val createdAt = cursor.getLong(3)!!
+                        add(paymentId to PaymentMetadata(externalId = externalId, webhookUrl = webhookUrl, createdAt = createdAt))
+                    }
+                }
+                QueryResult.Value(result)
+            }
+        ).value
+
+        metadataLinks
+            .forEach { (paymentId, metadata) ->
+                driver.execute(
+                    identifier = null,
+                    sql = """
+                        INSERT INTO payments_metadata (payment_id, external_id, webhook_url, created_at) VALUES (?, ?, ?, ?)
+                    """.trimIndent(),
+                    parameters = 4
+                ) {
+                    bindBytes(0, paymentId.toByteArray())
+                    bindString(1, metadata.externalId)
+                    bindString(2, metadata.webhookUrl.toString())
+                    bindLong(3, metadata.createdAt)
+                }
+            }
+
         listOf(
             "DROP TABLE lightning_outgoing_payments",
             "DROP TABLE lightning_outgoing_payment_parts",
@@ -200,6 +240,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             "DROP TABLE splice_outgoing_payments",
             "DROP TABLE splice_cpfp_outgoing_payments",
             "DROP TABLE channel_close_outgoing_payments",
+            "DROP TABLE payments_metadata_old",
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

@@ -24,6 +24,23 @@ CREATE TABLE link_lightning_outgoing_payment_parts (
     parent_id BLOB AS UUID NOT NULL
 );
 
+-- This table will be read then deleted in the code migration
+ALTER TABLE payments_metadata RENAME TO payments_metadata_old;
+DROP INDEX payments_metadata_external_id;
+
+-- This table stores metadata corresponding to a payment. Does not contain critical data.
+-- * id          => uuid identifier of the payment
+-- * external_id => an arbitrary string defined by the user to track the payment in their own system
+-- * webhook_url => a webhook url that will be notified for that specific payment
+CREATE TABLE payments_metadata (
+    payment_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    external_id TEXT,
+    webhook_url TEXT AS Url,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
+
 CREATE VIEW payments
 AS SELECT id, created_at, completed_at, data
 FROM (

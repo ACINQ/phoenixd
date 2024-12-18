@@ -9,7 +9,7 @@ CREATE TABLE on_chain_txs (
     locked_at INTEGER DEFAULT NULL
 );
 
-CREATE INDEX on_chain_txs_txid ON on_chain_txs(tx_id);
+CREATE INDEX on_chain_txs_tx_id ON on_chain_txs(tx_id);
 
 insert:
 INSERT INTO on_chain_txs(
@@ -33,7 +33,7 @@ FROM on_chain_txs t
 JOIN payments p ON t.payment_id=p.id
 WHERE confirmed_at IS NULL;
 
-listByTxid:
+listByTxId:
 SELECT data
 FROM on_chain_txs t
 JOIN payments p ON t.payment_id=p.id

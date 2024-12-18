@@ -41,6 +41,15 @@ CREATE TABLE payments_metadata (
 
 CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
 
+CREATE TABLE on_chain_txs (
+    payment_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    tx_id BLOB AS TxId NOT NULL,
+    confirmed_at INTEGER DEFAULT NULL,
+    locked_at INTEGER DEFAULT NULL
+);
+
+CREATE INDEX on_chain_txs_tx_id ON on_chain_txs(tx_id);
+
 CREATE VIEW payments
 AS SELECT id, created_at, completed_at, data
 FROM (

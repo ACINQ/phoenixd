@@ -72,6 +72,7 @@ sealed class LightningOutgoingDetailsData {
                     )
                 }
                 LightningOutgoingDetailsTypeVersion.SWAPOUT_V0 -> Json.decodeFromString<SwapOut.V0>(blob.decodeToString()).let {
+                    @Suppress("DEPRECATION")
                     LightningOutgoingPayment.Details.SwapOut(
                         address = it.address,
                         paymentRequest = Bolt11Invoice.read(it.paymentRequest).get(),

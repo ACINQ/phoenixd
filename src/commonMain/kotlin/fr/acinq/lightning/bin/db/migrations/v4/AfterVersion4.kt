@@ -37,7 +37,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                 is LightningOutgoingPayment -> payment.paymentHash to null
                 is OnChainOutgoingPayment -> null to payment.txId
             }
-            val sentAt = when(payment) {
+            val sentAt = when (payment) {
                 is LightningOutgoingPayment -> if (payment.status is LightningOutgoingPayment.Status.Succeeded) payment.completedAt else null
                 is OnChainOutgoingPayment -> payment.completedAt
             }
@@ -201,18 +201,19 @@ val AfterVersion4 = AfterVersion(4) { driver ->
         val metadataLinks = driver.executeQuery(
             identifier = null,
             sql = """
-                SELECT id, external_id, webhook_url, created_at
+                SELECT type, id, external_id, webhook_url, created_at
                 FROM payments_metadata_old
             """.trimIndent(),
             parameters = 0,
             mapper = { cursor ->
                 val result = buildList {
                     while (cursor.next().value) {
-                        val paymentId = UUID.fromString(cursor.getString(0)!!)
-                        val externalId = cursor.getString(1)
-                        val webhookUrl = cursor.getString(2)?.let { Url(it) }
-                        val createdAt = cursor.getLong(3)!!
-                        add(paymentId to PaymentMetadata(externalId = externalId, webhookUrl = webhookUrl, createdAt = createdAt))
+                        val type = cursor.getLong(0)!!
+                        val id = cursor.getString(1)!!.let { if (type == 1L) ByteVector32(it).deriveUUID() else UUID.fromString(it) }
+                        val externalId = cursor.getString(2)
+                        val webhookUrl = cursor.getString(3)?.let { Url(it) }
+                        val createdAt = cursor.getLong(4)!!
+                        add(id to PaymentMetadata(externalId = externalId, webhookUrl = webhookUrl, createdAt = createdAt))
                     }
                 }
                 QueryResult.Value(result)
@@ -249,7 +250,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                     while (cursor.next().value) {
                         val txId = cursor.getBytes(0)!!
                         val type = cursor.getLong(1)!!
-                        val id = cursor.getString(2)!!.let { if (type == 0L) ByteVector32(it).deriveUUID() else UUID.fromString(it) }
+                        val id = cursor.getString(2)!!.let { if (type == 1L) ByteVector32(it).deriveUUID() else UUID.fromString(it) }
                         val confirmedAt = cursor.getLong(3)
                         val lockedAt = cursor.getLong(4)
                         add(OnChainLink(txId = txId, paymentId = id, confirmedAt = confirmedAt, lockedAt = lockedAt))

@@ -36,7 +36,7 @@ import kotlinx.serialization.json.Json
 sealed class PurchaseData {
     sealed class Standard : PurchaseData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.Standard.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PurchaseData.Standard.V0")
         data class V0(
             val amount: Satoshi,
             val miningFees: Satoshi,
@@ -46,7 +46,7 @@ sealed class PurchaseData {
     }
     sealed class WithFeeCredit : PurchaseData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PurchaseData.WithFeeCredit.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PurchaseData.WithFeeCredit.V0")
         data class V0(
             val amount: Satoshi,
             val miningFees: Satoshi,

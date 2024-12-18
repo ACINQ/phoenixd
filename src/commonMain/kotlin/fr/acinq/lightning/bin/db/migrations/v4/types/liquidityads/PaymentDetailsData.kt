@@ -32,25 +32,25 @@ import kotlinx.serialization.UseSerializers
 sealed class PaymentDetailsData {
     sealed class ChannelBalance : PaymentDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.ChannelBalance.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PaymentDetailsData.ChannelBalance.V0")
         data object V0 : ChannelBalance()
     }
 
     sealed class FutureHtlc : PaymentDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.FutureHtlc.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PaymentDetailsData.FutureHtlc.V0")
         data class V0(val paymentHashes: List<ByteVector32>) : FutureHtlc()
     }
 
     sealed class FutureHtlcWithPreimage : PaymentDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.FutureHtlcWithPreimage.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PaymentDetailsData.FutureHtlcWithPreimage.V0")
         data class V0(val preimages: List<ByteVector32>) : FutureHtlcWithPreimage()
     }
 
     sealed class ChannelBalanceForFutureHtlc : PaymentDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.PaymentDetailsData.ChannelBalanceForFutureHtlc.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.liquidityads.PaymentDetailsData.ChannelBalanceForFutureHtlc.V0")
         data class V0(val paymentHashes: List<ByteVector32>) : ChannelBalanceForFutureHtlc()
     }
 

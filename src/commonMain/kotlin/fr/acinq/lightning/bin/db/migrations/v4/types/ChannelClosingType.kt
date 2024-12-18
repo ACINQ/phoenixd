@@ -30,7 +30,7 @@ enum class ClosingInfoTypeVersion {
 sealed class ClosingInfoData {
 
     @Serializable
-    @SerialName("fr.acinq.lightning.bin.db.payments.ClosingInfoData.V0")
+    @SerialName("fr.acinq.phoenix.db.payments.ClosingInfoData.V0")
     data class V0(val closingType: ChannelClosingType)
 
     companion object {

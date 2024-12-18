@@ -46,19 +46,19 @@ sealed class LightningOutgoingDetailsData {
 
     sealed class Normal : LightningOutgoingDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingDetailsData.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingDetailsData.V0")
         data class V0(val paymentRequest: String) : Normal()
     }
 
     sealed class SwapOut : LightningOutgoingDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.SwapOut.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.SwapOut.V0")
         data class V0(val address: String, val paymentRequest: String, val swapOutFee: Satoshi) : SwapOut()
     }
 
     sealed class Blinded : LightningOutgoingDetailsData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.Blinded.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.Blinded.V0")
         data class V0(val paymentRequest: String, val payerKey: String) : Blinded()
     }
 

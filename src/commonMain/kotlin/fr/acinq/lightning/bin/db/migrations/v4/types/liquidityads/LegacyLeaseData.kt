@@ -43,7 +43,7 @@ enum class InboundLiquidityLeaseType {
 @Suppress("DEPRECATION_WARNING")
 @Deprecated("obsolete with the new on-the-fly channel funding that replaces lease with purchase")
 @Serializable
-@SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.LeaseV0")
+@SerialName("fr.acinq.phoenix.db.payments.liquidityads.LeaseV0")
 data class LeaseV0(
     val amount: Satoshi,
     val miningFees: Satoshi,

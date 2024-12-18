@@ -40,17 +40,17 @@ sealed class LightningOutgoingPartStatusData {
 
     sealed class Succeeded : LightningOutgoingPartStatusData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingPartStatusData.Succeeded.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingPartStatusData.Succeeded.V0")
         data class V0(val preimage: ByteVector32) : Succeeded()
     }
 
     sealed class Failed : LightningOutgoingPartStatusData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingPartStatusData.Failed.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingPartStatusData.Failed.V0")
         data class V0(val remoteFailureCode: Int?, val details: String) : Failed()
 
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingPartStatusData.Failed.V1")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingPartStatusData.Failed.V1")
         data class V1(val code: Int, val details: String?) : Failed()
     }
 

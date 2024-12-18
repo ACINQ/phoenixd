@@ -17,7 +17,7 @@ import kotlinx.serialization.UseSerializers
 sealed class FundingFeeData {
 
     @Serializable
-    @SerialName("fr.acinq.lightning.bin.db.payments.liquidityads.FundingFeeData.V0")
+    @SerialName("fr.acinq.phoenix.db.payments.liquidityads.FundingFeeData.V0")
     data class V0(val amount: MilliSatoshi, val fundingTxId: TxId) : FundingFeeData()
 
 }

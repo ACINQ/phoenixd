@@ -40,13 +40,13 @@ sealed class LightningOutgoingStatusData {
 
     sealed class SucceededOffChain : LightningOutgoingStatusData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingStatusData.SucceededOffChain.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingStatusData.SucceededOffChain.V0")
         data class V0(@Serializable val preimage: ByteVector32) : SucceededOffChain()
     }
 
     sealed class Failed : LightningOutgoingStatusData() {
         @Serializable
-        @SerialName("fr.acinq.lightning.bin.db.payments.LightningOutgoingStatusData.Failed.V0")
+        @SerialName("fr.acinq.phoenix.db.payments.LightningOutgoingStatusData.Failed.V0")
         data class V0(val reason: String) : Failed()
     }
 

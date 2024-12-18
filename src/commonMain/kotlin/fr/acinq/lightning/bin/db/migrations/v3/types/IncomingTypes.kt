@@ -33,6 +33,10 @@ import fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads.FundingFeeData
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
+import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.UUID.Companion.randomUUID
+import fr.acinq.lightning.utils.sat
+import fr.acinq.lightning.utils.sum
 import fr.acinq.lightning.wire.LiquidityAds
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -54,7 +58,7 @@ private sealed class IncomingReceivedWithData {
         sealed class Htlc : Part() {
             @Deprecated("Replaced by [Htlc.V1], which supports the liquidity ads funding fee")
             @Serializable
-            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.Htlc.V0")
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.Htlc.V0")
             data class V0(
                 val amount: MilliSatoshi,
                 val channelId: ByteVector32,
@@ -62,7 +66,7 @@ private sealed class IncomingReceivedWithData {
             ) : Htlc()
 
             @Serializable
-            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.Htlc.V1")
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.Htlc.V1")
             data class V1(
                 val amountReceived: MilliSatoshi,
                 val channelId: ByteVector32,
@@ -72,9 +76,28 @@ private sealed class IncomingReceivedWithData {
         }
 
         sealed class NewChannel : Part() {
+            @Deprecated("Legacy type. Use V1 instead for new parts, with the new `id` field.")
+            @Serializable
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.NewChannel.V0")
+            data class V0(
+                @Serializable val amount: MilliSatoshi,
+                @Serializable val fees: MilliSatoshi,
+                @Serializable val channelId: ByteVector32?
+            ) : NewChannel()
+
+            /** V1 contains a new `id` field that ensure that each [NewChannel] is unique. Old V0 data will use a random UUID to respect the [IncomingPayment.ReceivedWith.NewChannel] interface. */
+            @Serializable
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.NewChannel.V1")
+            data class V1(
+                @Serializable val id: UUID,
+                @Serializable val amount: MilliSatoshi,
+                @Serializable val fees: MilliSatoshi,
+                @Serializable val channelId: ByteVector32?
+            ) : NewChannel()
+
             /** V2 supports dual funding. New fields: service/miningFees, channel id, funding tx id, and the confirmation/lock timestamps. Id is removed. */
             @Serializable
-            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.NewChannel.V2")
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.NewChannel.V2")
             data class V2(
                 val amount: MilliSatoshi,
                 val serviceFee: MilliSatoshi,
@@ -88,7 +111,7 @@ private sealed class IncomingReceivedWithData {
 
         sealed class SpliceIn : Part() {
             @Serializable
-            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.SpliceIn.V0")
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.SpliceIn.V0")
             data class V0(
                 val amount: MilliSatoshi,
                 val serviceFee: MilliSatoshi,
@@ -102,7 +125,7 @@ private sealed class IncomingReceivedWithData {
 
         sealed class FeeCredit : Part() {
             @Serializable
-            @SerialName("fr.acinq.lightning.bin.db.payments.IncomingReceivedWithData.Part.FeeCredit.V0")
+            @SerialName("fr.acinq.phoenix.db.payments.IncomingReceivedWithData.Part.FeeCredit.V0")
             data class V0(
                 val amount: MilliSatoshi
             ) : FeeCredit()
@@ -142,7 +165,7 @@ private sealed class IncomingOriginData {
 
     sealed class OnChain : IncomingOriginData() {
         @Serializable
-        data class V0(val txId: ByteVector32, val outpoints: List<OutPoint>) : SwapIn()
+        data class V0(val txId: ByteVector32, val outpoints: List<OutPoint>) : OnChain()
     }
 
     sealed class Offer : IncomingOriginData() {
@@ -250,6 +273,24 @@ fun mapIncomingPaymentFromV3(
                             channelId = it.channelId,
                             htlcId = it.htlcId
                         )
+                        is IncomingReceivedWithData.Part.NewChannel.V0 -> LegacyPayToOpenIncomingPayment.Part.OnChain(
+                            amountReceived = it.amount,
+                            serviceFee = it.fees,
+                            miningFee = 0.sat,
+                            channelId = it.channelId ?: ByteVector32.Zeroes,
+                            txId = TxId(ByteVector32.Zeroes),
+                            confirmedAt = received_at,
+                            lockedAt = received_at,
+                        )
+                        is IncomingReceivedWithData.Part.NewChannel.V1 -> LegacyPayToOpenIncomingPayment.Part.OnChain(
+                            amountReceived = it.amount,
+                            serviceFee = it.fees,
+                            miningFee = 0.sat,
+                            channelId = it.channelId ?: ByteVector32.Zeroes,
+                            txId = TxId(ByteVector32.Zeroes),
+                            confirmedAt = received_at,
+                            lockedAt = received_at,
+                        )
                         is IncomingReceivedWithData.Part.NewChannel.V2 -> LegacyPayToOpenIncomingPayment.Part.OnChain(
                             amountReceived = it.amount,
                             serviceFee = it.serviceFee,
@@ -274,6 +315,105 @@ fun mapIncomingPaymentFromV3(
                 createdAt = created_at,
                 completedAt = received_at
             )
-        else -> TODO("unsupported payment origin=$origin parts=$parts")
+        received_at != null && origin is IncomingOriginData.OnChain.V0 && parts.all { it is IncomingReceivedWithData.Part.NewChannel } -> NewChannelIncomingPayment(
+            id = randomUUID(),
+            amountReceived = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> it.amount
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> it.amount
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.amount
+                }
+            }.sum(),
+            serviceFee = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> it.fees
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> it.fees
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.serviceFee
+                }
+            }.sum(),
+            miningFee = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> 0.sat
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> 0.sat
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.miningFee
+                }
+            }.sum(),
+            channelId = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> it.channelId ?: ByteVector32.Zeroes
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> it.channelId ?: ByteVector32.Zeroes
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.channelId
+                }
+            }.first(),
+            txId = TxId(origin.txId),
+            localInputs = origin.outpoints.toSet(),
+            createdAt = created_at,
+            confirmedAt = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> received_at
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> received_at
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.confirmedAt
+                }
+            }.first(),
+            lockedAt = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> received_at
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> received_at
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.lockedAt
+                }
+            }.first(),
+        )
+        received_at != null && origin is IncomingOriginData.OnChain.V0 && parts.all { it is IncomingReceivedWithData.Part.SpliceIn } -> SpliceInIncomingPayment(
+            id = randomUUID(),
+            amountReceived = parts.filterIsInstance<IncomingReceivedWithData.Part.SpliceIn>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.SpliceIn.V0 -> it.amount
+                }
+            }.sum(),
+            miningFee = parts.filterIsInstance<IncomingReceivedWithData.Part.SpliceIn>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.SpliceIn.V0 -> it.miningFee
+                }
+            }.sum(),
+            channelId = parts.filterIsInstance<IncomingReceivedWithData.Part.SpliceIn>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.SpliceIn.V0 -> it.channelId
+                }
+            }.first(),
+            txId = TxId(origin.txId),
+            localInputs = origin.outpoints.toSet(),
+            createdAt = created_at,
+            confirmedAt = parts.filterIsInstance<IncomingReceivedWithData.Part.SpliceIn>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.SpliceIn.V0 -> it.confirmedAt
+                }
+            }.first(),
+            lockedAt = parts.filterIsInstance<IncomingReceivedWithData.Part.SpliceIn>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.SpliceIn.V0 -> it.lockedAt
+                }
+            }.first(),
+        )
+        received_at != null && origin is IncomingOriginData.SwapIn.V0 && parts.all { it is IncomingReceivedWithData.Part.NewChannel } -> LegacySwapInIncomingPayment(
+            id = randomUUID(),
+            amountReceived = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> it.amount
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> it.amount
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.amount
+                }
+            }.sum(),
+            fees = parts.filterIsInstance<IncomingReceivedWithData.Part.NewChannel>().map {
+                when (it) {
+                    is IncomingReceivedWithData.Part.NewChannel.V0 -> it.fees
+                    is IncomingReceivedWithData.Part.NewChannel.V1 -> it.fees
+                    is IncomingReceivedWithData.Part.NewChannel.V2 -> it.serviceFee
+                }
+            }.sum(),
+            address = origin.address,
+            createdAt = created_at,
+            completedAt = received_at
+        )
+        else -> TODO("unsupported payment origin=${origin::class} parts=$parts")
     }
 }

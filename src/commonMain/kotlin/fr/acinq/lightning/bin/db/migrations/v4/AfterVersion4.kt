@@ -5,6 +5,7 @@ package fr.acinq.lightning.bin.db.migrations.v4
 import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
+import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.bin.db.migrations.v4.queries.*
 import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.Companion.hopDescAdapter
@@ -12,6 +13,7 @@ import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingDetailsTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingPartStatusTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingStatusTypeVersion
+import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.bin.toByteArray
 import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.db.OnChainOutgoingPayment
@@ -233,6 +235,46 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                 }
             }
 
+        data class OnChainLink(val txId: ByteArray, val paymentId: UUID, val confirmedAt: Long?, val lockedAt: Long?)
+
+        val onChainTxLinks = driver.executeQuery(
+            identifier = null,
+            sql = """
+                SELECT tx_id, type, id, confirmed_at, locked_at
+                FROM link_tx_to_payments
+            """.trimIndent(),
+            parameters = 0,
+            mapper = { cursor ->
+                val result = buildList {
+                    while (cursor.next().value) {
+                        val txId = cursor.getBytes(0)!!
+                        val type = cursor.getLong(1)!!
+                        val id = cursor.getString(2)!!.let { if (type == 0L) ByteVector32(it).deriveUUID() else UUID.fromString(it) }
+                        val confirmedAt = cursor.getLong(3)
+                        val lockedAt = cursor.getLong(4)
+                        add(OnChainLink(txId = txId, paymentId = id, confirmedAt = confirmedAt, lockedAt = lockedAt))
+                    }
+                }
+                QueryResult.Value(result)
+            }
+        ).value
+
+        onChainTxLinks
+            .forEach { onChainTxLink ->
+                driver.execute(
+                    identifier = null,
+                    sql = """
+                        INSERT INTO on_chain_txs (payment_id, tx_id, confirmed_at, locked_at) VALUES (?, ?, ?, ?)
+                    """.trimIndent(),
+                    parameters = 4
+                ) {
+                    bindBytes(0, onChainTxLink.paymentId.toByteArray())
+                    bindBytes(1, onChainTxLink.txId)
+                    bindLong(2, onChainTxLink.confirmedAt)
+                    bindLong(3, onChainTxLink.lockedAt)
+                }
+            }
+
         listOf(
             "DROP TABLE lightning_outgoing_payments",
             "DROP TABLE lightning_outgoing_payment_parts",
@@ -241,6 +283,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             "DROP TABLE splice_cpfp_outgoing_payments",
             "DROP TABLE channel_close_outgoing_payments",
             "DROP TABLE payments_metadata_old",
+            "DROP TABLE link_tx_to_payments"
         ).forEach { sql ->
             driver.execute(identifier = null, sql = sql, parameters = 0)
         }

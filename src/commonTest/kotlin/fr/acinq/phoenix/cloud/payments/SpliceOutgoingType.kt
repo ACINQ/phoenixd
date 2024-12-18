@@ -26,18 +26,6 @@ data class SpliceOutgoingPaymentWrapper(
     val confirmedAt: Long?,
     val lockedAt: Long?,
 ) {
-    constructor(payment: SpliceOutgoingPayment) : this(
-        id = payment.id,
-        amountSat = payment.recipientAmount.sat,
-        address = payment.address,
-        miningFeeSat = payment.miningFees.sat,
-        txId = payment.txId.value.toByteArray(),
-        channelId = payment.channelId.toByteArray(),
-        createdAt = payment.createdAt,
-        confirmedAt = payment.confirmedAt,
-        lockedAt = payment.lockedAt
-    )
-
     @Throws(Exception::class)
     fun unwrap() = SpliceOutgoingPayment(
         id = id,
@@ -54,16 +42,3 @@ data class SpliceOutgoingPaymentWrapper(
     companion object
 }
 
-@OptIn(ExperimentalSerializationApi::class)
-fun SpliceOutgoingPayment.cborSerialize(): ByteArray {
-    val wrapper = SpliceOutgoingPaymentWrapper(payment = this)
-    return Cbor.encodeToByteArray(wrapper)
-}
-
-@OptIn(ExperimentalSerializationApi::class)
-@Throws(Exception::class)
-fun SpliceOutgoingPaymentWrapper.cborDeserialize(
-    blob: ByteArray
-): SpliceOutgoingPaymentWrapper {
-    return cborSerializer().decodeFromByteArray(blob)
-}

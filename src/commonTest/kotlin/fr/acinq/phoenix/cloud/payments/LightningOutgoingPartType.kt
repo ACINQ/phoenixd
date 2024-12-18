@@ -1,5 +1,10 @@
 package fr.acinq.phoenix.db.cloud
 
+import fr.acinq.lightning.MilliSatoshi
+import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries
+import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingPartStatusData
+import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingPartStatusTypeVersion
+import fr.acinq.lightning.db.LightningOutgoingPayment
 import fr.acinq.lightning.utils.UUID
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -33,6 +38,15 @@ data class LightningOutgoingPartWrapper(
     val status: StatusWrapper?,
     val createdAt: Long
 ) {
+
+    fun unwrap() = LightningOutgoingPayment.Part(
+        id = id,
+        amount = MilliSatoshi(msat = msat),
+        route = LightningOutgoingQueries.hopDescAdapter.decode(route),
+        status = status?.unwrap() ?: LightningOutgoingPayment.Part.Status.Pending,
+        createdAt = createdAt
+    )
+
     @Serializable
     @OptIn(ExperimentalSerializationApi::class)
     data class StatusWrapper(
@@ -40,6 +54,14 @@ data class LightningOutgoingPartWrapper(
         val type: String,
         @ByteString
         val blob: ByteArray
-    )
+    ) {
+        fun unwrap(): LightningOutgoingPayment.Part.Status {
+            return LightningOutgoingPartStatusData.deserialize(
+                typeVersion = LightningOutgoingPartStatusTypeVersion.valueOf(type),
+                blob = blob,
+                completedAt = ts
+            )
+        }
+    } // </StatusWrapper>
 
 } // </OutgoingPartData>

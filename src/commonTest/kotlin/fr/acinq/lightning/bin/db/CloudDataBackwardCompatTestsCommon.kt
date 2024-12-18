@@ -39,7 +39,12 @@ class CloudDataBackwardCompatTestsCommon {
                         received_with_type = cloudData.incoming.received?.type,
                         received_with_blob = cloudData.incoming.received?.blob
                     )
-                    else -> null
+                    cloudData.outgoing != null -> cloudData.outgoing.unwrap()
+                    cloudData.inboundPurchaseLiquidity != null -> cloudData.inboundPurchaseLiquidity.unwrap()
+                    cloudData.spliceOutgoing != null -> cloudData.spliceOutgoing.unwrap()
+                    cloudData.spliceCpfp != null -> cloudData.spliceCpfp.unwrap()
+                    cloudData.channelClose != null -> cloudData.channelClose.unwrap()
+                    else -> error("unknown cloud data")
                 }
                 println(walletPayment)
             }

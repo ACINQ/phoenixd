@@ -44,7 +44,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
             val lockedAt = currentTimestampMillis()
             database.onChainTransactionsQueries.setLocked(tx_id = txId, locked_at = lockedAt)
             database.onChainTransactionsQueries
-                .listByTxid(txId)
+                .listByTxId(txId)
                 .executeAsList()
                 .map { WalletPaymentAdapter.decode(it) }
                 .forEach { payment ->
@@ -72,7 +72,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
             val confirmedAt = currentTimestampMillis()
             database.onChainTransactionsQueries.setConfirmed(tx_id = txId, confirmed_at = confirmedAt)
             database.onChainTransactionsQueries
-                .listByTxid(txId)
+                .listByTxId(txId)
                 .executeAsList()
                 .map { WalletPaymentAdapter.decode(it) }
                 .forEach { payment ->

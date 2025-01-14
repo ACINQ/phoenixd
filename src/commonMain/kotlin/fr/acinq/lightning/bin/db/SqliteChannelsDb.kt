@@ -31,7 +31,13 @@ internal class SqliteChannelsDb(val driver: SqlDriver, database: PhoenixDatabase
 
     override suspend fun addOrUpdateChannel(state: PersistedChannelState) {
         withContext(Dispatchers.Default) {
-            queries.upsertChannel(state.channelId, state)
+            queries.transaction {
+                queries.getChannel(state.channelId).executeAsOneOrNull()?.run {
+                    queries.updateChannel(channel_id = state.channelId, data_ = state)
+                } ?: run {
+                    queries.insertChannel(channel_id = state.channelId, data_ = state)
+                }
+            }
         }
     }
 

@@ -46,7 +46,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     }
 
     transacter.transaction {
-        driver.executeQuery(
+        val lightningOutgoingPayments = driver.executeQuery(
             identifier = null,
             sql = """
     |SELECT parent.id,
@@ -72,6 +72,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     """.trimMargin(),
             parameters = 0,
             mapper = { cursor ->
+                val lightningOutgoingPayments = mutableListOf<LightningOutgoingPayment>()
                 while (cursor.next().value) {
                     val payment = LightningOutgoingQueries.mapLightningOutgoingPayment(
                         cursor.getString(0)!!,
@@ -92,11 +93,22 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                         cursor.getString(15)?.let { LightningOutgoingPartStatusTypeVersion.valueOf(it) },
                         cursor.getBytes(16)
                     )
-                    insertPayment(payment)
+                    lightningOutgoingPayments.add(payment)
                 }
-                QueryResult.Unit
+                QueryResult.Value(lightningOutgoingPayments.toList())
             }
-        )
+        ).value
+
+        /** Group a list of lightning outgoing payments by parent id and parts. */
+        fun groupByRawLightningOutgoing(payments: List<LightningOutgoingPayment>) = payments
+            .takeIf { it.isNotEmpty() }
+            ?.groupBy { it.id }
+            ?.values
+            ?.map { group -> group.first().copy(parts = group.flatMap { it.parts }) }
+            ?: emptyList()
+
+        groupByRawLightningOutgoing(lightningOutgoingPayments)
+            .map { insertPayment(it) }
 
         driver.executeQuery(
             identifier = null,

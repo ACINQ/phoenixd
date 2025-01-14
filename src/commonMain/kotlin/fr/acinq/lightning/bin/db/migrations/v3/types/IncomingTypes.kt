@@ -123,8 +123,6 @@ private sealed class IncomingReceivedWithData {
 
 private enum class IncomingOriginTypeVersion {
     INVOICE_V0,
-    SWAPIN_V0,
-    ONCHAIN_V0,
     OFFER_V0,
 }
 
@@ -133,16 +131,6 @@ private sealed class IncomingOriginData {
     sealed class Invoice : IncomingOriginData() {
         @Serializable
         data class V0(val paymentRequest: String) : Invoice()
-    }
-
-    sealed class SwapIn : IncomingOriginData() {
-        @Serializable
-        data class V0(val address: String?) : SwapIn()
-    }
-
-    sealed class OnChain : IncomingOriginData() {
-        @Serializable
-        data class V0(val txId: ByteVector32, val outpoints: List<OutPoint>) : SwapIn()
     }
 
     sealed class Offer : IncomingOriginData() {
@@ -154,8 +142,6 @@ private sealed class IncomingOriginData {
         fun deserialize(typeVersion: IncomingOriginTypeVersion, blob: ByteArray): IncomingOriginData =
             when (typeVersion) {
                 IncomingOriginTypeVersion.INVOICE_V0 -> Json.decodeFromString<Invoice.V0>(blob.decodeToString())
-                IncomingOriginTypeVersion.SWAPIN_V0 -> Json.decodeFromString<SwapIn.V0>(blob.decodeToString())
-                IncomingOriginTypeVersion.ONCHAIN_V0 -> Json.decodeFromString<OnChain.V0>(blob.decodeToString())
                 IncomingOriginTypeVersion.OFFER_V0 -> Json.decodeFromString<Offer.V0>(blob.decodeToString())
             }
     }
@@ -219,13 +205,15 @@ fun mapIncomingPaymentFromV3(
             Bolt11IncomingPayment(
                 preimage = ByteVector32(preimage),
                 paymentRequest = Bolt11Invoice.read(origin.paymentRequest).get(),
-                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) }
+                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) },
+                createdAt = created_at
             )
         received_at != null && origin is IncomingOriginData.Offer.V0 && parts.all { it is IncomingReceivedWithData.Part.Htlc || it is IncomingReceivedWithData.Part.FeeCredit } ->
             Bolt12IncomingPayment(
                 preimage = ByteVector32(preimage),
                 metadata = OfferPaymentMetadata.decode(origin.encodedMetadata),
-                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) }
+                parts = parts.map { mapLightningIncomingPaymentPart(it, received_at) },
+                createdAt = created_at
             )
         received_at != null && (origin is IncomingOriginData.Invoice || origin is IncomingOriginData.Offer) && parts.any { it is IncomingReceivedWithData.Part.SpliceIn || it is IncomingReceivedWithData.Part.NewChannel } ->
             LegacyPayToOpenIncomingPayment(
@@ -235,7 +223,7 @@ fun mapIncomingPaymentFromV3(
                     is IncomingOriginData.Offer.V0 -> LegacyPayToOpenIncomingPayment.Origin.Offer(OfferPaymentMetadata.decode(origin.encodedMetadata))
                     else -> error("impossible")
                 },
-                parts = parts.map {
+                parts = parts.mapNotNull {
                     when (it) {
                         is IncomingReceivedWithData.Part.Htlc.V0 -> LegacyPayToOpenIncomingPayment.Part.Lightning(
                             amountReceived = it.amount,
@@ -265,12 +253,12 @@ fun mapIncomingPaymentFromV3(
                             confirmedAt = it.confirmedAt,
                             lockedAt = it.lockedAt,
                         )
-                        else -> error("unexpected part=$it")
+                        is IncomingReceivedWithData.Part.FeeCredit.V0 -> null // cannot have a mix of pay-to-open + fee-credit
                     }
                 },
                 createdAt = created_at,
                 completedAt = received_at
             )
-        else -> TODO("unsupported payment origin=$origin parts=$parts")
+        else -> TODO("unsupported payment origin=${origin::class} parts=$parts")
     }
 }

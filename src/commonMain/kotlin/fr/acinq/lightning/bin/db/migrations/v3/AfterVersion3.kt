@@ -7,6 +7,7 @@ import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.lightning.bin.db.migrations.v3.types.mapIncomingPaymentFromV3
 import fr.acinq.lightning.bin.deriveUUID
+import fr.acinq.lightning.bin.toByteArray
 import fr.acinq.lightning.db.LegacyPayToOpenIncomingPayment
 import fr.acinq.lightning.db.LightningIncomingPayment
 import fr.acinq.lightning.serialization.payment.Serialization
@@ -53,12 +54,12 @@ val AfterVersion3 = AfterVersion(3) { driver ->
                     println("migrating incoming $payment")
                     when (payment) {
                         is LightningIncomingPayment -> {
-                            bindString(0, payment.paymentHash.deriveUUID().toString())
+                            bindBytes(0, payment.paymentHash.deriveUUID().toByteArray())
                             bindBytes(1, payment.paymentHash.toByteArray())
                             bindBytes(2, null)
                         }
                         is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> {
-                            bindString(0, payment.paymentHash.deriveUUID().toString())
+                            bindBytes(0, payment.paymentHash.deriveUUID().toByteArray())
                             bindBytes(1, payment.paymentHash.toByteArray())
                             bindBytes(2, null)
                         }

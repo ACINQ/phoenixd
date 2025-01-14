@@ -23,10 +23,6 @@ import fr.acinq.lightning.bin.db.payments.PaymentsMetadataQueries
 import fr.acinq.lightning.bin.db.payments.SqliteIncomingPaymentsDb
 import fr.acinq.lightning.bin.db.payments.SqliteOutgoingPaymentsDb
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.db.OnChainIncomingPayment.Companion.setConfirmed
-import fr.acinq.lightning.db.OnChainIncomingPayment.Companion.setLocked
-import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setConfirmed
-import fr.acinq.lightning.db.OnChainOutgoingPayment.Companion.setLocked
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers

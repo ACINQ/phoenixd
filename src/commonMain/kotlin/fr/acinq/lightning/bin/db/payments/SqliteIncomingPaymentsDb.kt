@@ -2,7 +2,6 @@ package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.db.LightningIncomingPayment.Companion.addReceivedParts
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

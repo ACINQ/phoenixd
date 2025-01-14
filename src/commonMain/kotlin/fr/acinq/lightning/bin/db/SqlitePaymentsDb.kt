@@ -49,14 +49,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setLocked(lockedAt)
-                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = lockedAt)
+                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = payment1.lockedAt)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
                         is LightningOutgoingPayment -> {}
                         is OnChainOutgoingPayment -> {
                             val payment1 = payment.setLocked(lockedAt)
-                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = lockedAt, sent_at = lockedAt)
+                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
                         }
                     }
                 }
@@ -77,14 +77,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                         is LightningIncomingPayment -> {}
                         is OnChainIncomingPayment -> {
                             val payment1 = payment.setConfirmed(confirmedAt)
-                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = null)
+                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = payment1.lockedAt)
                         }
                         is LegacyPayToOpenIncomingPayment -> {}
                         is LegacySwapInIncomingPayment -> {}
                         is LightningOutgoingPayment -> {}
                         is OnChainOutgoingPayment -> {
                             val payment1 = payment.setConfirmed(confirmedAt)
-                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = null, sent_at = null)
+                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
                         }
                     }
                 }
@@ -116,28 +116,17 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
             if (listAll) {
                 database.paymentsOutgoingQueries.list(created_at_from = from, created_at_to = to, limit = limit, offset = offset).executeAsList()
             } else {
-                database.paymentsOutgoingQueries.listSuccessful(sent_at_from = from, sent_at_to = to, limit = limit, offset = offset).executeAsList()
+                database.paymentsOutgoingQueries.listSuccessful(succeeded_at_from = from, succeeded_at_to = to, limit = limit, offset = offset).executeAsList()
             }
         }
     }
-
-//    suspend fun listSuccessfulPayments(from: Long = 0, to: Long = Long.MAX_VALUE, limit: Long = Long.MAX_VALUE, offset: Long = 0): List<WalletPayment> {
-//        return withContext(Dispatchers.Default) {
-//            database.paymentsQueries.list(
-//                limit = limit,
-//                offset = offset
-//            )
-//                .executeAsList()
-//                .map { WalletPaymentAdapter.decode(it) }
-//        }
-//    }
 
     suspend fun processSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32, process: (WalletPayment) -> Unit) {
         return withContext(Dispatchers.Default) {
             var batchOffset = 0L
             var fetching = true
             while (fetching) {
-                database.paymentsQueries.listCompleted(completed_at_from = from, completed_at_to = to, limit = batchSize, offset = batchOffset)
+                database.paymentsQueries.listSucceeded(succeeded_at_from = from, succeeded_at_to = to, limit = batchSize, offset = batchOffset)
                     .execute { cursor ->
                         var resultSize = 0
                         while (cursor.next().value) {

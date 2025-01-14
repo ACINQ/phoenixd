@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : IncomingPaymentsDb {
+
     override suspend fun addIncomingPayment(incomingPayment: IncomingPayment) {
         return withContext(Dispatchers.Default) {
             database.transaction {

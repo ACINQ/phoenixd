@@ -1,7 +1,6 @@
 package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.lightning.bin.db.PaymentMetadata
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenix.db.PhoenixDatabase

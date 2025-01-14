@@ -6,7 +6,7 @@ import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.lightning.bin.db.PaymentMetadata
+import fr.acinq.lightning.bin.db.payments.PaymentMetadata
 import fr.acinq.lightning.bin.db.migrations.v4.queries.*
 import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.Companion.hopDescAdapter
 import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion

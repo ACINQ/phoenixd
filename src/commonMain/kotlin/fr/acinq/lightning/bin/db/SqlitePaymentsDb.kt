@@ -121,25 +121,23 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
         }
     }
 
-    suspend fun listSuccessfulPayments(from: Long = 0, to: Long = Long.MAX_VALUE, limit: Long = Long.MAX_VALUE, offset: Long = 0): List<WalletPayment> {
-        return withContext(Dispatchers.Default) {
-            database.paymentsQueries.list(
-                completed_at_from = from,
-                completed_at_to = to,
-                limit = limit,
-                offset = offset
-            )
-                .executeAsList()
-                .map { WalletPaymentAdapter.decode(it) }
-        }
-    }
+//    suspend fun listSuccessfulPayments(from: Long = 0, to: Long = Long.MAX_VALUE, limit: Long = Long.MAX_VALUE, offset: Long = 0): List<WalletPayment> {
+//        return withContext(Dispatchers.Default) {
+//            database.paymentsQueries.list(
+//                limit = limit,
+//                offset = offset
+//            )
+//                .executeAsList()
+//                .map { WalletPaymentAdapter.decode(it) }
+//        }
+//    }
 
     suspend fun processSuccessfulPayments(from: Long, to: Long, batchSize: Long = 32, process: (WalletPayment) -> Unit) {
         return withContext(Dispatchers.Default) {
             var batchOffset = 0L
             var fetching = true
             while (fetching) {
-                database.paymentsQueries.list(completed_at_from = from, completed_at_to = to, limit = batchSize, offset = batchOffset)
+                database.paymentsQueries.listCompleted(completed_at_from = from, completed_at_to = to, limit = batchSize, offset = batchOffset)
                     .execute { cursor ->
                         var resultSize = 0
                         while (cursor.next().value) {

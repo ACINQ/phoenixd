@@ -19,7 +19,7 @@ import fr.acinq.bitcoin.PublicKey
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.lightning.bin.db.PaymentMetadata
+import fr.acinq.lightning.bin.db.payments.PaymentMetadata
 import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.channel.states.ChannelState

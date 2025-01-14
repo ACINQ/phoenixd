@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : OutgoingPaymentsDb {
+
     override suspend fun addLightningOutgoingPaymentParts(parentId: UUID, parts: List<LightningOutgoingPayment.Part>) {
         withContext(Dispatchers.Default) {
             database.transaction {
@@ -114,11 +115,11 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
 
     override suspend fun getLightningOutgoingPaymentFromPartId(partId: UUID): LightningOutgoingPayment? {
         return withContext(Dispatchers.Default) {
-        database.transactionWithResult {
-            val paymentId = database.paymentsOutgoingQueries.getParentId(partId).executeAsOneOrNull()!!
-            database.paymentsOutgoingQueries.get(paymentId).executeAsOneOrNull() as? LightningOutgoingPayment
-        }
+            database.transactionWithResult {
+                val paymentId = database.paymentsOutgoingQueries.getParentId(partId).executeAsOneOrNull()!!
+                database.paymentsOutgoingQueries.get(paymentId).executeAsOneOrNull() as? LightningOutgoingPayment
             }
+        }
     }
 
     override suspend fun listLightningOutgoingPayments(paymentHash: ByteVector32): List<LightningOutgoingPayment> {

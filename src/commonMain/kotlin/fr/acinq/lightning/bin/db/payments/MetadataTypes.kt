@@ -1,7 +1,6 @@
-package fr.acinq.lightning.bin.db
+package fr.acinq.lightning.bin.db.payments
 
 import io.ktor.http.*
-
 
 data class PaymentMetadata(
     val externalId: String?,

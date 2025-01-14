@@ -221,7 +221,6 @@ fun mapIncomingPaymentFromV3(
                 origin = when (origin) {
                     is IncomingOriginData.Invoice.V0 -> LegacyPayToOpenIncomingPayment.Origin.Invoice(Bolt11Invoice.read(origin.paymentRequest).get())
                     is IncomingOriginData.Offer.V0 -> LegacyPayToOpenIncomingPayment.Origin.Offer(OfferPaymentMetadata.decode(origin.encodedMetadata))
-                    else -> error("impossible")
                 },
                 parts = parts.mapNotNull {
                     when (it) {

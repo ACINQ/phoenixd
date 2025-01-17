@@ -89,17 +89,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
 
         val details: List<Details> = when (payment) {
             is LightningIncomingPayment -> extractLightningPaymentParts(payment)
-            is LegacySwapInIncomingPayment -> listOf(
-                Details(
-                    type = Type.legacy_swap_in,
-                    amount = payment.amount,
-                    feeCredit = 0.msat,
-                    miningFee = payment.fees.truncateToSatoshi(),
-                    serviceFee = 0.msat,
-                    paymentHash = null,
-                    txId = null
-                )
-            )
+            is LegacySwapInIncomingPayment -> listOf(Details(type = Type.legacy_swap_in, amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = null))
             is LegacyPayToOpenIncomingPayment -> extractLegacyPayToOpenParts(payment)
             is OnChainIncomingPayment -> listOf(Details(Type.swap_in, amount = payment.amount, feeCredit = 0.msat, miningFee = payment.fees.truncateToSatoshi(), serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
 
@@ -112,17 +102,14 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
             is SpliceOutgoingPayment -> listOf(Details(Type.swap_out, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is ChannelCloseOutgoingPayment -> listOf(Details(Type.channel_close, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
             is SpliceCpfpOutgoingPayment -> listOf(Details(Type.fee_bumping, amount = -payment.amount, feeCredit = 0.msat, miningFee = payment.miningFees, serviceFee = 0.msat, paymentHash = null, txId = payment.txId))
-            is InboundLiquidityOutgoingPayment -> listOf(
-                Details(
-                    Type.liquidity_purchase,
-                    amount = -payment.feePaidFromChannelBalance.total.toMilliSatoshi(),
-                    feeCredit = -payment.feeCreditUsed,
-                    miningFee = payment.miningFees,
-                    serviceFee = payment.serviceFees.toMilliSatoshi(),
-                    paymentHash = null,
-                    txId = payment.txId
-                )
-            )
+            is InboundLiquidityOutgoingPayment -> buildList {
+                if (payment.purchase.amount == 1.sat) {
+                    // Special dummy liquidity operation for creating the channel. In that case the received amount for the corresponding NewChannelIncomingPayment
+                    // already takes liquidity fees into account.
+                } else {
+                    Details(Type.liquidity_purchase, amount = -payment.feePaidFromChannelBalance.total.toMilliSatoshi(), feeCredit = -payment.feeCreditUsed, miningFee = payment.miningFees, serviceFee = payment.serviceFees.toMilliSatoshi(), paymentHash = null, txId = payment.txId)
+                }
+            }
         }
 
         details.forEach { addRow(timestamp, id, it) }

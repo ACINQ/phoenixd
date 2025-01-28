@@ -26,142 +26,140 @@ import fr.acinq.lightning.db.LightningOutgoingPayment.Part.HopDesc
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.secp256k1.Hex
 
-class LightningOutgoingQueries {
+object LightningOutgoingQueries {
 
-    companion object {
-        @Suppress("UNUSED_PARAMETER")
-        private fun mapLightningOutgoingPaymentWithoutParts(
-            id: String,
-            recipient_amount_msat: Long,
-            recipient_node_id: String,
-            payment_hash: ByteArray,
-            details_type: LightningOutgoingDetailsTypeVersion,
-            details_blob: ByteArray,
-            created_at: Long,
-            completed_at: Long?,
-            status_type: LightningOutgoingStatusTypeVersion?,
-            status_blob: ByteArray?
-        ): LightningOutgoingPayment {
-            val details = LightningOutgoingDetailsData.deserialize(details_type, details_blob)
-            return LightningOutgoingPayment(
-                id = UUID.fromString(id),
-                recipientAmount = MilliSatoshi(recipient_amount_msat),
-                recipient = PublicKey.parse(Hex.decode(recipient_node_id)),
-                details = details,
-                parts = listOf(),
-                status = mapPaymentStatus(status_type, status_blob, completed_at),
-                createdAt = created_at
-            )
-        }
+    @Suppress("UNUSED_PARAMETER")
+    private fun mapLightningOutgoingPaymentWithoutParts(
+        id: String,
+        recipient_amount_msat: Long,
+        recipient_node_id: String,
+        payment_hash: ByteArray,
+        details_type: LightningOutgoingDetailsTypeVersion,
+        details_blob: ByteArray,
+        created_at: Long,
+        completed_at: Long?,
+        status_type: LightningOutgoingStatusTypeVersion?,
+        status_blob: ByteArray?
+    ): LightningOutgoingPayment {
+        val details = LightningOutgoingDetailsData.deserialize(details_type, details_blob)
+        return LightningOutgoingPayment(
+            id = UUID.fromString(id),
+            recipientAmount = MilliSatoshi(recipient_amount_msat),
+            recipient = PublicKey.parse(Hex.decode(recipient_node_id)),
+            details = details,
+            parts = listOf(),
+            status = mapPaymentStatus(status_type, status_blob, completed_at),
+            createdAt = created_at
+        )
+    }
 
-        fun mapLightningOutgoingPayment(
-            id: String,
-            recipient_amount_msat: Long,
-            recipient_node_id: String,
-            payment_hash: ByteArray,
-            details_type: LightningOutgoingDetailsTypeVersion,
-            details_blob: ByteArray,
-            created_at: Long,
-            completed_at: Long?,
-            status_type: LightningOutgoingStatusTypeVersion?,
-            status_blob: ByteArray?,
-            // lightning parts data, may be null
-            lightning_part_id: String?,
-            lightning_part_amount_msat: Long?,
-            lightning_part_route: List<HopDesc>?,
-            lightning_part_created_at: Long?,
-            lightning_part_completed_at: Long?,
-            lightning_part_status_type: LightningOutgoingPartStatusTypeVersion?,
-            lightning_part_status_blob: ByteArray?,
-        ): LightningOutgoingPayment {
+    fun mapLightningOutgoingPayment(
+        id: String,
+        recipient_amount_msat: Long,
+        recipient_node_id: String,
+        payment_hash: ByteArray,
+        details_type: LightningOutgoingDetailsTypeVersion,
+        details_blob: ByteArray,
+        created_at: Long,
+        completed_at: Long?,
+        status_type: LightningOutgoingStatusTypeVersion?,
+        status_blob: ByteArray?,
+        // lightning parts data, may be null
+        lightning_part_id: String?,
+        lightning_part_amount_msat: Long?,
+        lightning_part_route: List<HopDesc>?,
+        lightning_part_created_at: Long?,
+        lightning_part_completed_at: Long?,
+        lightning_part_status_type: LightningOutgoingPartStatusTypeVersion?,
+        lightning_part_status_blob: ByteArray?,
+    ): LightningOutgoingPayment {
 
-            val parts = if (lightning_part_id != null && lightning_part_amount_msat != null && lightning_part_route != null && lightning_part_created_at != null) {
-                listOf(
-                    mapLightningPart(
-                        id = lightning_part_id,
-                        amountMsat = lightning_part_amount_msat,
-                        route = lightning_part_route,
-                        createdAt = lightning_part_created_at,
-                        completedAt = lightning_part_completed_at,
-                        statusType = lightning_part_status_type,
-                        statusBlob = lightning_part_status_blob
-                    )
+        val parts = if (lightning_part_id != null && lightning_part_amount_msat != null && lightning_part_route != null && lightning_part_created_at != null) {
+            listOf(
+                mapLightningPart(
+                    id = lightning_part_id,
+                    amountMsat = lightning_part_amount_msat,
+                    route = lightning_part_route,
+                    createdAt = lightning_part_created_at,
+                    completedAt = lightning_part_completed_at,
+                    statusType = lightning_part_status_type,
+                    statusBlob = lightning_part_status_blob
                 )
-            } else emptyList()
-
-            return mapLightningOutgoingPaymentWithoutParts(
-                id = id,
-                recipient_amount_msat = recipient_amount_msat,
-                recipient_node_id = recipient_node_id,
-                payment_hash = payment_hash,
-                details_type = details_type,
-                details_blob = details_blob,
-                created_at = created_at,
-                completed_at = completed_at,
-                status_type = status_type,
-                status_blob = status_blob
-            ).copy(
-                parts = parts
             )
-        }
+        } else emptyList()
 
-        private fun mapLightningPart(
-            id: String,
-            amountMsat: Long,
-            route: List<HopDesc>,
-            createdAt: Long,
-            completedAt: Long?,
-            statusType: LightningOutgoingPartStatusTypeVersion?,
-            statusBlob: ByteArray?
-        ): LightningOutgoingPayment.Part {
-            return LightningOutgoingPayment.Part(
-                id = UUID.fromString(id),
-                amount = MilliSatoshi(amountMsat),
-                route = route,
-                status = mapLightningPartStatus(
-                    statusType = statusType,
-                    statusBlob = statusBlob,
-                    completedAt = completedAt
-                ),
-                createdAt = createdAt
-            )
-        }
+        return mapLightningOutgoingPaymentWithoutParts(
+            id = id,
+            recipient_amount_msat = recipient_amount_msat,
+            recipient_node_id = recipient_node_id,
+            payment_hash = payment_hash,
+            details_type = details_type,
+            details_blob = details_blob,
+            created_at = created_at,
+            completed_at = completed_at,
+            status_type = status_type,
+            status_blob = status_blob
+        ).copy(
+            parts = parts
+        )
+    }
 
-        private fun mapPaymentStatus(
-            statusType: LightningOutgoingStatusTypeVersion?,
-            statusBlob: ByteArray?,
-            completedAt: Long?,
-        ): LightningOutgoingPayment.Status = when {
-            completedAt == null && statusType == null && statusBlob == null -> LightningOutgoingPayment.Status.Pending
-            completedAt != null && statusType != null && statusBlob != null -> LightningOutgoingStatusData.deserialize(statusType, statusBlob, completedAt)
-            else -> throw UnhandledOutgoingStatus(completedAt, statusType, statusBlob)
-        }
+    private fun mapLightningPart(
+        id: String,
+        amountMsat: Long,
+        route: List<HopDesc>,
+        createdAt: Long,
+        completedAt: Long?,
+        statusType: LightningOutgoingPartStatusTypeVersion?,
+        statusBlob: ByteArray?
+    ): LightningOutgoingPayment.Part {
+        return LightningOutgoingPayment.Part(
+            id = UUID.fromString(id),
+            amount = MilliSatoshi(amountMsat),
+            route = route,
+            status = mapLightningPartStatus(
+                statusType = statusType,
+                statusBlob = statusBlob,
+                completedAt = completedAt
+            ),
+            createdAt = createdAt
+        )
+    }
 
-        private fun mapLightningPartStatus(
-            statusType: LightningOutgoingPartStatusTypeVersion?,
-            statusBlob: ByteArray?,
-            completedAt: Long?,
-        ): LightningOutgoingPayment.Part.Status = when {
-            completedAt == null && statusType == null && statusBlob == null -> LightningOutgoingPayment.Part.Status.Pending
-            completedAt != null && statusType != null && statusBlob != null -> LightningOutgoingPartStatusData.deserialize(statusType, statusBlob, completedAt)
-            else -> throw UnhandledOutgoingPartStatus(statusType, statusBlob, completedAt)
-        }
+    private fun mapPaymentStatus(
+        statusType: LightningOutgoingStatusTypeVersion?,
+        statusBlob: ByteArray?,
+        completedAt: Long?,
+    ): LightningOutgoingPayment.Status = when {
+        completedAt == null && statusType == null && statusBlob == null -> LightningOutgoingPayment.Status.Pending
+        completedAt != null && statusType != null && statusBlob != null -> LightningOutgoingStatusData.deserialize(statusType, statusBlob, completedAt)
+        else -> throw UnhandledOutgoingStatus(completedAt, statusType, statusBlob)
+    }
 
-        val hopDescAdapter: ColumnAdapter<List<HopDesc>, String> = object : ColumnAdapter<List<HopDesc>, String> {
-            override fun decode(databaseValue: String): List<HopDesc> = when {
-                databaseValue.isEmpty() -> listOf()
-                else -> databaseValue.split(";").map { hop ->
-                    val els = hop.split(":")
-                    val n1 = PublicKey.parse(Hex.decode(els[0]))
-                    val n2 = PublicKey.parse(Hex.decode(els[1]))
-                    val cid = els[2].takeIf { it.isNotBlank() }?.run { ShortChannelId(this) }
-                    HopDesc(n1, n2, cid)
-                }
+    private fun mapLightningPartStatus(
+        statusType: LightningOutgoingPartStatusTypeVersion?,
+        statusBlob: ByteArray?,
+        completedAt: Long?,
+    ): LightningOutgoingPayment.Part.Status = when {
+        completedAt == null && statusType == null && statusBlob == null -> LightningOutgoingPayment.Part.Status.Pending
+        completedAt != null && statusType != null && statusBlob != null -> LightningOutgoingPartStatusData.deserialize(statusType, statusBlob, completedAt)
+        else -> throw UnhandledOutgoingPartStatus(statusType, statusBlob, completedAt)
+    }
+
+    val hopDescAdapter: ColumnAdapter<List<HopDesc>, String> = object : ColumnAdapter<List<HopDesc>, String> {
+        override fun decode(databaseValue: String): List<HopDesc> = when {
+            databaseValue.isEmpty() -> listOf()
+            else -> databaseValue.split(";").map { hop ->
+                val els = hop.split(":")
+                val n1 = PublicKey.parse(Hex.decode(els[0]))
+                val n2 = PublicKey.parse(Hex.decode(els[1]))
+                val cid = els[2].takeIf { it.isNotBlank() }?.run { ShortChannelId(this) }
+                HopDesc(n1, n2, cid)
             }
+        }
 
-            override fun encode(value: List<HopDesc>): String = value.joinToString(";") {
-                "${it.nodeId}:${it.nextNodeId}:${it.shortChannelId ?: ""}"
-            }
+        override fun encode(value: List<HopDesc>): String = value.joinToString(";") {
+            "${it.nodeId}:${it.nextNodeId}:${it.shortChannelId ?: ""}"
         }
     }
 }

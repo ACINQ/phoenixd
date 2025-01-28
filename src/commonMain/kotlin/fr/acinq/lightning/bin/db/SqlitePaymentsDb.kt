@@ -24,6 +24,7 @@ import fr.acinq.lightning.bin.db.payments.SqliteIncomingPaymentsDb
 import fr.acinq.lightning.bin.db.payments.SqliteOutgoingPaymentsDb
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.currentTimestampMillis
+import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,31 +36,35 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
 
     val metadataQueries = PaymentsMetadataQueries(database)
 
+    override suspend fun getInboundLiquidityPurchase(txId: TxId): LiquidityAds.LiquidityTransactionDetails? {
+        val payment = buildList {
+            addAll(database.paymentsIncomingQueries.listByTxId(txId).executeAsList())
+            addAll(database.paymentsOutgoingQueries.listByTxId(txId).executeAsList())
+        }.firstOrNull()
+        @Suppress("DEPRECATION")
+        return when (payment) {
+            is LightningIncomingPayment -> payment.liquidityPurchaseDetails
+            is OnChainIncomingPayment -> payment.liquidityPurchaseDetails
+            is LegacyPayToOpenIncomingPayment -> null
+            is LegacySwapInIncomingPayment -> null
+            is LightningOutgoingPayment -> null
+            is OnChainOutgoingPayment -> payment.liquidityPurchaseDetails
+            null -> null
+        }
+    }
+
     override suspend fun setLocked(txId: TxId) {
         database.transaction {
             val lockedAt = currentTimestampMillis()
             database.onChainTransactionsQueries.setLocked(tx_id = txId, locked_at = lockedAt)
-            database.onChainTransactionsQueries
-                .listByTxId(txId)
-                .executeAsList()
-                .map { WalletPaymentAdapter.decode(it) }
-                .forEach { payment ->
-                    @Suppress("DEPRECATION")
-                    when (payment) {
-                        is LightningIncomingPayment -> {}
-                        is OnChainIncomingPayment -> {
-                            val payment1 = payment.setLocked(lockedAt)
-                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = payment1.lockedAt)
-                        }
-                        is LegacyPayToOpenIncomingPayment -> {}
-                        is LegacySwapInIncomingPayment -> {}
-                        is LightningOutgoingPayment -> {}
-                        is OnChainOutgoingPayment -> {
-                            val payment1 = payment.setLocked(lockedAt)
-                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
-                        }
-                    }
-                }
+            database.paymentsIncomingQueries.listByTxId(txId).executeAsList().filterIsInstance<OnChainIncomingPayment>().forEach { payment ->
+                val payment1 = payment.setLocked(lockedAt)
+                database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, txId = payment1.txId, receivedAt = payment1.lockedAt)
+            }
+            database.paymentsOutgoingQueries.listByTxId(txId).executeAsList().filterIsInstance<OnChainOutgoingPayment>().forEach { payment ->
+                val payment1 = payment.setLocked(lockedAt)
+                database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
+            }
         }
     }
 
@@ -67,27 +72,14 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
         database.transaction {
             val confirmedAt = currentTimestampMillis()
             database.onChainTransactionsQueries.setConfirmed(tx_id = txId, confirmed_at = confirmedAt)
-            database.onChainTransactionsQueries
-                .listByTxId(txId)
-                .executeAsList()
-                .map { WalletPaymentAdapter.decode(it) }
-                .forEach { payment ->
-                    @Suppress("DEPRECATION")
-                    when (payment) {
-                        is LightningIncomingPayment -> {}
-                        is OnChainIncomingPayment -> {
-                            val payment1 = payment.setConfirmed(confirmedAt)
-                            database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, receivedAt = payment1.lockedAt)
-                        }
-                        is LegacyPayToOpenIncomingPayment -> {}
-                        is LegacySwapInIncomingPayment -> {}
-                        is LightningOutgoingPayment -> {}
-                        is OnChainOutgoingPayment -> {
-                            val payment1 = payment.setConfirmed(confirmedAt)
-                            database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
-                        }
-                    }
-                }
+            database.paymentsIncomingQueries.listByTxId(txId).executeAsList().filterIsInstance<OnChainIncomingPayment>().forEach { payment ->
+                val payment1 = payment.setConfirmed(confirmedAt)
+                database.paymentsIncomingQueries.update(id = payment1.id, data = payment1, txId = payment1.txId, receivedAt = payment1.lockedAt)
+            }
+            database.paymentsOutgoingQueries.listByTxId(txId).executeAsList().filterIsInstance<OnChainOutgoingPayment>().forEach { payment ->
+                val payment1 = payment.setConfirmed(confirmedAt)
+                database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
+            }
         }
     }
 

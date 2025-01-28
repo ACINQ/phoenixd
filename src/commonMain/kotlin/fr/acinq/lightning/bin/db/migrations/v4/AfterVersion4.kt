@@ -4,20 +4,20 @@ import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.payments.PaymentMetadata
 import fr.acinq.lightning.bin.db.migrations.v4.queries.*
-import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.Companion.hopDescAdapter
+import fr.acinq.lightning.bin.db.migrations.v4.queries.LightningOutgoingQueries.hopDescAdapter
 import fr.acinq.lightning.bin.db.migrations.v4.types.ClosingInfoTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingDetailsTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingPartStatusTypeVersion
 import fr.acinq.lightning.bin.db.migrations.v4.types.LightningOutgoingStatusTypeVersion
 import fr.acinq.lightning.bin.deriveUUID
 import fr.acinq.lightning.bin.toByteArray
-import fr.acinq.lightning.db.LightningOutgoingPayment
-import fr.acinq.lightning.db.OnChainOutgoingPayment
-import fr.acinq.lightning.db.OutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.serialization.payment.Serialization
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.toByteVector32
 import io.ktor.http.*
 
 val AfterVersion4 = AfterVersion(4) { driver ->
@@ -46,6 +46,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
     }
 
     transacter.transaction {
+
         val lightningOutgoingPayments = driver.executeQuery(
             identifier = null,
             sql = """
@@ -110,25 +111,64 @@ val AfterVersion4 = AfterVersion(4) { driver ->
         groupByRawLightningOutgoing(lightningOutgoingPayments)
             .map { insertPayment(it) }
 
+        val incomingPayments = driver.executeQuery(
+            identifier = null,
+            sql = "SELECT data FROM payments_incoming",
+            parameters = 0,
+            mapper = { cursor ->
+                val result = buildMap<TxId, IncomingPayment> {
+                    while (cursor.next().value) {
+                        val data = cursor.getBytes(0)!!
+                        when(val incomingPayment = Serialization.deserialize(data).getOrThrow()) {
+                            is LightningIncomingPayment ->
+                                when(val txId = incomingPayment.parts
+                                    .filterIsInstance<LightningIncomingPayment.Part.Htlc>()
+                                    .firstNotNullOfOrNull { it.fundingFee?.fundingTxId }) {
+                                    is TxId -> put(txId, incomingPayment)
+                                    else -> {}
+                            }
+                            is NewChannelIncomingPayment -> put(incomingPayment.txId, incomingPayment)
+                            else -> {}
+                        }
+                    }
+                }
+                QueryResult.Value(result)
+            }
+        ).value
+
         driver.executeQuery(
             identifier = null,
-            sql = "SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, payment_details_type, created_at, confirmed_at, locked_at FROM inbound_liquidity_outgoing_payments",
+            sql = "SELECT id, mining_fees_sat, channel_id, tx_id, lease_type, lease_blob, created_at, confirmed_at, locked_at FROM inbound_liquidity_outgoing_payments",
             parameters = 0,
             mapper = { cursor ->
                 while (cursor.next().value) {
-                    val payment = InboundLiquidityQueries.mapPayment(
+
+                    val txId = TxId(cursor.getBytes(3)!!.toByteVector32())
+                    val (updatedIncomingPayment, liquidityPayment) = InboundLiquidityQueries.mapPayment(
                         id = cursor.getString(0)!!,
                         mining_fees_sat = cursor.getLong(1)!!,
                         channel_id = cursor.getBytes(2)!!,
                         tx_id = cursor.getBytes(3)!!,
                         lease_type = cursor.getString(4)!!,
                         lease_blob = cursor.getBytes(5)!!,
-                        payment_details_type = cursor.getString(6),
-                        created_at = cursor.getLong(7)!!,
-                        confirmed_at = cursor.getLong(8),
-                        locked_at = cursor.getLong(9)
+                        created_at = cursor.getLong(6)!!,
+                        confirmed_at = cursor.getLong(7),
+                        locked_at = cursor.getLong(8),
+                        incomingPayment = incomingPayments[txId]
                     )
-                    insertPayment(payment)
+
+                    updatedIncomingPayment?.let {
+                        driver.execute(
+                            identifier = null,
+                            sql = "UPDATE payments_incoming SET data=? WHERE id=?".trimMargin(),
+                            parameters = 2
+                        ) {
+                            bindBytes(0, Serialization.serialize(updatedIncomingPayment))
+                            bindBytes(1, updatedIncomingPayment.id.toByteArray())
+                        }
+                    }
+
+                    liquidityPayment?.let { insertPayment(liquidityPayment) }
                 }
                 QueryResult.Unit
             }

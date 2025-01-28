@@ -24,35 +24,34 @@ import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
 
-class ChannelCloseOutgoingQueries {
-    companion object {
-        fun mapChannelCloseOutgoingPayment(
-            id: String,
-            amount_sat: Long,
-            address: String,
-            is_default_address: Long,
-            mining_fees_sat: Long,
-            tx_id: ByteArray,
-            created_at: Long,
-            confirmed_at: Long?,
-            locked_at: Long?,
-            channel_id: ByteArray,
-            closing_info_type: ClosingInfoTypeVersion,
-            closing_info_blob: ByteArray
-        ): ChannelCloseOutgoingPayment {
-            return ChannelCloseOutgoingPayment(
-                id = UUID.fromString(id),
-                recipientAmount = amount_sat.sat,
-                address = address,
-                isSentToDefaultAddress = is_default_address == 1L,
-                miningFees = mining_fees_sat.sat,
-                txId = TxId(tx_id),
-                createdAt = created_at,
-                confirmedAt = confirmed_at,
-                lockedAt = locked_at,
-                channelId = channel_id.toByteVector32(),
-                closingType = ClosingInfoData.deserialize(closing_info_type, closing_info_blob),
-            )
-        }
+object ChannelCloseOutgoingQueries {
+
+    fun mapChannelCloseOutgoingPayment(
+        id: String,
+        amount_sat: Long,
+        address: String,
+        is_default_address: Long,
+        mining_fees_sat: Long,
+        tx_id: ByteArray,
+        created_at: Long,
+        confirmed_at: Long?,
+        locked_at: Long?,
+        channel_id: ByteArray,
+        closing_info_type: ClosingInfoTypeVersion,
+        closing_info_blob: ByteArray
+    ): ChannelCloseOutgoingPayment {
+        return ChannelCloseOutgoingPayment(
+            id = UUID.fromString(id),
+            recipientAmount = amount_sat.sat,
+            address = address,
+            isSentToDefaultAddress = is_default_address == 1L,
+            miningFee = mining_fees_sat.sat,
+            txId = TxId(tx_id),
+            createdAt = created_at,
+            confirmedAt = confirmed_at,
+            lockedAt = locked_at,
+            channelId = channel_id.toByteVector32(),
+            closingType = ClosingInfoData.deserialize(closing_info_type, closing_info_blob),
+        )
     }
 }

@@ -2,6 +2,7 @@ package fr.acinq.lightning.bin.db.payments
 
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenix.db.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,7 +15,11 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
                 database.paymentsIncomingQueries.insert(
                     id = incomingPayment.id,
                     payment_hash = (incomingPayment as? LightningIncomingPayment)?.paymentHash,
-                    tx_id = (incomingPayment as? OnChainIncomingPayment)?.txId,
+                    tx_id = when (incomingPayment) {
+                        is LightningIncomingPayment -> incomingPayment.liquidityPurchaseDetails?.txId
+                        is OnChainIncomingPayment -> incomingPayment.txId
+                        else -> null
+                    },
                     created_at = incomingPayment.createdAt,
                     received_at = incomingPayment.completedAt,
                     data_ = incomingPayment
@@ -26,6 +31,7 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
                             payment_id = incomingPayment.id,
                             tx_id = incomingPayment.txId
                         )
+
                     else -> {}
                 }
             }
@@ -37,17 +43,32 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
             database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment
         }
 
-    override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Part>) {
+    override suspend fun receiveLightningPayment(paymentHash: ByteVector32, parts: List<LightningIncomingPayment.Part>, liquidityPurchase: LiquidityAds.LiquidityTransactionDetails?) {
         withContext(Dispatchers.Default) {
             database.transaction {
                 when (val paymentInDb = database.paymentsIncomingQueries.getByPaymentHash(paymentHash).executeAsOneOrNull() as? LightningIncomingPayment) {
                     is LightningIncomingPayment -> {
-                        val paymentInDb1 = paymentInDb.addReceivedParts(parts)
+                        val paymentInDb1 = paymentInDb.addReceivedParts(parts, liquidityPurchase)
                         database.paymentsIncomingQueries.update(
                             id = paymentInDb1.id,
                             data = paymentInDb1,
-                            receivedAt = paymentInDb1.completedAt
+                            receivedAt = paymentInDb1.completedAt,
+                            txId = paymentInDb1.liquidityPurchaseDetails?.txId
                         )
+                        liquidityPurchase?.let {
+                            when (val autoLiquidityPayment = database.paymentsOutgoingQueries.listByTxId(liquidityPurchase.txId).executeAsOneOrNull()) {
+                                is AutomaticLiquidityPurchasePayment -> {
+                                    val autoLiquidityPayment1 = autoLiquidityPayment.copy(incomingPaymentReceivedAt = paymentInDb1.completedAt)
+                                    database.paymentsOutgoingQueries.update(
+                                        id = autoLiquidityPayment1.id,
+                                        completed_at = autoLiquidityPayment1.completedAt,
+                                        succeeded_at = autoLiquidityPayment1.succeededAt,
+                                        data = autoLiquidityPayment1
+                                    )
+                                }
+                                else -> {}
+                            }
+                        }
                     }
                     null -> error("missing payment for payment_hash=$paymentHash")
                 }

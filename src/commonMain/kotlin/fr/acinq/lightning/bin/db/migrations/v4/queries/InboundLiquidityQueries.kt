@@ -18,40 +18,84 @@ package fr.acinq.lightning.bin.db.migrations.v4.queries
 
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.bin.db.migrations.v4.types.liquidityads.PurchaseData
-import fr.acinq.lightning.db.InboundLiquidityOutgoingPayment
+import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
+import fr.acinq.lightning.wire.LiquidityAds
 
-class InboundLiquidityQueries {
+object InboundLiquidityQueries {
 
-    companion object {
-        fun mapPayment(
-            id: String,
-            mining_fees_sat: Long,
-            channel_id: ByteArray,
-            tx_id: ByteArray,
-            lease_type: String,
-            lease_blob: ByteArray,
-            @Suppress("UNUSED_PARAMETER") payment_details_type: String?,
-            created_at: Long,
-            confirmed_at: Long?,
-            locked_at: Long?
-        ): InboundLiquidityOutgoingPayment {
-            val purchase = PurchaseData.decodeAsCanonical(lease_type, lease_blob)
-            return InboundLiquidityOutgoingPayment(
-                id = UUID.fromString(id),
-                // Attention! With the new OTF and lightning-kmp#710, the liquidity mining fee is split between `localMiningFee` and `purchase.miningFee`.
-                // However, for compatibility reasons with legacy lease data, we keep storing the "merged" mining fee in the mining_fee_sat column.
-                // It means that to retrieve the `localMiningFee`, we must subtract `purchase.miningFee` from the `mining_fee_sat` column.
-                localMiningFees = mining_fees_sat.sat - purchase.fees.miningFee,
-                channelId = channel_id.toByteVector32(),
-                txId = TxId(tx_id),
-                purchase = purchase,
-                createdAt = created_at,
-                confirmedAt = confirmed_at,
-                lockedAt = locked_at
-            )
+    fun mapPayment(
+        id: String,
+        mining_fees_sat: Long,
+        channel_id: ByteArray,
+        tx_id: ByteArray,
+        lease_type: String,
+        lease_blob: ByteArray,
+        created_at: Long,
+        confirmed_at: Long?,
+        locked_at: Long?,
+        incomingPayment: IncomingPayment?
+    ): Pair<IncomingPayment?, OutgoingPayment?> {
+        val channelId = channel_id.toByteVector32()
+        val miningFee = mining_fees_sat.sat
+        val txId = TxId(tx_id)
+        val purchase = PurchaseData.decodeAsCanonical(lease_type, lease_blob)
+
+        return when (incomingPayment) {
+            is LightningIncomingPayment -> {
+                val liquidityPurchaseDetails = LiquidityAds.LiquidityTransactionDetails(
+                    txId = txId,
+                    miningFee = miningFee,
+                    purchase = purchase
+                )
+                val (incomingPayment1, incomingPaymentReceivedAt) = when (incomingPayment) {
+                    is Bolt11IncomingPayment -> incomingPayment.copy(
+                        liquidityPurchaseDetails = liquidityPurchaseDetails
+                    ) to incomingPayment.completedAt
+
+                    is Bolt12IncomingPayment -> incomingPayment.copy(
+                        liquidityPurchaseDetails = liquidityPurchaseDetails
+                    ) to incomingPayment.completedAt
+
+                    else -> null to null
+                }
+                val liquidityPayment = AutomaticLiquidityPurchasePayment(
+                    id = UUID.fromString(id),
+                    miningFee = miningFee - purchase.fees.miningFee,
+                    channelId = channelId,
+                    txId = txId,
+                    liquidityPurchase = purchase,
+                    createdAt = created_at,
+                    confirmedAt = confirmed_at,
+                    lockedAt = locked_at,
+                    incomingPaymentReceivedAt = incomingPaymentReceivedAt
+                )
+                incomingPayment1 to liquidityPayment
+            }
+
+            is NewChannelIncomingPayment -> {
+                val incomingPayment1 =
+                    incomingPayment.copy(liquidityPurchase = purchase)
+                incomingPayment1 to null
+            }
+
+            null -> {
+                val liquidityPayment = ManualLiquidityPurchasePayment(
+                    id = UUID.fromString(id),
+                    miningFee = miningFee - purchase.fees.miningFee,
+                    channelId = channelId,
+                    txId = txId,
+                    liquidityPurchase = purchase,
+                    createdAt = created_at,
+                    confirmedAt = confirmed_at,
+                    lockedAt = locked_at
+                )
+                null to liquidityPayment
+            }
+
+            else -> error("impossible")
         }
     }
 }

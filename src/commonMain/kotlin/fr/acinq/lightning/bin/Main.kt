@@ -315,13 +315,14 @@ class Phoenixd : CliktCommand() {
                             }
                             is PaymentEvents.PaymentSent ->
                                 when (val payment = it.payment) {
-                                    is InboundLiquidityOutgoingPayment -> {
+                                    is AutomaticLiquidityPurchasePayment -> {
                                         val totalFee = payment.fees.truncateToSatoshi()
-                                        val feePaidFromBalance = payment.feePaidFromChannelBalance.total
-                                        val feePaidFromFeeCredit = payment.feeCreditUsed.truncateToSatoshi()
+                                        val purchaseDetails = payment.liquidityPurchaseDetails
+                                        val feePaidFromBalance = purchaseDetails.feePaidFromChannelBalance.total
+                                        val feePaidFromFeeCredit = purchaseDetails.feeCreditUsed.truncateToSatoshi()
                                         val feeRemaining = totalFee - feePaidFromBalance - feePaidFromFeeCredit
-                                        val purchaseType = payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
-                                        consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")
+                                        val purchaseType = purchaseDetails.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
+                                        consoleLog("purchased inbound liquidity: ${purchaseDetails.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")
                                     }
                                     else -> {}
                                 }

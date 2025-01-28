@@ -98,14 +98,6 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
         }
     }
 
-    override suspend fun getInboundLiquidityPurchase(fundingTxId: TxId): InboundLiquidityOutgoingPayment? {
-        return withContext(Dispatchers.Default) {
-            database.paymentsOutgoingQueries.listByTxId(fundingTxId).executeAsList()
-                .filterIsInstance<InboundLiquidityOutgoingPayment>()
-                .firstOrNull()
-        }
-    }
-
     override suspend fun getLightningOutgoingPayment(id: UUID): LightningOutgoingPayment? {
         return withContext(Dispatchers.Default) {
             database.paymentsOutgoingQueries.get(id).executeAsOneOrNull() as? LightningOutgoingPayment

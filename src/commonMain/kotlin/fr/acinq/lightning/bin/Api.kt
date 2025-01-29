@@ -220,11 +220,11 @@ class Api(
                         offset = call.parameters.getOptionalLong("offset") ?: 0,
                         listAll = call.parameters["all"]?.toBoolean() ?: false, // by default, only list incoming payments that have been received
                         externalId = call.parameters["externalId"] // may filter incoming payments by an external id
-                    ).map { (payment, externalId) ->
+                    ).mapNotNull { (payment, externalId) ->
                         when (payment) {
                             is LightningIncomingPayment -> IncomingPayment(payment, externalId)
                             is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, externalId)
-                            else -> {}
+                            else -> null
                         }
                     }
                     call.respond(payments)

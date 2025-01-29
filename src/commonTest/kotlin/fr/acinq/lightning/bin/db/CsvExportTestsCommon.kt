@@ -46,7 +46,7 @@ class CsvExportTestsCommon {
         val driver = createAppDbDriver(testdir, Chain.Testnet3, PublicKey.fromHex("03be9f16ffcfe10ec7381506601b1b75c9638d5e5aa8c4e7a546573ee09bc68fa2"))
         val database = createPhoenixDb(driver)
         val paymentsDb = SqlitePaymentsDb(database)
-        val csvWriter = WalletPaymentCsvWriter("csv/export.csv".toPath())
+        val csvWriter = WalletPaymentCsvWriter(testdir / "export.csv".toPath())
         runBlocking {
             paymentsDb.processSuccessfulPayments(0, currentTimestampMillis()) { payment ->
                 csvWriter.add(payment)

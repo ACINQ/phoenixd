@@ -121,12 +121,12 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                         val data = cursor.getBytes(0)!!
                         when(val incomingPayment = Serialization.deserialize(data).getOrThrow()) {
                             is LightningIncomingPayment ->
-                                when(val txId = incomingPayment.parts
+                                when (val txId = incomingPayment.parts
                                     .filterIsInstance<LightningIncomingPayment.Part.Htlc>()
                                     .firstNotNullOfOrNull { it.fundingFee?.fundingTxId }) {
                                     is TxId -> put(txId, incomingPayment)
                                     else -> {}
-                            }
+                                }
                             is NewChannelIncomingPayment -> put(incomingPayment.txId, incomingPayment)
                             else -> {}
                         }
@@ -160,11 +160,16 @@ val AfterVersion4 = AfterVersion(4) { driver ->
                     updatedIncomingPayment?.let {
                         driver.execute(
                             identifier = null,
-                            sql = "UPDATE payments_incoming SET data=? WHERE id=?".trimMargin(),
-                            parameters = 2
+                            sql = "UPDATE payments_incoming SET data=?, tx_id=? WHERE id=?",
+                            parameters = 3
                         ) {
                             bindBytes(0, Serialization.serialize(updatedIncomingPayment))
-                            bindBytes(1, updatedIncomingPayment.id.toByteArray())
+                            bindBytes(1, when (updatedIncomingPayment) {
+                                is LightningIncomingPayment -> updatedIncomingPayment.liquidityPurchaseDetails?.txId
+                                is OnChainIncomingPayment -> updatedIncomingPayment.txId
+                                else -> null
+                            }?.value?.toByteArray())
+                            bindBytes(2, updatedIncomingPayment.id.toByteArray())
                         }
                     }
 

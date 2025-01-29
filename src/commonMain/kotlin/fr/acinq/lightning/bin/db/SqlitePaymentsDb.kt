@@ -119,7 +119,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
             var batchOffset = 0L
             var fetching = true
             while (fetching) {
-                database.paymentsQueries.listSucceeded(succeeded_at_from = from, succeeded_at_to = to, limit = batchSize, offset = batchOffset)
+                database.paymentsQueries.listSuccessful(succeeded_at_from = from, succeeded_at_to = to, limit = batchSize, offset = batchOffset)
                     .execute { cursor ->
                         var resultSize = 0
                         while (cursor.next().value) {

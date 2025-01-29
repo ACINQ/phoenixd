@@ -35,10 +35,8 @@ class CsvExportTestsCommon {
     @Test
     fun `export to csv (starblocks)`() {
         val testdir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "phoenix_tests" / "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}"
-        println(testdir)
         FileSystem.SYSTEM.createDirectories(testdir)
         FileSystem.RESOURCES.list("/sampledbs/v3".toPath()).forEach { file ->
-            println(file)
             FileSystem.RESOURCES.source(file).use { bytesIn ->
                 FileSystem.SYSTEM.sink(testdir / file.name).buffer().use { bytesOut ->
                     bytesOut.writeAll(bytesIn)

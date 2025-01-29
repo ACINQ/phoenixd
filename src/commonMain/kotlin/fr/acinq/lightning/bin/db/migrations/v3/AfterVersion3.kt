@@ -51,7 +51,6 @@ val AfterVersion3 = AfterVersion(3) { driver ->
                     sql = "INSERT INTO payments_incoming (id, payment_hash, tx_id, created_at, received_at, data) VALUES (?, ?, ?, ?, ?, ?)",
                     parameters = 6
                 ) {
-                    println("migrating incoming $payment")
                     when (payment) {
                         is LightningIncomingPayment -> {
                             bindBytes(0, payment.paymentHash.deriveUUID().toByteArray())

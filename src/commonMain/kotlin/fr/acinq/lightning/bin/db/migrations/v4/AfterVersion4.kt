@@ -30,7 +30,6 @@ val AfterVersion4 = AfterVersion(4) { driver ->
             sql = "INSERT INTO payments_outgoing (id, payment_hash, tx_id, created_at, completed_at, succeeded_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
             parameters = 7
         ) {
-            println("migrating outgoing $payment")
             val (paymentHash, txId) = when (payment) {
                 is LightningOutgoingPayment -> payment.paymentHash to null
                 is OnChainOutgoingPayment -> null to payment.txId

@@ -17,10 +17,8 @@ class DbMigrationTestsCommon {
     @Test
     fun `read v3 db`() = runTest {
         val testdir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "phoenix_tests" / "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}"
-        println(testdir)
         FileSystem.SYSTEM.createDirectories(testdir)
         FileSystem.RESOURCES.list("/sampledbs/v3".toPath()).forEach { file ->
-            println(file)
             FileSystem.RESOURCES.source(file).use { bytesIn ->
                 FileSystem.SYSTEM.sink(testdir / file.name).buffer().use { bytesOut ->
                     bytesOut.writeAll(bytesIn)
@@ -32,22 +30,18 @@ class DbMigrationTestsCommon {
 
         SqlitePaymentsDb(database)
             .listIncomingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = true)
-            .also { println("$it") }
             .also { assertEquals(2150, it.size) }
 
         SqlitePaymentsDb(database)
             .listIncomingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = false)
-            .also { println("$it") }
             .also { assertEquals(739, it.size) }
 
         SqlitePaymentsDb(database)
             .listOutgoingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = true)
-            .also { println("$it") }
             .also { assertEquals(2 + 1 + 30 + 5, it.size) }
 
         SqlitePaymentsDb(database)
             .listOutgoingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = false)
-            .also { println("$it") }
             .also { assertEquals(2 + 1 + 24 + 5, it.size) }
     }
 

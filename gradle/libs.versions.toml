@@ -1,0 +1,15 @@
+[versions]
+kotlin = "1.9.23"
+okio = "3.8.0"
+clikt = "4.2.2"
+ktor = "2.3.8"
+sqldelight = "2.0.1" # TODO: remove 'addEnclosingTransaction' hack in AfterVersionX files when upgrading
+lightningkmp = "1.8.5-SNAPSHOT"
+
+# test dependencies
+test-logback = "1.2.3"
+
+[plugins]
+multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

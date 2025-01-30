@@ -1,5 +1,3 @@
-rootProject.name = "phoenixd"
-
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -7,3 +5,13 @@ pluginManagement {
     }
 }
 
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal()
+        maven("https://oss.sonatype.org/content/repositories/snapshots")
+        mavenCentral()
+        google()
+    }
+}
+
+rootProject.name = "phoenixd"

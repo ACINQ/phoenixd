@@ -1,38 +1,13 @@
-import Versions.ktor
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import java.io.ByteArrayOutputStream
 
-buildscript {
-    dependencies {
-        classpath("app.cash.sqldelight:gradle-plugin:${Versions.sqlDelight}")
-    }
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
 plugins {
-    kotlin("multiplatform") version Versions.kotlin
-    kotlin("plugin.serialization") version Versions.kotlin
-    id("app.cash.sqldelight") version Versions.sqlDelight
+    alias(libs.plugins.multiplatform)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.sqldelight)
     application
-}
-
-allprojects {
-    group = "fr.acinq.phoenixd"
-    version = "0.4.3-SNAPSHOT"
-
-    repositories {
-        // using the local maven repository with Kotlin Multi Platform can lead to build errors that are hard to diagnose.
-        // uncomment this only if you need to experiment with snapshot dependencies that have not yet be published.
-        mavenLocal()
-        maven("https://oss.sonatype.org/content/repositories/snapshots")
-        mavenCentral()
-        google()
-    }
 }
 
 /** Get the current git commit hash. */
@@ -59,7 +34,7 @@ val buildVersionsTask by tasks.registering(Sync::class) {
             |object BuildVersions {
             |    const val phoenixdCommit = "${gitCommitHash()}"
             |    const val phoenixdVersion = "${project.version}-${gitCommitHash().take(7)}"
-            |    const val lightningKmpVersion = "${Versions.lightningKmp}"
+            |    const val lightningKmpVersion = "${libs.versions.lightningkmp.get()}"
             |}
             |
             """.trimMargin()
@@ -113,25 +88,25 @@ kotlin {
         commonMain {
             kotlin.srcDir(buildVersionsTask.map { it.destinationDir })
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp-core:${Versions.lightningKmp}")
+                implementation("fr.acinq.lightning:lightning-kmp-core:${libs.versions.lightningkmp.get()}")
                 // ktor serialization
-                implementation(ktor("serialization-kotlinx-json"))
+                implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor.get()}")
                 // ktor server
-                implementation(ktor("server-core"))
-                implementation(ktor("server-content-negotiation"))
-                implementation(ktor("server-cio"))
-                implementation(ktor("server-websockets"))
-                implementation(ktor("server-auth"))
-                implementation(ktor("server-status-pages")) // exception handling
+                implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-server-content-negotiation:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-server-websockets:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-server-auth:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-server-status-pages:${libs.versions.ktor.get()}") // exception handling
                 // ktor client (needed for webhook)
-                implementation(ktor("client-core"))
-                implementation(ktor("client-content-negotiation"))
-                implementation(ktor("client-auth"))
-                implementation(ktor("client-json"))
+                implementation("io.ktor:ktor-client-core:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-client-content-negotiation:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-client-auth:${libs.versions.ktor.get()}")
+                implementation("io.ktor:ktor-client-json:${libs.versions.ktor.get()}")
 
-                implementation("com.squareup.okio:okio:${Versions.okio}")
-                implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
-                implementation("app.cash.sqldelight:coroutines-extensions:${Versions.sqlDelight}")
+                implementation("com.squareup.okio:okio:${libs.versions.okio.get()}")
+                implementation("com.github.ajalt.clikt:clikt:${libs.versions.clikt.get()}")
+                //implementation("app.cash.sqldelight:coroutines-extensions:${libs.versions.sq}")
             }
         }
         commonTest {
@@ -141,27 +116,27 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                implementation("app.cash.sqldelight:sqlite-driver:${Versions.sqlDelight}")
-                implementation(ktor("client-okhttp"))
-                implementation("ch.qos.logback:logback-classic:1.2.3")
+                implementation("app.cash.sqldelight:sqlite-driver:${libs.versions.sqldelight.get()}")
+                implementation("io.ktor:ktor-client-okhttp:${libs.versions.ktor.get()}")
+                implementation("ch.qos.logback:logback-classic:${libs.versions.test.logback.get()}")
             }
         }
         nativeMain {
             dependencies {
-                implementation("app.cash.sqldelight:native-driver:${Versions.sqlDelight}")
+                implementation("app.cash.sqldelight:native-driver:${libs.versions.sqldelight.get()}")
             }
         }
         if (currentOs.isLinux) {
             linuxMain {
                 dependencies {
-                    implementation(ktor("client-curl"))
+                    implementation("io.ktor:ktor-client-curl:${libs.versions.ktor.get()}")
                 }
             }
         }
         if (currentOs.isMacOsX) {
             macosMain {
                 dependencies {
-                    implementation(ktor("client-darwin"))
+                    implementation("io.ktor:ktor-client-darwin:${libs.versions.ktor.get()}")
                 }
             }
         }

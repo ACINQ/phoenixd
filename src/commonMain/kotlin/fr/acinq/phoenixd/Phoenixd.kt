@@ -400,6 +400,7 @@ class Phoenixd : CliktCommand() {
             peerConnectionLoop.cancel()
             peer.disconnect()
             server.stop()
+            driver.close()
             exitProcess(0)
         }
         server.environment.monitor.subscribe(ApplicationStopped) { consoleLog(brightYellow("http server stopped")) }

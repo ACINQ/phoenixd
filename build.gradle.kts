@@ -1,5 +1,7 @@
 import Versions.ktor
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import java.io.ByteArrayOutputStream
 
 buildscript {
@@ -135,7 +137,6 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
             }
         }
         jvmMain {
@@ -220,6 +221,15 @@ distributions {
 // forward std input when app is run via gradle (otherwise keyboard input will return EOF)
 tasks.withType<JavaExec> {
     standardInput = System.`in`
+}
+
+// print errors to console in native tests
+tasks.withType<KotlinNativeTest> {
+    testLogging {
+        exceptionFormat = TestExceptionFormat.FULL
+        showStandardStreams = true
+        showStackTraces = true
+    }
 }
 
 sqldelight {

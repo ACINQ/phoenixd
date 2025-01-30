@@ -3,7 +3,7 @@ package fr.acinq.lightning.bin.db
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.bin.createAppDbDriver
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -15,11 +15,11 @@ import kotlin.test.assertEquals
 class DbMigrationTestsCommon {
 
     @Test
-    fun `read v3 db`() = runTest {
+    fun `read v3 db`() = runBlocking {
         val testdir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "phoenix_tests" / "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}"
         FileSystem.SYSTEM.createDirectories(testdir)
-        FileSystem.RESOURCES.list("/sampledbs/v3".toPath()).forEach { file ->
-            FileSystem.RESOURCES.source(file).use { bytesIn ->
+        FileSystem.SYSTEM.list("src/commonTest/resources/sampledbs/v3".toPath()).forEach { file ->
+            FileSystem.SYSTEM.source(file).use { bytesIn ->
                 FileSystem.SYSTEM.sink(testdir / file.name).buffer().use { bytesOut ->
                     bytesOut.writeAll(bytesIn)
                 }
@@ -43,6 +43,8 @@ class DbMigrationTestsCommon {
         SqlitePaymentsDb(database)
             .listOutgoingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = false)
             .also { assertEquals(2 + 1 + 24 + 5, it.size) }
+
+        driver.close()
     }
 
 

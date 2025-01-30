@@ -44,3 +44,6 @@ project/plugins/project/
 target/
 project/target
 DeleteMe*.scala
+
+# unzipped jvm packages
+phoenix-*-jvm

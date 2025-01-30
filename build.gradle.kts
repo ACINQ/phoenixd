@@ -106,7 +106,6 @@ kotlin {
 
                 implementation("com.squareup.okio:okio:${libs.versions.okio.get()}")
                 implementation("com.github.ajalt.clikt:clikt:${libs.versions.clikt.get()}")
-                //implementation("app.cash.sqldelight:coroutines-extensions:${libs.versions.sq}")
             }
         }
         commonTest {

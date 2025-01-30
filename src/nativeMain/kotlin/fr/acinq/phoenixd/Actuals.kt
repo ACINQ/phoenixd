@@ -7,7 +7,7 @@ import fr.acinq.bitcoin.PublicKey
 import fr.acinq.phoenixd.conf.EnvVars.PHOENIX_DATADIR
 import fr.acinq.phoenixd.db.migrations.v3.afterVersion3
 import fr.acinq.phoenixd.db.migrations.v4.afterVersion4
-import fr.acinq.phoenixd.db.PhoenixDatabase
+import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
 import okio.Path

@@ -6,7 +6,7 @@ import fr.acinq.lightning.db.OnChainOutgoingPayment
 import fr.acinq.lightning.db.OutgoingPayment
 import fr.acinq.lightning.db.OutgoingPaymentsDb
 import fr.acinq.lightning.utils.UUID
-import fr.acinq.phoenixd.db.PhoenixDatabase
+import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

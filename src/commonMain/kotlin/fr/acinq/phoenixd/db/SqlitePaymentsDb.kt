@@ -25,6 +25,7 @@ import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenixd.db.payments.PaymentsMetadataQueries
 import fr.acinq.phoenixd.db.payments.SqliteIncomingPaymentsDb
 import fr.acinq.phoenixd.db.payments.SqliteOutgoingPaymentsDb
+import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -118,7 +119,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
             var batchOffset = 0L
             var fetching = true
             while (fetching) {
-                database.paymentsViewQueries.listSuccessful(succeeded_at_from = from, succeeded_at_to = to, limit = batchSize, offset = batchOffset)
+                database.paymentsQueries.listSuccessful(succeeded_at_from = from, succeeded_at_to = to, limit = batchSize, offset = batchOffset)
                     .execute { cursor ->
                         var resultSize = 0
                         while (cursor.next().value) {

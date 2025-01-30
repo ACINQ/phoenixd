@@ -147,7 +147,7 @@ class Api(
                 get("getinfo") {
                     val info = NodeInfo(
                         nodeId = nodeParams.nodeId,
-                        channels = peer.channels.values.map { Channel.from(it) },
+                        channels = peer.channels.values.map { ApiType.Channel.from(it) },
                         chain = nodeParams.chain.name.lowercase(),
                         blockHeight = peer.currentTipFlow.value,
                         version = BuildVersions.phoenixdVersion

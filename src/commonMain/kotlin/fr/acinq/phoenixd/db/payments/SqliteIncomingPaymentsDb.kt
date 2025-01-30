@@ -3,7 +3,7 @@ package fr.acinq.phoenixd.db.payments
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.wire.LiquidityAds
-import fr.acinq.phoenixd.db.PhoenixDatabase
+import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

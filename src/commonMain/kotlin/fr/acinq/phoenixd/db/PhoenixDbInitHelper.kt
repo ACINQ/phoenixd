@@ -11,6 +11,7 @@ import fr.acinq.lightning.db.OutgoingPayment
 import fr.acinq.lightning.db.WalletPayment
 import fr.acinq.lightning.serialization.payment.Serialization
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.phoenixd.db.sqldelight.*
 import io.ktor.http.*
 
 fun createPhoenixDb(driver: SqlDriver) = PhoenixDatabase(

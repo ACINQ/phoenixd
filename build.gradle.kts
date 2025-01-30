@@ -235,7 +235,7 @@ tasks.withType<KotlinNativeTest> {
 sqldelight {
     databases {
         create("PhoenixDatabase") {
-            packageName.set("fr.acinq.phoenixd.db")
+            packageName.set("fr.acinq.phoenixd.db.sqldelight")
             srcDirs.from("src/commonMain/sqldelight/phoenixdb")
         }
     }

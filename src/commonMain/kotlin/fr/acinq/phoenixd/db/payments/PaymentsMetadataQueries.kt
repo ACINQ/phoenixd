@@ -2,7 +2,7 @@ package fr.acinq.phoenixd.db.payments
 
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.lightning.utils.currentTimestampMillis
-import fr.acinq.phoenixd.db.PhoenixDatabase
+import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import fr.acinq.phoenixd.deriveUUID
 import io.ktor.http.*
 

@@ -12,11 +12,21 @@ import fr.acinq.lightning.db.LegacyPayToOpenIncomingPayment
 import fr.acinq.lightning.db.LightningIncomingPayment
 import fr.acinq.lightning.serialization.payment.Serialization
 
-val AfterVersion3 = AfterVersion(3) { driver ->
+/**
+ * @param addEnclosingTransaction this is a workaround while waiting for
+ * https://github.com/sqldelight/sqldelight/pull/5218 to be released to
+ * be released.
+ */
+fun afterVersion3(addEnclosingTransaction: Boolean) = AfterVersion(3) { driver ->
 
-    val transacter = object : TransacterImpl(driver) {}
+    fun maybeTx(body: () -> Any) = if (addEnclosingTransaction) {
+        val transacter = object : TransacterImpl(driver) {}
+        transacter.transaction { body() }
+    } else {
+        body()
+    }
 
-    transacter.transaction {
+    maybeTx {
         val payments = driver.executeQuery(
             identifier = null,
             sql = "SELECT * FROM incoming_payments",

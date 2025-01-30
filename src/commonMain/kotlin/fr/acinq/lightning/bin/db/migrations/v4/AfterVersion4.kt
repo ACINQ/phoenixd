@@ -20,9 +20,19 @@ import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.toByteVector32
 import io.ktor.http.*
 
-val AfterVersion4 = AfterVersion(4) { driver ->
+/**
+ * @param addEnclosingTransaction this is a workaround while waiting for
+ * https://github.com/sqldelight/sqldelight/pull/5218 to be released to
+ * be released.
+ */
+fun afterVersion4(addEnclosingTransaction: Boolean) = AfterVersion(4) { driver ->
 
-    val transacter = object : TransacterImpl(driver) {}
+    fun maybeTx(body: () -> Any) = if (addEnclosingTransaction) {
+        val transacter = object : TransacterImpl(driver) {}
+        transacter.transaction { body() }
+    } else {
+        body()
+    }
 
     fun insertPayment(payment: OutgoingPayment) {
         driver.execute(
@@ -44,7 +54,7 @@ val AfterVersion4 = AfterVersion(4) { driver ->
         }
     }
 
-    transacter.transaction {
+    maybeTx {
 
         val lightningOutgoingPayments = driver.executeQuery(
             identifier = null,

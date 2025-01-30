@@ -22,7 +22,7 @@ plugins {
 }
 
 allprojects {
-    group = "fr.acinq.lightning"
+    group = "fr.acinq.phoenixd"
     version = "0.4.3-SNAPSHOT"
 
     repositories {
@@ -54,7 +54,7 @@ val buildVersionsTask by tasks.registering(Sync::class) {
     from(
         resources.text.fromString(
             """
-            |package fr.acinq.lightning
+            |package fr.acinq.phoenixd
             |
             |object BuildVersions {
             |    const val phoenixdCommit = "${gitCommitHash()}"
@@ -66,7 +66,7 @@ val buildVersionsTask by tasks.registering(Sync::class) {
         )
     ) {
         rename { "BuildVersions.kt" }
-        into("fr/acinq/lightning")
+        into("fr/acinq/phoenixd")
     }
     into(layout.buildDirectory.dir("generated/kotlin/"))
 }
@@ -82,11 +82,11 @@ kotlin {
     fun KotlinNativeTargetWithHostTests.phoenixBinaries() {
         binaries {
             executable("phoenixd") {
-                entryPoint = "fr.acinq.lightning.bin.main"
+                entryPoint = "fr.acinq.phoenixd.main"
                 optimized = false // without this, release mode throws 'Index 0 out of bounds for length 0' in StaticInitializersOptimization.kt
             }
             executable("phoenix-cli") {
-                entryPoint = "fr.acinq.lightning.cli.main"
+                entryPoint = "fr.acinq.phoenixd.cli.main"
                 optimized = false // without this, release mode throws 'Index 0 out of bounds for length 0' in StaticInitializersOptimization.kt
             }
         }
@@ -169,11 +169,11 @@ kotlin {
 }
 
 application {
-    mainClass = "fr.acinq.lightning.bin.MainKt"
+    mainClass = "fr.acinq.phoenixd.PhoenixdKt"
 }
 
 val cliScripts by tasks.register("cliScripts", CreateStartScripts::class) {
-    mainClass.set("fr.acinq.lightning.cli.PhoenixCliKt")
+    mainClass.set("fr.acinq.phoenixd.cli.PhoenixCliKt")
     outputDir = tasks.startScripts.get().outputDir
     classpath = tasks.startScripts.get().classpath
     applicationName = "phoenix-cli"
@@ -235,7 +235,7 @@ tasks.withType<KotlinNativeTest> {
 sqldelight {
     databases {
         create("PhoenixDatabase") {
-            packageName.set("fr.acinq.phoenix.db")
+            packageName.set("fr.acinq.phoenixd.db")
             srcDirs.from("src/commonMain/sqldelight/phoenixdb")
         }
     }

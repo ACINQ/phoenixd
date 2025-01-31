@@ -29,7 +29,7 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         schema = PhoenixDatabase.Schema,
         name = "phoenix.$chainName.${nodeId.toHex().take(6)}.db",
         maxReaderConnections = 1,
-        onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString())) },
+        onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString(), foreignKeyConstraints = true)) },
         afterVersion3(addEnclosingTransaction = false),
         afterVersion4(addEnclosingTransaction = false)
     )

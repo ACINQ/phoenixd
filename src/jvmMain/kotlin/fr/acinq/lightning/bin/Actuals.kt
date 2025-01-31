@@ -33,7 +33,7 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
 
     val driver = JdbcSqliteDriver(
         url = "jdbc:sqlite:$path",
-        properties = Properties(),
+        properties = Properties().apply { put("foreign_keys", "true") },
         schema = PhoenixDatabase.Schema,
         migrateEmptySchema = false,
         afterVersion3(addEnclosingTransaction = true),

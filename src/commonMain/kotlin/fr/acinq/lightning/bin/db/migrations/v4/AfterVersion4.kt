@@ -337,8 +337,8 @@ fun afterVersion4(addEnclosingTransaction: Boolean) = AfterVersion(4) { driver -
             }
 
         listOf(
-            "DROP TABLE lightning_outgoing_payments",
             "DROP TABLE lightning_outgoing_payment_parts",
+            "DROP TABLE lightning_outgoing_payments",
             "DROP TABLE inbound_liquidity_outgoing_payments",
             "DROP TABLE splice_outgoing_payments",
             "DROP TABLE splice_cpfp_outgoing_payments",

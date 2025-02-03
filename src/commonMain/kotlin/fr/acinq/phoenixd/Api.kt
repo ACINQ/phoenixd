@@ -261,6 +261,19 @@ class Api(
                         call.respond(OutgoingPayment(it))
                     } ?: call.respond(HttpStatusCode.NotFound)
                 }
+                get("payments/outgoingbyhash") {
+                    val paymentHash = call.parameters.getByteVector32("paymentHash")
+                    paymentDb.listLightningOutgoingPayments(paymentHash).maxByOrNull {
+                        when (it.status) {
+                            is LightningOutgoingPayment.Status.Succeeded -> 3
+                            is LightningOutgoingPayment.Status.Pending -> 2
+                            is LightningOutgoingPayment.Status.Failed -> 1
+                        }
+                    }
+                        ?.let {
+                            call.respond(OutgoingPayment(it))
+                        } ?: call.respond(HttpStatusCode.NotFound)
+                }
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("payinvoice") {
                         val formParameters = call.receiveParameters()

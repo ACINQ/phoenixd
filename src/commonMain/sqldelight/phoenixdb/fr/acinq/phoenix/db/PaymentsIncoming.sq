@@ -76,7 +76,7 @@ SELECT data
 FROM   payments_incoming
 WHERE  tx_id=?;
 
-delete:
+deleteByPaymentHash:
 DELETE FROM payments_incoming
 WHERE payment_hash = ?;
 

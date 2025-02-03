@@ -77,14 +77,18 @@ object InboundLiquidityQueries {
 
             is NewChannelIncomingPayment -> {
                 val incomingPayment1 =
-                    incomingPayment.copy(liquidityPurchase = purchase)
+                    incomingPayment.copy(
+                        miningFee = incomingPayment.miningFee + purchase.fees.miningFee,
+                        serviceFee = purchase.fees.serviceFee.toMilliSatoshi(),
+                        liquidityPurchase = purchase
+                    )
                 incomingPayment1 to null
             }
 
             null -> {
                 val liquidityPayment = ManualLiquidityPurchasePayment(
                     id = UUID.fromString(id),
-                    miningFee = miningFee - purchase.fees.miningFee,
+                    miningFee = miningFee,
                     channelId = channelId,
                     txId = txId,
                     liquidityPurchase = purchase,

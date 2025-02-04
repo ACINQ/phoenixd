@@ -1,0 +1,63 @@
+-- Migration: v4 -> v5
+--
+-- There is also a code migration, see AfterVersion4.kt
+
+CREATE TABLE payments_outgoing (
+    id BLOB AS UUID NOT NULL PRIMARY KEY,
+    payment_hash BLOB AS ByteVector32,
+    tx_id BLOB AS TxId,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER, -- a completed outgoing payment can be a success or a failure
+    succeeded_at INTEGER, -- will only be set for a successful payment
+    data BLOB AS OutgoingPayment NOT NULL
+);
+
+CREATE INDEX payments_outgoing_payment_hash_idx ON payments_outgoing(payment_hash);
+CREATE INDEX payments_outgoing_tx_id_idx ON payments_outgoing(tx_id);
+
+-- Create indexes to optimize the queries in AggregatedQueries.
+-- Tip: Use "explain query plan" to ensure they're actually being used.
+CREATE INDEX payments_outgoing_filter_idx ON payments_outgoing(completed_at) WHERE completed_at IS NOT NULL;
+
+CREATE TABLE link_lightning_outgoing_payment_parts (
+    part_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    parent_id BLOB AS UUID NOT NULL
+);
+
+-- This table will be read then deleted in the code migration
+ALTER TABLE payments_metadata RENAME TO payments_metadata_old;
+DROP INDEX payments_metadata_external_id;
+
+-- This table stores metadata corresponding to a payment. Does not contain critical data.
+-- * id          => uuid identifier of the payment
+-- * external_id => an arbitrary string defined by the user to track the payment in their own system
+-- * webhook_url => a webhook url that will be notified for that specific payment
+CREATE TABLE payments_metadata (
+    payment_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    external_id TEXT,
+    webhook_url TEXT AS Url,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
+
+CREATE TABLE on_chain_txs (
+    payment_id BLOB AS UUID NOT NULL PRIMARY KEY,
+    tx_id BLOB AS TxId NOT NULL,
+    confirmed_at INTEGER,
+    locked_at INTEGER
+);
+
+CREATE INDEX on_chain_txs_tx_id ON on_chain_txs(tx_id);
+
+-- This view returns all outgoing payments, but only successful incoming payments.
+CREATE VIEW payments
+AS SELECT id, created_at, completed_at, succeeded_at, order_ts, data
+FROM (
+    SELECT id, created_at, received_at AS completed_at, received_at AS succeeded_at, received_at AS order_ts, data
+    FROM payments_incoming
+    WHERE received_at IS NOT NULL -- we only consider completed incoming payments
+UNION ALL
+    SELECT id, created_at, completed_at, succeeded_at, created_at AS order_ts, data
+    FROM payments_outgoing
+);

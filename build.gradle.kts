@@ -1,5 +1,7 @@
 import Versions.ktor
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import java.io.ByteArrayOutputStream
 
 buildscript {
@@ -111,7 +113,7 @@ kotlin {
         commonMain {
             kotlin.srcDir(buildVersionsTask.map { it.destinationDir })
             dependencies {
-                implementation("fr.acinq.lightning:lightning-kmp:${Versions.lightningKmp}")
+                implementation("fr.acinq.lightning:lightning-kmp-core:${Versions.lightningKmp}")
                 // ktor serialization
                 implementation(ktor("serialization-kotlinx-json"))
                 // ktor server
@@ -219,6 +221,15 @@ distributions {
 // forward std input when app is run via gradle (otherwise keyboard input will return EOF)
 tasks.withType<JavaExec> {
     standardInput = System.`in`
+}
+
+// print errors to console in native tests
+tasks.withType<KotlinNativeTest> {
+    testLogging {
+        exceptionFormat = TestExceptionFormat.FULL
+        showStandardStreams = true
+        showStackTraces = true
+    }
 }
 
 sqldelight {

@@ -30,7 +30,6 @@ import fr.acinq.lightning.bin.conf.PhoenixSeed
 import fr.acinq.lightning.bin.conf.getOrGenerateSeed
 import fr.acinq.lightning.bin.db.SqliteChannelsDb
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
-import fr.acinq.lightning.bin.db.WalletPaymentId
 import fr.acinq.lightning.bin.db.createPhoenixDb
 import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.bin.logs.FileLogWriter
@@ -45,8 +44,6 @@ import fr.acinq.lightning.io.TcpSocket
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.payment.LiquidityPolicy
 import fr.acinq.lightning.utils.*
-import fr.acinq.lightning.wire.LiquidityAds
-import fr.acinq.phoenix.db.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -275,10 +272,14 @@ class Phoenixd : CliktCommand() {
                     nodeParams.nodeEvents
                         .collect {
                             when {
-                                it is PaymentEvents.PaymentReceived && it.amount > 0.msat -> {
-                                    val incomingPayment = paymentsDb.getIncomingPayment(it.paymentHash)
-                                    val metadata = paymentsDb.metadataQueries.get(WalletPaymentId.IncomingPaymentId(it.paymentHash))
-                                    emit(ApiType.PaymentReceived(it, incomingPayment, metadata))
+                                it is PaymentEvents.PaymentReceived && it.payment.amount > 0.msat -> {
+                                    when(val payment = it.payment) {
+                                        is LightningIncomingPayment -> {
+                                            val metadata = paymentsDb.metadataQueries.get(payment.paymentHash)
+                                            emit(ApiType.PaymentReceived(payment, metadata))
+                                        }
+                                        else -> {}
+                                    }
                                 }
                                 else -> {}
                             }
@@ -304,20 +305,24 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<PaymentEvents>()
                     .collect {
                         when (it) {
-                            is PaymentEvents.PaymentReceived -> {
-                                val fee = it.receivedWith.filterIsInstance<IncomingPayment.ReceivedWith.LightningPayment>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
-                                val type = it.receivedWith.joinToString { part -> part::class.simpleName.toString().lowercase() }
-                                consoleLog("received lightning payment: ${it.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
+                            is PaymentEvents.PaymentReceived -> when(val payment = it.payment) {
+                                is LightningIncomingPayment -> {
+                                    val fee = payment.parts.filterIsInstance<LightningIncomingPayment.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
+                                    val type = payment.parts.joinToString { part -> part::class.simpleName.toString().lowercase() }
+                                    consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
+                                }
+                                else -> {}
                             }
                             is PaymentEvents.PaymentSent ->
                                 when (val payment = it.payment) {
-                                    is InboundLiquidityOutgoingPayment -> {
+                                    is AutomaticLiquidityPurchasePayment -> {
                                         val totalFee = payment.fees.truncateToSatoshi()
-                                        val feePaidFromBalance = payment.feePaidFromChannelBalance.total
-                                        val feePaidFromFeeCredit = payment.feeCreditUsed.truncateToSatoshi()
+                                        val purchaseDetails = payment.liquidityPurchaseDetails
+                                        val feePaidFromBalance = purchaseDetails.feePaidFromChannelBalance.total
+                                        val feePaidFromFeeCredit = purchaseDetails.feeCreditUsed.truncateToSatoshi()
                                         val feeRemaining = totalFee - feePaidFromBalance - feePaidFromFeeCredit
-                                        val purchaseType = payment.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
-                                        consoleLog("purchased inbound liquidity: ${payment.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")
+                                        val purchaseType = purchaseDetails.purchase.paymentDetails.paymentType::class.simpleName.toString().lowercase()
+                                        consoleLog("purchased inbound liquidity: ${purchaseDetails.purchase.amount} (totalFee=$totalFee feePaidFromBalance=$feePaidFromBalance feePaidFromFeeCredit=$feePaidFromFeeCredit feeRemaining=$feeRemaining purchaseType=$purchaseType)")
                                     }
                                     else -> {}
                                 }
@@ -396,6 +401,7 @@ class Phoenixd : CliktCommand() {
             peerConnectionLoop.cancel()
             peer.disconnect()
             server.stop()
+            driver.close()
             exitProcess(0)
         }
         server.environment.monitor.subscribe(ApplicationStopped) { consoleLog(brightYellow("http server stopped")) }

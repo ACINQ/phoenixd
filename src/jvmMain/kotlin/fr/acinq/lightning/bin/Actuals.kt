@@ -7,6 +7,8 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.lightning.bin.conf.EnvVars.PHOENIX_DATADIR
+import fr.acinq.lightning.bin.db.migrations.v3.afterVersion3
+import fr.acinq.lightning.bin.db.migrations.v4.afterVersion4
 import fr.acinq.phoenix.db.PhoenixDatabase
 import okio.Path
 import okio.Path.Companion.toPath
@@ -29,7 +31,14 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         driver.close()
     }
 
-    val driver = JdbcSqliteDriver("jdbc:sqlite:$path", Properties(), PhoenixDatabase.Schema)
+    val driver = JdbcSqliteDriver(
+        url = "jdbc:sqlite:$path",
+        properties = Properties().apply { put("foreign_keys", "true") },
+        schema = PhoenixDatabase.Schema,
+        migrateEmptySchema = false,
+        afterVersion3(addEnclosingTransaction = true),
+        afterVersion4(addEnclosingTransaction = true)
+    )
     return driver
 }
 

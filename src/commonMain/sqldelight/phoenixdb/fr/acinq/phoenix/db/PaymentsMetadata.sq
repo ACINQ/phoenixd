@@ -1,14 +1,15 @@
+import fr.acinq.lightning.utils.UUID;
+import io.ktor.http.Url;
+
 -- This table stores metadata corresponding to a payment. Does not contain critical data.
--- * type        => the type of a payment, an int as defined in the DbType enum
--- * id          => the internal identifier of a payment, can be a payment hash (incoming) or a UUID (outgoing)
+-- * id          => uuid identifier of the payment
 -- * external_id => an arbitrary string defined by the user to track the payment in their own system
+-- * webhook_url => a webhook url that will be notified for that specific payment
 CREATE TABLE payments_metadata (
-    type INTEGER NOT NULL,
-    id TEXT NOT NULL,
+    payment_id BLOB AS UUID NOT NULL PRIMARY KEY,
     external_id TEXT,
-    webhook_url TEXT,
-    created_at INTEGER NOT NULL,
-    PRIMARY KEY (type, id)
+    webhook_url TEXT AS Url,
+    created_at INTEGER NOT NULL
 );
 
 CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
@@ -17,13 +18,12 @@ CREATE INDEX payments_metadata_external_id ON payments_metadata(external_id);
 
 insert:
 INSERT INTO payments_metadata (
-            type,
-            id,
+            payment_id,
             external_id,
             webhook_url,
             created_at
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?);
 
 get:
 SELECT external_id, webhook_url, created_at FROM payments_metadata
-WHERE type = ? AND id = ?;
+WHERE payment_id=?;

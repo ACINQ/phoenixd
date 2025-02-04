@@ -37,6 +37,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
 
+@Serializable
 sealed class ApiType {
 
     @Serializable
@@ -109,7 +110,7 @@ sealed class ApiType {
             event.payment.routingFee.truncateToSatoshi(),
             event.request.paymentId,
             event.payment.paymentHash,
-            (event.payment.status as LightningOutgoingPayment.Status.Succeeded).preimage
+            (event.payment.status as fr.acinq.lightning.db.LightningOutgoingPayment.Status.Succeeded).preimage
         )
     }
 
@@ -122,8 +123,9 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("incoming_payment")
-    data class IncomingPayment(val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long) {
+    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long): ApiType() {
         constructor(payment: LightningIncomingPayment, externalId: String?) : this (
+            subType = "lightning",
             paymentHash = payment.paymentHash,
             preimage = payment.paymentPreimage,
             externalId = externalId,
@@ -139,6 +141,7 @@ sealed class ApiType {
         )
         @Suppress("DEPRECATION")
         constructor(payment: LegacyPayToOpenIncomingPayment, externalId: String?) : this (
+            subType = "lightning",
             paymentHash = payment.paymentHash,
             preimage = payment.paymentPreimage,
             externalId = externalId,
@@ -156,8 +159,9 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val paymentId: String, val paymentHash: ByteVector32?, val preimage: ByteVector32?, val txId: TxId?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long) {
+    data class OutgoingPayment(val subType: String, val paymentId: String, val paymentHash: ByteVector32?, val preimage: ByteVector32?, val txId: TxId?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long): ApiType() {
         constructor(payment: LightningOutgoingPayment) : this(
+            subType = "lightning",
             paymentId = payment.id.toString(),
             paymentHash = payment.paymentHash,
             preimage = (payment.status as? LightningOutgoingPayment.Status.Succeeded)?.preimage,
@@ -170,6 +174,13 @@ sealed class ApiType {
             createdAt = payment.createdAt,
         )
         constructor(payment: OnChainOutgoingPayment) : this(
+            subType = when(payment) {
+                is AutomaticLiquidityPurchasePayment -> "auto_liquidity"
+                is ManualLiquidityPurchasePayment -> "manual_liquidity"
+                is SpliceOutgoingPayment -> "splice_out"
+                is SpliceCpfpOutgoingPayment -> "splice_cpfp"
+                is ChannelCloseOutgoingPayment -> "channel_close"
+            },
             paymentId = payment.id.toString(),
             paymentHash = null,
             preimage = null,

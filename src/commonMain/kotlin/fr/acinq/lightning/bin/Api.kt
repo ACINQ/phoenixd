@@ -16,8 +16,6 @@ import fr.acinq.lightning.bin.csv.WalletPaymentCsvWriter
 import fr.acinq.lightning.bin.db.SqlitePaymentsDb
 import fr.acinq.lightning.bin.json.ApiType.*
 import fr.acinq.lightning.bin.json.ApiType.Channel
-import fr.acinq.lightning.bin.json.ApiType.IncomingPayment
-import fr.acinq.lightning.bin.json.ApiType.OutgoingPayment
 import fr.acinq.lightning.bin.payments.AddressResolver
 import fr.acinq.lightning.bin.payments.Parser
 import fr.acinq.lightning.bin.payments.PayDnsAddress
@@ -27,6 +25,7 @@ import fr.acinq.lightning.bin.payments.lnurl.models.Lnurl
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlAuth
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlPay
 import fr.acinq.lightning.bin.payments.lnurl.models.LnurlWithdraw
+import fr.acinq.lightning.bin.json.ApiType
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
@@ -34,6 +33,8 @@ import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.db.LightningOutgoingPayment
+import fr.acinq.lightning.db.OnChainOutgoingPayment
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
@@ -213,7 +214,7 @@ class Api(
                     }
                 }
                 get("payments/incoming") {
-                    val payments = paymentDb.listIncomingPayments(
+                    val payments: List<ApiType> = paymentDb.listIncomingPayments(
                         from = call.parameters.getOptionalLong("from") ?: 0L,
                         to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis(),
                         limit = call.parameters.getOptionalLong("limit") ?: 20,
@@ -222,8 +223,8 @@ class Api(
                         externalId = call.parameters["externalId"] // may filter incoming payments by an external id
                     ).mapNotNull { (payment, externalId) ->
                         when (payment) {
-                            is LightningIncomingPayment -> IncomingPayment(payment, externalId)
-                            is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, externalId)
+                            is LightningIncomingPayment -> ApiType.IncomingPayment(payment, externalId)
+                            is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> ApiType.IncomingPayment(payment, externalId)
                             else -> null
                         }
                     }
@@ -232,9 +233,9 @@ class Api(
                 get("payments/incoming/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
                     val metadata = paymentDb.metadataQueries.get(paymentHash)
-                    val payment = when (val payment = paymentDb.getIncomingPayment(paymentHash)) {
-                        is LightningIncomingPayment -> IncomingPayment(payment, metadata?.externalId)
-                        is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> IncomingPayment(payment, metadata?.externalId)
+                    val payment: ApiType? = when (val payment = paymentDb.getIncomingPayment(paymentHash)) {
+                        is LightningIncomingPayment -> ApiType.IncomingPayment(payment, metadata?.externalId)
+                        is @Suppress("DEPRECATION") LegacyPayToOpenIncomingPayment -> ApiType.IncomingPayment(payment, metadata?.externalId)
                         else -> null
                     }
                     payment
@@ -242,7 +243,7 @@ class Api(
                         ?: call.respond(HttpStatusCode.NotFound)
                 }
                 get("payments/outgoing") {
-                    val payments = paymentDb.listOutgoingPayments(
+                    val payments: List<ApiType> = paymentDb.listOutgoingPayments(
                         from = call.parameters.getOptionalLong("from") ?: 0L,
                         to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis(),
                         limit = call.parameters.getOptionalLong("limit") ?: 20,
@@ -250,17 +251,18 @@ class Api(
                         listAll = call.parameters["all"]?.toBoolean() ?: false // by default, only list outgoing payments that have been successfully sent, or are pending
                     ).map {
                         when (it) {
-                            is LightningOutgoingPayment -> OutgoingPayment(it)
-                            is OnChainOutgoingPayment -> OutgoingPayment(it)
+                            is LightningOutgoingPayment -> ApiType.OutgoingPayment(it)
+                            is OnChainOutgoingPayment -> ApiType.OutgoingPayment(it)
                         }
                     }
                     call.respond(payments)
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")
-                    paymentDb.getLightningOutgoingPayment(uuid)?.let {
-                        call.respond(OutgoingPayment(it))
-                    } ?: call.respond(HttpStatusCode.NotFound)
+                    val payment: ApiType? = paymentDb.getLightningOutgoingPayment(uuid)?.let { ApiType.OutgoingPayment(it) }
+                    payment
+                        ?.let { call.respond(it) }
+                        ?: call.respond(HttpStatusCode.NotFound)
                 }
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("payinvoice") {

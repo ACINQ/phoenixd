@@ -55,7 +55,9 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                         )
                         database.onChainTransactionsQueries.insert(
                             payment_id = outgoingPayment.id,
-                            tx_id = outgoingPayment.txId
+                            tx_id = outgoingPayment.txId,
+                            confirmed_at = outgoingPayment.confirmedAt,
+                            locked_at = outgoingPayment.lockedAt
                         )
                     }
                 }

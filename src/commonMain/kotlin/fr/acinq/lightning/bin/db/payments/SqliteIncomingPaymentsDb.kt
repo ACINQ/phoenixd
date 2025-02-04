@@ -29,7 +29,9 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
                     is OnChainIncomingPayment ->
                         database.onChainTransactionsQueries.insert(
                             payment_id = incomingPayment.id,
-                            tx_id = incomingPayment.txId
+                            tx_id = incomingPayment.txId,
+                            confirmed_at = incomingPayment.confirmedAt,
+                            locked_at = incomingPayment.lockedAt
                         )
 
                     else -> {}

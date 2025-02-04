@@ -22,6 +22,7 @@ import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.utils.toByteVector32
+import fr.acinq.lightning.utils.toMilliSatoshi
 import fr.acinq.lightning.wire.LiquidityAds
 
 object InboundLiquidityQueries {

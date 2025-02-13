@@ -41,6 +41,7 @@ import kotlinx.serialization.UseSerializers
 sealed class ApiType {
 
     @Serializable
+    @ConsistentCopyVisibility
     data class Channel internal constructor(
         val state: String,
         val channelId: ByteVector32? = null,

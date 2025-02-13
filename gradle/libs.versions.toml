@@ -1,13 +1,13 @@
 [versions]
-kotlin = "1.9.23"
-okio = "3.8.0"
-clikt = "4.2.2"
-ktor = "2.3.8"
-sqldelight = "2.0.1" # TODO: remove 'addEnclosingTransaction' hack in AfterVersionX files when upgrading
+kotlin = "2.1.0"
+okio = "3.10.2"
+clikt = "4.4.0"
+ktor = "2.3.12"
+sqldelight = "2.0.2" # TODO: remove 'addEnclosingTransaction' hack in AfterVersionX files when upgrading
 lightningkmp = "1.8.5-SNAPSHOT"
 
 # test dependencies
-test-logback = "1.2.3"
+test-logback = "1.5.16"
 
 [plugins]
 multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

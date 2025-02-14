@@ -71,6 +71,11 @@ kotlin {
         // there is no kotlin native toolchain for linux arm64 yet, but we can still build for the JVM
         // see https://youtrack.jetbrains.com/issue/KT-51794/Cant-run-JVM-targets-on-ARM-Linux-when-using-Kotlin-Multiplatform-plugin
         linuxX64 {
+            compilations["main"].cinterops.create("sqlite") {
+                // use sqlite3 amalgamation on linux tests to prevent linking issues on new linux distros with dependency libraries which are to recent (for example glibc)
+                // see: https://github.com/touchlab/SQLiter/pull/38#issuecomment-867171789
+                definitionFile.set(File("$rootDir/src/nativeInterop/cinterop/sqlite3.def"))
+            }
             phoenixBinaries()
         }
     }
@@ -207,6 +212,8 @@ tasks.withType<KotlinNativeTest> {
 }
 
 sqldelight {
+    // On Linux we build libsqlite locally using cinterops
+    linkSqlite = !currentOs.isLinux
     databases {
         create("PhoenixDatabase") {
             packageName.set("fr.acinq.phoenixd.db.sqldelight")

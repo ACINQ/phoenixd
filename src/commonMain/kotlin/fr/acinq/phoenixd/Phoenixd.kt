@@ -22,6 +22,15 @@ import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.LiquidityEvents
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
+import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
+import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
+import fr.acinq.lightning.crypto.LocalKeyManager
+import fr.acinq.lightning.db.*
+import fr.acinq.lightning.io.Peer
+import fr.acinq.lightning.io.TcpSocket
+import fr.acinq.lightning.logging.LoggerFactory
+import fr.acinq.lightning.payment.LiquidityPolicy
+import fr.acinq.lightning.utils.*
 import fr.acinq.phoenixd.conf.EnvVars.PHOENIX_SEED
 import fr.acinq.phoenixd.conf.LSP
 import fr.acinq.phoenixd.conf.ListValueSource
@@ -34,15 +43,6 @@ import fr.acinq.phoenixd.json.ApiType
 import fr.acinq.phoenixd.logs.FileLogWriter
 import fr.acinq.phoenixd.logs.TimestampFormatter
 import fr.acinq.phoenixd.logs.stringTimestamp
-import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
-import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
-import fr.acinq.lightning.crypto.LocalKeyManager
-import fr.acinq.lightning.db.*
-import fr.acinq.lightning.io.Peer
-import fr.acinq.lightning.io.TcpSocket
-import fr.acinq.lightning.logging.LoggerFactory
-import fr.acinq.lightning.payment.LiquidityPolicy
-import fr.acinq.lightning.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -224,7 +224,8 @@ class Phoenixd : CliktCommand() {
         consoleLog(cyan("chain: $chain"))
         consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))
 
-        val scope = GlobalScope
+        val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
         val loggerFactory = LoggerFactory(
             StaticConfig(minSeverity = Severity.Info, logWriterList = buildList {
                 // always log to file
@@ -272,7 +273,7 @@ class Phoenixd : CliktCommand() {
                         .collect {
                             when {
                                 it is PaymentEvents.PaymentReceived && it.payment.amount > 0.msat -> {
-                                    when(val payment = it.payment) {
+                                    when (val payment = it.payment) {
                                         is LightningIncomingPayment -> {
                                             val metadata = paymentsDb.metadataQueries.get(payment.paymentHash)
                                             emit(ApiType.PaymentReceived(payment, metadata))
@@ -304,7 +305,7 @@ class Phoenixd : CliktCommand() {
                     .filterIsInstance<PaymentEvents>()
                     .collect {
                         when (it) {
-                            is PaymentEvents.PaymentReceived -> when(val payment = it.payment) {
+                            is PaymentEvents.PaymentReceived -> when (val payment = it.payment) {
                                 is LightningIncomingPayment -> {
                                     val fee = payment.parts.filterIsInstance<LightningIncomingPayment.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
                                     val type = payment.parts.joinToString { part -> part::class.simpleName.toString().lowercase() }
@@ -373,37 +374,49 @@ class Phoenixd : CliktCommand() {
             peer.connectionState.first { it == Connection.ESTABLISHED }
         }
 
-        val server = embeddedServer(CIO, port = httpBindPort, host = httpBindIp,
+        val server = embeddedServer(
+            CIO,
+            environment = applicationEnvironment {
+
+            },
             configure = {
+                connector {
+                    port = httpBindPort
+                    host = httpBindIp
+                }
                 reuseAddress = true
             },
             module = {
                 Api(nodeParams, peer, eventsFlow, httpPassword, httpPasswordLimitedAccess, webHookUrls, webHookSecret, loggerFactory).run { module() }
             }
         )
-        val serverJob = scope.launch {
-            try {
-                server.start(wait = true)
-            } catch (t: Throwable) {
-                if (t.cause?.message?.contains("Address already in use") == true) {
-                    consoleLog(t.cause?.message.toString(), err = true)
-                } else throw t
-            }
-        }
 
-        server.environment.monitor.subscribe(ServerReady) {
-            consoleLog("listening on http://$httpBindIp:$httpBindPort")
-        }
-        server.environment.monitor.subscribe(ApplicationStopPreparing) {
-            consoleLog(brightYellow("shutting down..."))
-            listeners.cancel()
-            peerConnectionLoop.cancel()
+        fun stop() {
+            scope.cancel()
             peer.disconnect()
-            server.stop()
             driver.close()
             exitProcess(0)
         }
-        server.environment.monitor.subscribe(ApplicationStopped) { consoleLog(brightYellow("http server stopped")) }
+
+        val serverJob = scope.launch {
+            kotlin.runCatching {
+                server.start(wait = true)
+            }.onFailure {
+                consoleLog(it.cause?.message.toString(), err = true)
+                stop()
+            }
+        }
+
+        server.monitor.subscribe(ServerReady) {
+            consoleLog("listening on http://$httpBindIp:$httpBindPort")
+        }
+        server.monitor.subscribe(ApplicationStopPreparing) {
+            consoleLog(brightYellow("shutting down..."))
+            stop()
+        }
+        server.monitor.subscribe(ApplicationStopped) {
+            consoleLog(brightYellow("http server stopped"))
+        }
 
         runBlocking { serverJob.join() }
     }

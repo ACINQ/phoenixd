@@ -9,7 +9,7 @@ import io.ktor.server.response.*
  * This [AuthenticationProvider] uses protocols header as a workaround.
  * See https://stackoverflow.com/a/77060459
  */
-class WebsocketProtocolAuthenticationProvider(private val _name: String, val validate: suspend (List<HeaderValue>) -> Principal?) : AuthenticationProvider(object : Config(_name) {}) {
+class WebsocketProtocolAuthenticationProvider(private val _name: String, val validate: suspend (List<HeaderValue>) -> UserIdPrincipal?) : AuthenticationProvider(object : Config(_name) {}) {
 
     override suspend fun onAuthenticate(context: AuthenticationContext) {
         val call = context.call

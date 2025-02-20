@@ -204,7 +204,7 @@ class Phoenixd : CliktCommand() {
                     When receiving a Lightning payment that doesn't fit in your existing channel:
                     - If the payment amount is large enough to cover mining fees and service fees for automated liquidity, then your channel will be created or enlarged right away.
                     - If the payment is too small, then the full amount is added to your fee credit, and will be used later to pay for future fees. ${bold(red("The fee credit is non-refundable"))}.
-                    The initial fee to create your channel can be quite significant. Please see this doc for help estimating what it will be in your case: https://phoenix.acinq.co/server/auto-liquidity
+                    The initial fee to create your channel can be quite significant. Please see this doc for help estimating what it will be in your case: ${bold("https://phoenix.acinq.co/server/auto-liquidity")}.
                     """.trimIndent()
                 )
                 terminal.println()

@@ -260,9 +260,9 @@ class Api(
                         ?.let { call.respond(it) }
                         ?: call.respond(HttpStatusCode.NotFound)
                 }
-                get("payments/outgoingbyhash") {
+                get("payments/outgoingbyhash/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
-                    val payment = paymentDb.listLightningOutgoingPayments(paymentHash).maxByOrNull {
+                    val payment: ApiType? = paymentDb.listLightningOutgoingPayments(paymentHash).maxByOrNull {
                         when (it.status) {
                             is LightningOutgoingPayment.Status.Succeeded -> 3
                             is LightningOutgoingPayment.Status.Pending -> 2

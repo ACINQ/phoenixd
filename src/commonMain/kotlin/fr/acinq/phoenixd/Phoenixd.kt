@@ -183,7 +183,6 @@ class Phoenixd : CliktCommand() {
         }
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     override fun run() {
         if (seed.isNew && !agreeToTermsOfService) {
             runBlocking {
@@ -205,6 +204,7 @@ class Phoenixd : CliktCommand() {
                     When receiving a Lightning payment that doesn't fit in your existing channel:
                     - If the payment amount is large enough to cover mining fees and service fees for automated liquidity, then your channel will be created or enlarged right away.
                     - If the payment is too small, then the full amount is added to your fee credit, and will be used later to pay for future fees. ${bold(red("The fee credit is non-refundable"))}.
+                    The initial fee to create your channel can be quite significant. Please see this doc for help estimating what it will be in your case: https://phoenix.acinq.co/server/auto-liquidity
                     """.trimIndent()
                 )
                 terminal.println()
@@ -215,7 +215,7 @@ class Phoenixd : CliktCommand() {
                 )
                 terminal.println()
                 terminal.println("Phoenix server is about to start, use ${bold("phoenix-cli")} or the ${bold("http api")} to interact with the daemon. This message will not be displayed next time.")
-                terminal.println("Press any key to continue...")
+                terminal.println(bold(yellow("Press any key to continue...")))
                 terminal.readLineOrNull(true)
                 terminal.println()
             }

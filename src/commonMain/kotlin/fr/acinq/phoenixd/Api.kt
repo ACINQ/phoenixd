@@ -262,15 +262,17 @@ class Api(
                 }
                 get("payments/outgoingbyhash/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
-                    val payment: ApiType? = paymentDb.listLightningOutgoingPayments(paymentHash).maxByOrNull {
-                        when (it.status) {
-                            is LightningOutgoingPayment.Status.Succeeded -> 3
-                            is LightningOutgoingPayment.Status.Pending -> 2
-                            is LightningOutgoingPayment.Status.Failed -> 1
+                    val payment: ApiType? = paymentDb.listLightningOutgoingPayments(paymentHash)
+                        .maxByOrNull {
+                            when (it.status) {
+                                is LightningOutgoingPayment.Status.Succeeded -> 3
+                                is LightningOutgoingPayment.Status.Pending -> 2
+                                is LightningOutgoingPayment.Status.Failed -> 1
+                            }
                         }
-                    }
+                        ?.let { ApiType.OutgoingPayment(it) }
                     payment
-                        ?.let { call.respond(ApiType.OutgoingPayment(it)) }
+                        ?.let { call.respond(it) }
                         ?: call.respond(HttpStatusCode.NotFound)
                 }
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {

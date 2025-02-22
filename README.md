@@ -30,5 +30,5 @@ Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc
 
 ### JVM
 ```shell
-./gradlew distZip
+./gradlew jvmDistZip
 ```

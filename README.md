@@ -32,5 +32,5 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ### JVM
 ```shell
-./gradlew distZip
+./gradlew jvmDistZip
 ```

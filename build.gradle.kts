@@ -147,9 +147,11 @@ kotlin {
                 implementation("ch.qos.logback:logback-classic:${libs.versions.test.logback.get()}")
             }
         }
-        nativeMain {
-            dependencies {
-                implementation("app.cash.sqldelight:native-driver:${libs.versions.sqldelight.get()}")
+        if (currentOs.isLinux || currentOs.isMacOsX) {
+            nativeMain {
+                dependencies {
+                    implementation("app.cash.sqldelight:native-driver:${libs.versions.sqldelight.get()}")
+                }
             }
         }
         if (currentOs.isLinux) {

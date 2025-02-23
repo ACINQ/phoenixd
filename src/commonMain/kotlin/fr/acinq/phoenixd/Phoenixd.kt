@@ -3,6 +3,8 @@ package fr.acinq.phoenixd
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
+import co.touchlab.kermit.io.RollingFileLogWriter
+import co.touchlab.kermit.io.RollingFileLogWriterConfig
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.context
@@ -40,7 +42,6 @@ import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
 import fr.acinq.phoenixd.json.ApiType
-import fr.acinq.phoenixd.logs.FileLogWriter
 import fr.acinq.phoenixd.logs.TimestampFormatter
 import fr.acinq.phoenixd.logs.stringTimestamp
 import io.ktor.http.*
@@ -49,6 +50,7 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.io.files.Path
 import okio.FileSystem
 import okio.buffer
 import okio.use
@@ -229,7 +231,7 @@ class Phoenixd : CliktCommand() {
         val loggerFactory = LoggerFactory(
             StaticConfig(minSeverity = Severity.Info, logWriterList = buildList {
                 // always log to file
-                add(FileLogWriter(datadir / "phoenix.log", scope))
+                add(RollingFileLogWriter(RollingFileLogWriterConfig(logFileName = "phoenix", logFilePath = Path(datadir.toString()))))
                 // only log to console if verbose mode is enabled
                 if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })

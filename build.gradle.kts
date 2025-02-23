@@ -132,6 +132,7 @@ kotlin {
 
                 implementation("com.squareup.okio:okio:${libs.versions.okio.get()}")
                 implementation("com.github.ajalt.clikt:clikt:${libs.versions.clikt.get()}")
+                implementation("co.touchlab:kermit-io:${libs.versions.kermit.io.get()}")
             }
         }
         commonTest {

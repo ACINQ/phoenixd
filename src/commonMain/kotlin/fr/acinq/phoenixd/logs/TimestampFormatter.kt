@@ -4,11 +4,9 @@ import co.touchlab.kermit.Message
 import co.touchlab.kermit.MessageStringFormatter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.Tag
-import kotlinx.datetime.Clock
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
+import kotlinx.datetime.*
+import kotlinx.datetime.format.DateTimeComponents
 import kotlinx.datetime.format.char
-import kotlinx.datetime.toLocalDateTime
 
 object TimestampFormatter : MessageStringFormatter {
     override fun formatMessage(severity: Severity?, tag: Tag?, message: Message): String {

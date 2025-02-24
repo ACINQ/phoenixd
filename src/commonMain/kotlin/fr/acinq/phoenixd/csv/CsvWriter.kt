@@ -1,25 +1,26 @@
 package fr.acinq.phoenixd.csv
 
-import okio.BufferedSink
-import okio.FileSystem
-import okio.Path
-import okio.buffer
+import kotlinx.io.Sink
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
 
 /**
  * A generic class for writing CSV files.
  */
 open class CsvWriter(path: Path) {
 
-    private val sink: BufferedSink
+    private val sink: Sink
 
     init {
-        path.parent?.let { dir -> FileSystem.SYSTEM.createDirectories(dir) }
-        sink = FileSystem.SYSTEM.sink(path, mustCreate = false).buffer()
+        path.parent?.let { dir -> SystemFileSystem.createDirectories(dir) }
+        sink = SystemFileSystem.sink(path).buffered()
     }
 
     fun addRow(vararg fields: String) {
         val cleanFields = fields.map { processField(it) }
-        sink.writeUtf8(cleanFields.joinToString(separator = ",", postfix = "\n"))
+        sink.writeString(cleanFields.joinToString(separator = ",", postfix = "\n"))
     }
 
     fun addRow(fields: List<String>) {

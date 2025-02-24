@@ -38,6 +38,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 
 fun main(args: Array<String>) =
@@ -73,7 +74,7 @@ fun main(args: Array<String>) =
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
 
 class PhoenixCli : CliktCommand() {
-    private val confFile = datadir / "phoenix.conf"
+    private val confFile = Path(datadir, "phoenix.conf")
 
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)

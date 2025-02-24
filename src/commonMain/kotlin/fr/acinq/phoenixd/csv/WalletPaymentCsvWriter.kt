@@ -10,7 +10,7 @@ import fr.acinq.phoenixd.csv.WalletPaymentCsvWriter.Type
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.*
 import kotlinx.datetime.Instant
-import okio.Path
+import kotlinx.io.files.Path
 
 /**
  * Exports a payments db items to a csv file.

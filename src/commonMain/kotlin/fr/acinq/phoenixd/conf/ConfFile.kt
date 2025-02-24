@@ -1,14 +1,16 @@
 package fr.acinq.phoenixd.conf
 
-import okio.FileSystem
-import okio.Path
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readLine
 
 fun readConfFile(confFile: Path): List<Pair<String, String>> =
     buildList {
-        if (FileSystem.SYSTEM.exists(confFile)) {
-            FileSystem.SYSTEM.read(confFile) {
+        if (SystemFileSystem.exists(confFile)) {
+            SystemFileSystem.source(confFile).buffered().use {
                 while (true) {
-                    val line = readUtf8Line() ?: break
+                    val line = it.readLine() ?: break
                     line.split("=").run { add(first() to last()) }
                 }
             }

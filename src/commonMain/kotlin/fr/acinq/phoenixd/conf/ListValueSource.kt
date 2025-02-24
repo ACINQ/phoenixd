@@ -3,7 +3,7 @@ package fr.acinq.phoenixd.conf
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.Option
 import com.github.ajalt.clikt.sources.ValueSource
-import okio.Path
+import kotlinx.io.files.Path
 
 /**
  * Very similar to [com.github.ajalt.clikt.sources.MapValueSource], but backed by a [List]

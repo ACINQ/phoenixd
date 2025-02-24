@@ -109,7 +109,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-auth:${libs.versions.ktor.get()}")
                 implementation("io.ktor:ktor-client-json:${libs.versions.ktor.get()}")
 
-                implementation("com.squareup.okio:okio:${libs.versions.okio.get()}")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinx.io.get()}")
                 implementation("com.github.ajalt.clikt:clikt:${libs.versions.clikt.get()}")
             }
         }

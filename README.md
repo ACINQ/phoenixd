@@ -12,8 +12,6 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ### Native Linux/WSL x64
 
-Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.
-
 ```shell
 ./gradlew linuxX64DistZip
 ```

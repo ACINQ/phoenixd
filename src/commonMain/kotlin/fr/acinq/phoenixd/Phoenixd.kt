@@ -3,7 +3,6 @@ package fr.acinq.phoenixd
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
-import co.touchlab.kermit.io.RollingFileLogWriter
 import co.touchlab.kermit.io.RollingFileLogWriterConfig
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
@@ -43,6 +42,7 @@ import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
 import fr.acinq.phoenixd.json.ApiType
+import fr.acinq.phoenixd.logs.RollingFileLogWriter
 import fr.acinq.phoenixd.logs.TimestampFormatter
 import fr.acinq.phoenixd.logs.stringTimestamp
 import io.ktor.http.*
@@ -239,12 +239,7 @@ class Phoenixd : CliktCommand() {
         val loggerFactory = LoggerFactory(
             StaticConfig(minSeverity = Severity.Info, logWriterList = buildList {
                 // always log to file
-                add(RollingFileLogWriter(RollingFileLogWriterConfig(
-                    logFileName = "phoenix",
-                    logFilePath = Path(datadir.toString()),
-                    rollOnSize = logRotateSize,
-                    maxLogFiles = logRotateMaxFiles
-                )))
+                add(RollingFileLogWriter(RollingFileLogWriterConfig(logFileName = "phoenix", logFilePath = Path(datadir.toString()), rollOnSize = logRotateSize, maxLogFiles = logRotateMaxFiles)))
                 // only log to console if verbose mode is enabled
                 if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })

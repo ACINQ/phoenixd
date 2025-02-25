@@ -10,9 +10,11 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ## Build
 
-### Native Linux/WSL x64
+### Requirements
 
-Requires `libsqlite-dev` and `libcurl4-gnutls-dev`, both compiled against `glibc 2.19`.
+- [OpenJDK 21](https://adoptium.net/temurin/releases/?package=jdk&version=21)
+
+### Native Linux/WSL x64
 
 ```shell
 ./gradlew linuxX64DistZip

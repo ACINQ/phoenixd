@@ -114,6 +114,11 @@ class Api(
             status(HttpStatusCode.NotFound) { call, status ->
                 call.respondText(text = "Unknown endpoint (check api doc)", status = status)
             }
+            status(HttpStatusCode.NoContent) { call, _ ->
+                // Will be returned when a payment lookup returns no result for a given id.
+                // We convert those to 404 for backward compatibility, and because it is more correct for a REST interface.
+                call.respondText(text = "Not found", status = HttpStatusCode.NotFound)
+            }
         }
         install(Authentication) {
             basic {
@@ -236,7 +241,7 @@ class Api(
                     }
                     payment
                         ?.let { call.respond(it) }
-                        ?: call.respond(HttpStatusCode.NotFound)
+                        ?: call.respond(HttpStatusCode.NoContent)
                 }
                 get("payments/outgoing") {
                     val payments: List<ApiType> = paymentDb.listOutgoingPayments(
@@ -258,7 +263,7 @@ class Api(
                     val payment: ApiType? = paymentDb.getLightningOutgoingPayment(uuid)?.let { ApiType.OutgoingPayment(it) }
                     payment
                         ?.let { call.respond(it) }
-                        ?: call.respond(HttpStatusCode.NotFound)
+                        ?: call.respond(HttpStatusCode.NoContent)
                 }
                 get("payments/outgoingbyhash/{paymentHash}") {
                     val paymentHash = call.parameters.getByteVector32("paymentHash")
@@ -273,7 +278,7 @@ class Api(
                         ?.let { ApiType.OutgoingPayment(it) }
                     payment
                         ?.let { call.respond(it) }
-                        ?: call.respond(HttpStatusCode.NotFound)
+                        ?: call.respond(HttpStatusCode.NoContent)
                 }
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("payinvoice") {

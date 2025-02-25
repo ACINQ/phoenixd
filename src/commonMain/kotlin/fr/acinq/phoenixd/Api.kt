@@ -1,9 +1,8 @@
 package fr.acinq.phoenixd
 
-import fr.acinq.bitcoin.Bitcoin
-import fr.acinq.bitcoin.ByteVector
-import fr.acinq.bitcoin.ByteVector32
-import fr.acinq.bitcoin.Script
+import fr.acinq.bitcoin.*
+import fr.acinq.bitcoin.crypto.Digest
+import fr.acinq.bitcoin.crypto.hmac
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
@@ -58,9 +57,10 @@ import io.ktor.server.websocket.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.io.bytestring.encodeToByteString
+import kotlinx.io.files.Path
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import okio.ByteString.Companion.encodeUtf8
 import kotlin.time.Duration.Companion.seconds
 
 class Api(
@@ -74,7 +74,7 @@ class Api(
     private val loggerFactory: LoggerFactory,
 ) {
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalStdlibApi::class)
     fun Application.module() {
 
         val log = loggerFactory.newLogger(this::class)
@@ -463,7 +463,7 @@ class Api(
                 post("export") {
                     val from = call.parameters.getOptionalLong("from") ?: 0L
                     val to = call.parameters.getOptionalLong("to") ?: currentTimestampMillis()
-                    val csvPath = datadir / "exports" / "export-${currentTimestampSeconds()}.csv"
+                    val csvPath = Path(datadir, "exports", "export-${currentTimestampSeconds()}.csv")
                     log.info { "exporting payments to $csvPath..." }
                     val csvWriter = WalletPaymentCsvWriter(csvPath)
                     paymentDb.processSuccessfulPayments(from, to) { payment ->
@@ -498,10 +498,10 @@ class Api(
         client.sendPipeline.intercept(HttpSendPipeline.State) {
             when (val body = context.body) {
                 is TextContent -> {
-                    val bodyBytes = body.text.encodeUtf8()
-                    val secretBytes = webhookSecret.encodeUtf8()
+                    val bodyBytes = body.text.encodeToByteArray()
+                    val secretBytes = webhookSecret.encodeToByteArray()
                     val sig = bodyBytes.hmacSha256(secretBytes)
-                    context.headers.append("X-Phoenix-Signature", sig.hex())
+                    context.headers.append("X-Phoenix-Signature", sig.toHexString())
                 }
             }
         }
@@ -564,4 +564,5 @@ class Api(
     private fun Parameters.getLnurlAuth(argName: String): LnurlAuth = this[argName]?.let { LnurlParser.extractLnurl(it) as LnurlAuth } ?: missing(argName)
 
     private fun Parameters.getOptionalUrl(argName: String): Url? = this[argName]?.let { runCatching { Url(it) }.getOrNull() ?: invalidType(argName, "url") }
+
 }

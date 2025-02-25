@@ -5,10 +5,10 @@ import fr.acinq.bitcoin.PublicKey
 import fr.acinq.phoenixd.createAppDbDriver
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import okio.FileSystem
-import okio.Path.Companion.toPath
-import okio.buffer
-import okio.use
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -16,12 +16,12 @@ class DbMigrationTestsCommon {
 
     @Test
     fun `read v3 db`() = runBlocking {
-        val testdir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "phoenix_tests" / "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}"
-        FileSystem.SYSTEM.createDirectories(testdir)
-        FileSystem.SYSTEM.list("src/commonTest/resources/sampledbs/v3".toPath()).forEach { file ->
-            FileSystem.SYSTEM.source(file).use { bytesIn ->
-                FileSystem.SYSTEM.sink(testdir / file.name).buffer().use { bytesOut ->
-                    bytesOut.writeAll(bytesIn)
+        val testdir = Path(SystemTemporaryDirectory, "phoenix_tests", "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}")
+        SystemFileSystem.createDirectories(testdir)
+        SystemFileSystem.list(Path("src/commonTest/resources/sampledbs/v3")).forEach { file ->
+            SystemFileSystem.source(file).buffered().use { bytesIn ->
+                SystemFileSystem.sink(Path(testdir, file.name)).buffered().use { bytesOut ->
+                    bytesIn.transferTo(bytesOut)
                 }
             }
         }

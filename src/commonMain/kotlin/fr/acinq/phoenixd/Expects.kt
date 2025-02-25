@@ -3,7 +3,7 @@ package fr.acinq.phoenixd
 import app.cash.sqldelight.db.SqlDriver
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
-import okio.Path
+import kotlinx.io.files.Path
 
 expect val datadir: Path
 

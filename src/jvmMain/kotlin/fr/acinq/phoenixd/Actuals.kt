@@ -10,18 +10,17 @@ import fr.acinq.phoenixd.conf.EnvVars.PHOENIX_DATADIR
 import fr.acinq.phoenixd.db.migrations.v3.afterVersion3
 import fr.acinq.phoenixd.db.migrations.v4.afterVersion4
 import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
-import okio.Path
-import okio.Path.Companion.toPath
+import kotlinx.io.files.Path
 import java.util.*
 
-actual val datadir: Path = (System.getenv()[PHOENIX_DATADIR]?.toPath() ?: System.getProperty("user.home").toPath().div(".phoenix"))
+actual val datadir: Path = System.getenv()[PHOENIX_DATADIR]?.let { Path(it) } ?: Path(Path(System.getProperty("user.home")), ".phoenix")
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
     val chainName = when (chain) {
         is Chain.Testnet3 -> "testnet"
         else -> chain.name.lowercase()
     }
-    val path = dir / "phoenix.$chainName.${nodeId.toHex().take(6)}.db"
+    val path = Path(dir, "phoenix.$chainName.${nodeId.toHex().take(6)}.db")
 
     // Initial schema version wasn't set, so we need to set it manually
     JdbcSqliteDriver("jdbc:sqlite:$path").let { driver ->

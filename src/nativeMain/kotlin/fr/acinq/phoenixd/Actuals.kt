@@ -10,15 +10,14 @@ import fr.acinq.phoenixd.db.migrations.v4.afterVersion4
 import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
-import okio.Path
-import okio.Path.Companion.toPath
+import kotlinx.io.files.Path
 import platform.posix.getenv
 import platform.posix.setenv
 
 @OptIn(ExperimentalForeignApi::class)
 actual val datadir: Path = setenv("KTOR_LOG_LEVEL", "WARN", 1)
     .let {
-        getenv(PHOENIX_DATADIR)?.toKString()?.toPath() ?: getenv("HOME")?.toKString()!!.toPath().div(".phoenix") }
+        getenv(PHOENIX_DATADIR)?.toKString()?.let { Path(it) } ?: Path(getenv("HOME")?.toKString()!!, ".phoenix") }
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
     val chainName = when (chain) {

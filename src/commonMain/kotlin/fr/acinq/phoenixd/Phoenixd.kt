@@ -49,9 +49,10 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import okio.FileSystem
-import okio.buffer
-import okio.use
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -63,7 +64,7 @@ fun main(args: Array<String>) = Phoenixd()
     .main(args)
 
 class Phoenixd : CliktCommand() {
-    private val confFile = datadir / "phoenix.conf"
+    private val confFile = Path(datadir, "phoenix.conf")
     private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
         .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false) }
         .defaultLazy {
@@ -102,7 +103,7 @@ class Phoenixd : CliktCommand() {
             // if we are here then no value is defined in phoenix.conf
             terminal.print(yellow("Generating default api password..."))
             val value = randomBytes32().toHex()
-            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password=$value") }
+            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nhttp-password=$value") }
             terminal.println(white("done"))
             value
         }
@@ -111,7 +112,7 @@ class Phoenixd : CliktCommand() {
             // if we are here then no value is defined in phoenix.conf
             terminal.print(yellow("Generating limited access api password..."))
             val value = randomBytes32().toHex()
-            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nhttp-password-limited-access=$value") }
+            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nhttp-password-limited-access=$value") }
             terminal.println(white("done"))
             value
         }
@@ -123,7 +124,7 @@ class Phoenixd : CliktCommand() {
             // if we are here then no value is defined in phoenix.conf
             terminal.print(yellow("Generating webhook secret..."))
             val value = randomBytes32().toHex()
-            FileSystem.SYSTEM.appendingSink(confFile, mustExist = false).buffer().use { it.writeUtf8("\nwebhook-secret=$value") }
+            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nwebhook-secret=$value") }
             terminal.println(white("done"))
             value
         }
@@ -168,7 +169,7 @@ class Phoenixd : CliktCommand() {
     ).default(Verbosity.Default, defaultForHelp = "prints high-level info to the console")
 
     init {
-        FileSystem.SYSTEM.createDirectories(datadir)
+        SystemFileSystem.createDirectories(datadir)
         context {
             valueSource = ListValueSource.fromFile(confFile)
             helpFormatter = { MordantHelpFormatter(it, showDefaultValues = true) }
@@ -188,7 +189,7 @@ class Phoenixd : CliktCommand() {
             runBlocking {
                 terminal.println(green("Backup"))
                 terminal.println("This software is self-custodial, you have full control and responsibility over your funds.")
-                terminal.println("Your 12-words seed is located in ${FileSystem.SYSTEM.canonicalize(datadir)}, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
+                terminal.println("Your 12-words seed is located in $datadir, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
                 terminal.println("Do not share the same seed with other phoenix instances (mobile or server), it will cause issues and channel force closes.")
                 terminal.println()
                 terminal.prompt(
@@ -220,7 +221,7 @@ class Phoenixd : CliktCommand() {
                 terminal.println()
             }
         }
-        consoleLog(cyan("datadir: ${FileSystem.SYSTEM.canonicalize(datadir)}"))
+        consoleLog(cyan("datadir: $datadir"))
         consoleLog(cyan("chain: $chain"))
         consoleLog(cyan("autoLiquidity: ${liquidityOptions.autoLiquidity}"))
 
@@ -229,7 +230,7 @@ class Phoenixd : CliktCommand() {
         val loggerFactory = LoggerFactory(
             StaticConfig(minSeverity = Severity.Info, logWriterList = buildList {
                 // always log to file
-                add(FileLogWriter(datadir / "phoenix.log", scope))
+                add(FileLogWriter(Path(datadir, "phoenix.log"), scope))
                 // only log to console if verbose mode is enabled
                 if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })

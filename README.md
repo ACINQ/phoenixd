@@ -10,6 +10,12 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ## Build
 
+### Requirements
+
+For all platforms:
+
+- [OpenJDK 21](https://adoptium.net/temurin/releases/?package=jdk&version=21)
+
 ### Native Linux/WSL x64
 
 ```shell

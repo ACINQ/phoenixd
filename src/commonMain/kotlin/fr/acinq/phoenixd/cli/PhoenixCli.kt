@@ -159,9 +159,15 @@ class ListChannels : PhoenixCliCommand(name = "listchannels", help = "List all c
 }
 
 class GetOutgoingPayment : PhoenixCliCommand(name = "getoutgoingpayment", help = "Get outgoing payment") {
-    private val uuid by option("--uuid").convert { UUID.fromString(it) }.required()
+    private val uuidOrPaymentHash: Either<UUID, ByteVector32> by mutuallyExclusiveOptions(
+        option("--uuid").convert { Either.Left(UUID.fromString(it)) },
+        option("--paymentHash", "--hash").convert { Either.Right(it.toByteVector32()) }
+    ).single().required()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
-        it.get(url = commonOptions.baseUrl / "payments/outgoing/$uuid")
+        when(val id = uuidOrPaymentHash) {
+            is Either.Left -> it.get(url = commonOptions.baseUrl / "payments/outgoing/${id.value}")
+            is Either.Right -> it.get(url = commonOptions.baseUrl / "payments/outgoingbyhash/${id.value}")
+        }
     }
 }
 
@@ -185,7 +191,7 @@ class ListOutgoingPayments : PhoenixCliCommand(name = "listoutgoingpayments", he
 }
 
 class GetIncomingPayment : PhoenixCliCommand(name = "getincomingpayment", help = "Get incoming payment") {
-    private val paymentHash by option("--paymentHash", "--h").convert { it.toByteVector32() }.required()
+    private val paymentHash by option("--paymentHash", "--hash").convert { it.toByteVector32() }.required()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "payments/incoming/$paymentHash")
     }

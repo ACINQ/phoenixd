@@ -74,7 +74,7 @@ class Api(
     private val loggerFactory: LoggerFactory,
 ) {
 
-    @OptIn(ExperimentalSerializationApi::class, ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class)
     fun Application.module() {
 
         val log = loggerFactory.newLogger(this::class)
@@ -500,8 +500,8 @@ class Api(
                 is TextContent -> {
                     val bodyBytes = body.text.encodeToByteArray()
                     val secretBytes = webhookSecret.encodeToByteArray()
-                    val hmac256Sig = Digest.sha256().hmac(secretBytes, bodyBytes, 64)
-                    context.headers.append("X-Phoenix-Signature", hmac256Sig.toHexString())
+                    val sig = bodyBytes.hmacSha256(secretBytes)
+                    context.headers.append("X-Phoenix-Signature", sig.toHexString())
                 }
             }
         }
@@ -564,4 +564,5 @@ class Api(
     private fun Parameters.getLnurlAuth(argName: String): LnurlAuth = this[argName]?.let { LnurlParser.extractLnurl(it) as LnurlAuth } ?: missing(argName)
 
     private fun Parameters.getOptionalUrl(argName: String): Url? = this[argName]?.let { runCatching { Url(it) }.getOrNull() ?: invalidType(argName, "url") }
+
 }

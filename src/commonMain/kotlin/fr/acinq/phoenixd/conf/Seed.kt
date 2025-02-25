@@ -10,7 +10,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 
-data class PhoenixSeed(val seed: ByteVector, val isNew: Boolean)
+data class PhoenixSeed(val seed: ByteVector, val isNew: Boolean, val path: Path?)
 
 /**
  * @return a pair with the seed and a boolean indicating whether the seed was newly generated
@@ -28,5 +28,5 @@ fun getOrGenerateSeed(dir: Path): PhoenixSeed {
         mnemonics to true
     }
     MnemonicCode.validate(mnemonics)
-    return PhoenixSeed(seed = MnemonicCode.toSeed(mnemonics, "").toByteVector(), isNew = isNew)
+    return PhoenixSeed(seed = MnemonicCode.toSeed(mnemonics, "").toByteVector(), isNew = isNew, path = file)
 }

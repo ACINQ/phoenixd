@@ -67,7 +67,11 @@ fun main(args: Array<String>) = Phoenixd()
 class Phoenixd : CliktCommand() {
     private val confFile = Path(datadir, "phoenix.conf")
 
-    private val agreeToTermsOfService by option("--agree-to-terms-of-service", hidden = true, help = "Agree to terms of service").flag()
+    private val agreeToTermsOfService by option(
+        "--agree-to-terms-of-service",
+        hidden = true,
+        help = "Agree to terms of service"
+    ).flag()
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet3
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
@@ -80,41 +84,13 @@ class Phoenixd : CliktCommand() {
                 else -> error("unsupported chain")
             }
         }
-    private val mempoolPollingInterval by option("--mempool-space-polling-interval-minutes", help = "Polling interval for mempool.space API", hidden = true)
+    private val mempoolPollingInterval by option(
+        "--mempool-space-polling-interval-minutes",
+        help = "Polling interval for mempool.space API",
+        hidden = true
+    )
         .int().convert { it.minutes }
         .default(10.minutes)
-    private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
-    private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPassword by option("--http-password", help = "Password for the http api (full access)")
-        .defaultLazy {
-            // if we are here then no value is defined in phoenix.conf
-            terminal.print(yellow("Generating default api password..."))
-            val value = randomBytes32().toHex()
-            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nhttp-password=$value") }
-            terminal.println(white("done"))
-            value
-        }
-    private val httpPasswordLimitedAccess by option("--http-password-limited-access", help = "Password for the http api (limited access)")
-        .defaultLazy {
-            // if we are here then no value is defined in phoenix.conf
-            terminal.print(yellow("Generating limited access api password..."))
-            val value = randomBytes32().toHex()
-            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nhttp-password-limited-access=$value") }
-            terminal.println(white("done"))
-            value
-        }
-    private val webHookUrls by option("--webhook", help = "Webhook http endpoint for push notifications (alternative to websocket)")
-        .convert { Url(it) }
-        .multiple()
-    private val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
-        .defaultLazy {
-            // if we are here then no value is defined in phoenix.conf
-            terminal.print(yellow("Generating webhook secret..."))
-            val value = randomBytes32().toHex()
-            SystemFileSystem.sink(confFile, append = true).buffered().use { it.writeString("\nwebhook-secret=$value") }
-            terminal.println(white("done"))
-            value
-        }
 
     class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
         val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
@@ -143,6 +119,51 @@ class Phoenixd : CliktCommand() {
     }
 
     private val liquidityOptions by LiquidityOptions()
+
+    inner class HttpOptions : OptionGroup(name = "Http Options") {
+        val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
+        val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
+        val httpPassword by option("--http-password", help = "Password for the http api (full access)")
+            .defaultLazy {
+                // if we are here then no value is defined in phoenix.conf
+                this@Phoenixd.terminal.print(yellow("Generating default api password..."))
+                val value = randomBytes32().toHex()
+                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                    .use { it.writeString("\nhttp-password=$value") }
+                this@Phoenixd.terminal.println(white("done"))
+                value
+            }
+        val httpPasswordLimitedAccess by option(
+            "--http-password-limited-access",
+            help = "Password for the http api (limited access)"
+        )
+            .defaultLazy {
+                // if we are here then no value is defined in phoenix.conf
+                this@Phoenixd.terminal.print(yellow("Generating limited access api password..."))
+                val value = randomBytes32().toHex()
+                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                    .use { it.writeString("\nhttp-password-limited-access=$value") }
+                this@Phoenixd.terminal.println(white("done"))
+                value
+            }
+        val webHookUrls by option(
+            "--webhook",
+            help = "Webhook http endpoint for push notifications (alternative to websocket)"
+        )
+            .convert { Url(it) }
+            .multiple()
+        val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
+            .defaultLazy {
+                // if we are here then no value is defined in phoenix.conf
+                this@Phoenixd.terminal.print(yellow("Generating webhook secret..."))
+                val value = randomBytes32().toHex()
+                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                    .use { it.writeString("\nwebhook-secret=$value") }
+                this@Phoenixd.terminal.println(white("done"))
+                value
+            }
+    }
+    private val httpOptions by HttpOptions()
 
     sealed class SeedSpec {
         data class Manual(val seed: ByteVector) : SeedSpec()
@@ -399,13 +420,13 @@ class Phoenixd : CliktCommand() {
             },
             configure = {
                 connector {
-                    port = httpBindPort
-                    host = httpBindIp
+                    port = httpOptions.httpBindPort
+                    host = httpOptions.httpBindIp
                 }
                 reuseAddress = true
             },
             module = {
-                Api(nodeParams, peer, eventsFlow, httpPassword, httpPasswordLimitedAccess, webHookUrls, webHookSecret, loggerFactory).run { module() }
+                Api(nodeParams, peer, eventsFlow, httpOptions.httpPassword, httpOptions.httpPasswordLimitedAccess, httpOptions.webHookUrls, httpOptions.webHookSecret, loggerFactory).run { module() }
             }
         )
 
@@ -426,7 +447,7 @@ class Phoenixd : CliktCommand() {
         }
 
         server.monitor.subscribe(ServerReady) {
-            consoleLog("listening on http://$httpBindIp:$httpBindPort")
+            consoleLog("listening on http://${httpOptions.httpBindIp}:${httpOptions.httpBindPort}")
         }
         server.monitor.subscribe(ApplicationStopPreparing) {
             consoleLog(brightYellow("shutting down..."))

@@ -111,6 +111,7 @@ kotlin {
 
                 implementation("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinx.io.get()}")
                 implementation("com.github.ajalt.clikt:clikt:${libs.versions.clikt.get()}")
+                implementation("co.touchlab:kermit-io:${libs.versions.kermit.io.get()}")
             }
         }
         commonTest {

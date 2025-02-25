@@ -3,6 +3,7 @@ package fr.acinq.phoenixd
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
+import co.touchlab.kermit.io.RollingFileLogWriterConfig
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.context
@@ -13,6 +14,7 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
+import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
@@ -40,7 +42,7 @@ import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
 import fr.acinq.phoenixd.json.ApiType
-import fr.acinq.phoenixd.logs.FileLogWriter
+import fr.acinq.phoenixd.logs.RollingFileLogWriter
 import fr.acinq.phoenixd.logs.TimestampFormatter
 import fr.acinq.phoenixd.logs.stringTimestamp
 import io.ktor.http.*
@@ -157,6 +159,13 @@ class Phoenixd : CliktCommand() {
 
     private val liquidityOptions by LiquidityOptions()
 
+    private val logRotateSize by option("--log-rotate-size", help = "Log rotate size in MB.")
+        .long().convert { it * 1024 * 1024 }
+        .default(10 * 1024 * 1024, "10")
+    private val logRotateMaxFiles by option("--log-rotate-max-files", help = "Maximum number of log files kept.")
+        .int()
+        .default(5, "5")
+
     sealed class Verbosity {
         data object Default : Verbosity()
         data object Silent : Verbosity()
@@ -230,7 +239,7 @@ class Phoenixd : CliktCommand() {
         val loggerFactory = LoggerFactory(
             StaticConfig(minSeverity = Severity.Info, logWriterList = buildList {
                 // always log to file
-                add(FileLogWriter(Path(datadir, "phoenix.log"), scope))
+                add(RollingFileLogWriter(RollingFileLogWriterConfig(logFileName = "phoenix", logFilePath = Path(datadir.toString()), rollOnSize = logRotateSize, maxLogFiles = logRotateMaxFiles)))
                 // only log to console if verbose mode is enabled
                 if (verbosity == Verbosity.Verbose) add(CommonWriter(TimestampFormatter))
             })

@@ -68,7 +68,7 @@ fun main(args: Array<String>) = Phoenixd()
 class Phoenixd : CliktCommand() {
     private val confFile = Path(datadir, "phoenix.conf")
     private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
-        .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false) }
+        .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false, path = null) }
         .defaultLazy {
             val value = try {
                 getOrGenerateSeed(datadir)
@@ -198,7 +198,7 @@ class Phoenixd : CliktCommand() {
             runBlocking {
                 terminal.println(green("Backup"))
                 terminal.println("This software is self-custodial, you have full control and responsibility over your funds.")
-                terminal.println("Your 12-words seed is located in $datadir, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
+                terminal.println("Your 12-words seed is located in ${seed.path}, ${bold(red("make sure to do a backup or you risk losing your funds"))}.")
                 terminal.println("Do not share the same seed with other phoenix instances (mobile or server), it will cause issues and channel force closes.")
                 terminal.println()
                 terminal.prompt(

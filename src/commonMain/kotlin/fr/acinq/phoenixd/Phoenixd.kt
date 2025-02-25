@@ -5,12 +5,10 @@ import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.io.RollingFileLogWriterConfig
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.output.MordantHelpFormatter
-import com.github.ajalt.clikt.parameters.groups.OptionGroup
-import com.github.ajalt.clikt.parameters.groups.provideDelegate
+import com.github.ajalt.clikt.parameters.groups.*
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
@@ -18,6 +16,7 @@ import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.rendering.TextStyles.bold
+import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.MnemonicCode
 import fr.acinq.lightning.Lightning.randomBytes32
@@ -67,21 +66,7 @@ fun main(args: Array<String>) = Phoenixd()
 
 class Phoenixd : CliktCommand() {
     private val confFile = Path(datadir, "phoenix.conf")
-    private val seed by option("--seed", help = "Manually provide a 12-words seed", hidden = true, envvar = PHOENIX_SEED)
-        .convert { PhoenixSeed(MnemonicCode.toSeed(it, "").toByteVector(), isNew = false, path = null) }
-        .defaultLazy {
-            val value = try {
-                getOrGenerateSeed(datadir)
-            } catch (t: Throwable) {
-                throw UsageError(t.message, paramName = "seed")
-            }
-            if (value.isNew) {
-                terminal.print(yellow("Generating new seed..."))
-                runBlocking { delay(500.milliseconds) }
-                terminal.println(white("done"))
-            }
-            value
-        }
+
     private val agreeToTermsOfService by option("--agree-to-terms-of-service", hidden = true, help = "Agree to terms of service").flag()
     private val chain by option("--chain", help = "Bitcoin chain to use").choice(
         "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet3
@@ -159,6 +144,18 @@ class Phoenixd : CliktCommand() {
 
     private val liquidityOptions by LiquidityOptions()
 
+    sealed class SeedSpec {
+        data class Manual(val seed: ByteVector) : SeedSpec()
+        data class SeedPath(val path: Path) : SeedSpec()
+    }
+
+    private val seedSpec by mutuallyExclusiveOptions(
+        option("--seed", help = "Explicitly provide a 12-words seed", hidden = false, envvar = PHOENIX_SEED)
+            .convert { SeedSpec.Manual(MnemonicCode.toSeed(it, "").toByteVector()) },
+        option("--seed-path", help = "Override the path to the seed file", hidden = false)
+            .convert { SeedSpec.SeedPath(Path(it)) }
+    ).single().default(SeedSpec.SeedPath(Path(datadir, "seed.dat")))
+
     private val logRotateSize by option("--log-rotate-size", help = "Log rotate size in MB.")
         .long().convert { it * 1024 * 1024 }
         .default(10 * 1024 * 1024, "10")
@@ -194,6 +191,17 @@ class Phoenixd : CliktCommand() {
     }
 
     override fun run() {
+        val seed = when (val seedSpec = seedSpec) {
+            is SeedSpec.Manual -> PhoenixSeed(seed = seedSpec.seed, isNew = false, path = null)
+            is SeedSpec.SeedPath -> seedSpec.getOrGenerateSeed()
+        }
+
+        if (seed.isNew) {
+            terminal.print(yellow("Generating new seed..."))
+            runBlocking { delay(500.milliseconds) }
+            terminal.println(white("done"))
+        }
+
         if (seed.isNew && !agreeToTermsOfService) {
             runBlocking {
                 terminal.println(green("Backup"))

@@ -111,7 +111,7 @@ class Phoenixd : CliktCommand() {
             "50k" to 50_000.sat,
             "100k" to 100_000.sat,
         ).convert { it.toMilliSatoshi() }.default(100_000.sat.toMilliSatoshi(), "100k")
-        private val maxRelativeFeePct by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent.", hidden = true)
+        private val maxRelativeFeePct by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent", hidden = true)
             .int()
             .restrictTo(1..50)
             .default(30)
@@ -177,10 +177,10 @@ class Phoenixd : CliktCommand() {
             .convert { SeedSpec.SeedPath(Path(it)) }
     ).single().default(SeedSpec.SeedPath(Path(datadir, "seed.dat")))
 
-    private val logRotateSize by option("--log-rotate-size", help = "Log rotate size in MB.")
+    private val logRotateSize by option("--log-rotate-size", help = "Log rotate size in MB")
         .long().convert { it * 1024 * 1024 }
         .default(10 * 1024 * 1024, "10")
-    private val logRotateMaxFiles by option("--log-rotate-max-files", help = "Maximum number of log files kept.")
+    private val logRotateMaxFiles by option("--log-rotate-max-files", help = "Maximum number of log files kept")
         .int()
         .default(5, "5")
 

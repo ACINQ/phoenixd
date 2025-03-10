@@ -12,8 +12,10 @@ import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCommand
+import fr.acinq.lightning.channel.ChannelCommand.*
 import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
+import fr.acinq.lightning.channel.states.Closing
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
@@ -54,6 +56,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -460,7 +463,8 @@ class Api(
                                 .filterIsInstance<ChannelCloseOutgoingPayment>()
                                 .first()
                         }
-                        peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(scriptPubKey, ClosingFeerates(feerate))))
+                        val replyTo = CompletableDeferred<fr.acinq.lightning.channel.ChannelCloseResponse>()
+                        peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(replyTo, scriptPubKey, feerate)))
                         val channelClose = res.await()
                         call.respondText(channelClose.txId.toString())
                     }

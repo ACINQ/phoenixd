@@ -18,17 +18,17 @@ RUN git clone --recursive --single-branch --branch ${PHOENIXD_BRANCH} -c advice.
     && test `git rev-parse HEAD` = ${PHOENIXD_COMMIT_HASH} || exit 1 \
     && ./gradlew distTar
 
-# Alpine image to minimize final image size
-FROM eclipse-temurin:21-jre-alpine as FINAL
+# JRE image to minimize final image size
+FROM eclipse-temurin:21-jre-jammy as FINAL
 
 # Upgrade all packages and install dependencies
-RUN apk update \
-    && apk upgrade --no-interactive
-RUN apk add --update --no-cache bash
+RUN apt-get update \
+    && apt-get upgrade -y
+RUN apt-get install -y --no-install-recommends bash
 
 # Create a phoenix group and user
-RUN addgroup -S phoenix -g 1000 \
-    && adduser -S phoenix -G phoenix -u 1000 -h /phoenix
+RUN addgroup --system phoenix --gid 1000 \
+    && adduser --system phoenix --ingroup phoenix --uid 1000 --home /phoenix
 USER phoenix
 
 # Unpack the release

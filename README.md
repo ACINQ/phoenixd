@@ -20,6 +20,8 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 ./gradlew linuxX64DistZip
 ```
 
+If you are on a system with a different glibc, try to use nix and build phoenixd inside the shell that you can create with the command `nix-shell .nix/shell.nix`.
+
 ### Native MacOS x64
 ```shell
 ./gradlew macosX64DistZip

@@ -44,6 +44,9 @@ class SqliteOutgoingPaymentsDb(private val database: PhoenixDatabase) : Outgoing
                             succeeded_at = outgoingPayment.succeededAt,
                             data_ = outgoingPayment
                         )
+                        outgoingPayment.parts.forEach { part ->
+                            database.paymentsOutgoingQueries.insertPartLink(part_id = part.id, parent_id = outgoingPayment.id)
+                        }
                     }
                     is OnChainOutgoingPayment -> {
                         database.paymentsOutgoingQueries.insert(

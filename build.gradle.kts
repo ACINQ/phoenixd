@@ -173,7 +173,7 @@ kotlin {
 
 distributions {
     fun Distribution.configureNativeDistribution(buildTask: String, dir: String, classifier: String) {
-        distributionBaseName = "phoenix"
+        distributionBaseName = "phoenixd"
         distributionClassifier = classifier
         contents {
             from(tasks[buildTask])

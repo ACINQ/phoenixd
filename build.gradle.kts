@@ -1,4 +1,6 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import java.io.ByteArrayOutputStream
@@ -7,7 +9,7 @@ plugins {
     alias(libs.plugins.multiplatform)
     alias(libs.plugins.serialization)
     alias(libs.plugins.sqldelight)
-    application
+    distribution
 }
 
 /** Get the current git commit hash. */
@@ -51,7 +53,26 @@ val arch = System.getProperty("os.arch")
 
 kotlin {
     jvm {
-        withJava()
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        binaries {
+            // this distribution is only needed to generate eclair-cli scripts
+            executable(KotlinCompilation.MAIN_COMPILATION_NAME, "phoenix-cli") {
+                applicationName.set("phoenix-cli")
+                mainClass.set("fr.acinq.phoenixd.cli.PhoenixCliKt")
+            }
+            executable {
+                applicationName.set("phoenixd")
+                mainClass.set("fr.acinq.phoenixd.PhoenixdKt")
+                applicationDistribution
+                    .from("$projectDir/build/jvmPhoenix-cli/scripts") {
+                    include("*")
+                }.into("bin")
+            }
+            // generate the phoenix-cli scripts before building the main jvm ditribution
+            tasks["jvmDistZip"].dependsOn("startScriptsForJvmPhoenix-cli")
+            // hide the phoenix-cli distribution task from the 'tasks' output
+            tasks.filter { it.name.contains("Phoenix-cliDist") }.forEach { it.group = null }
+        }
     }
 
     fun KotlinNativeTargetWithHostTests.phoenixBinaries() {
@@ -126,9 +147,11 @@ kotlin {
                 implementation("ch.qos.logback:logback-classic:${libs.versions.test.logback.get()}")
             }
         }
-        nativeMain {
-            dependencies {
-                implementation("app.cash.sqldelight:native-driver:${libs.versions.sqldelight.get()}")
+        if (currentOs.isLinux || currentOs.isMacOsX) {
+            nativeMain {
+                dependencies {
+                    implementation("app.cash.sqldelight:native-driver:${libs.versions.sqldelight.get()}")
+                }
             }
         }
         if (currentOs.isLinux) {
@@ -148,28 +171,9 @@ kotlin {
     }
 }
 
-application {
-    mainClass = "fr.acinq.phoenixd.PhoenixdKt"
-}
-
-val cliScripts by tasks.register("cliScripts", CreateStartScripts::class) {
-    mainClass.set("fr.acinq.phoenixd.cli.PhoenixCliKt")
-    outputDir = tasks.startScripts.get().outputDir
-    classpath = tasks.startScripts.get().classpath
-    applicationName = "phoenix-cli"
-}
-
-tasks.startScripts {
-    dependsOn(cliScripts)
-}
-
 distributions {
-    main {
-        distributionBaseName = "phoenix"
-        distributionClassifier = "jvm"
-    }
     fun Distribution.configureNativeDistribution(buildTask: String, dir: String, classifier: String) {
-        distributionBaseName = "phoenix"
+        distributionBaseName = "phoenixd"
         distributionClassifier = classifier
         contents {
             from(tasks[buildTask])

@@ -1,4 +1,4 @@
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.10-blue.svg?style=flat&logo=kotlin)](http://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-blue.svg?style=flat&logo=kotlin)](http://kotlinlang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![](https://img.shields.io/badge/www-Homepage-green.svg)](https://phoenix.acinq.co/server)
 [![](https://img.shields.io/badge/www-API_doc-red.svg)](https://phoenix.acinq.co/server/api)
@@ -32,5 +32,5 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ### JVM
 ```shell
-./gradlew distZip
+./gradlew jvmDistZip
 ```

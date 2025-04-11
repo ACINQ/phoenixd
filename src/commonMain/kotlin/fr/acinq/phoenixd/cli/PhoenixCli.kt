@@ -54,6 +54,7 @@ fun main(args: Array<String>) =
             GetIncomingPayment(),
             ListIncomingPayments(),
             CreateInvoice(),
+            CreateOffer(),
             GetOffer(),
             GetLnAddress(),
             PayInvoice(),
@@ -246,7 +247,22 @@ class CreateInvoice : PhoenixCliCommand(name = "createinvoice", help = "Create a
     }
 }
 
-class GetOffer : PhoenixCliCommand(name = "getoffer", help = "Return a Lightning offer (static invoice)") {
+class CreateOffer : PhoenixCliCommand(name = "createoffer", help = "Create a Lightning offer (reusable invoice)") {
+    private val amountSat by option("--amountSat").long()
+    private val description by option("--description", "--desc")
+
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "createoffer").toString(),
+            formParameters = parameters {
+                amountSat?.let { append("amountSat", it.toString()) }
+                description?.let { append("description", it) }
+            }
+        )
+    }
+}
+
+class GetOffer : PhoenixCliCommand(name = "getoffer", help = "Return a default Lightning offer (reusable invoice). Consider using 'createinvoice' instead.") {
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.get(url = commonOptions.baseUrl / "getoffer")
     }

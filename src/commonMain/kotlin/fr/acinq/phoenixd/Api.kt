@@ -204,6 +204,14 @@ class Api(
                     }
                     call.respond(GeneratedInvoice(invoice.amount?.truncateToSatoshi(), invoice.paymentHash, serialized = invoice.write()))
                 }
+                post("createoffer") {
+                    val formParameters = call.receiveParameters()
+                    val amount = formParameters.getOptionalLong("amountSat")?.sat
+                    val maxDescriptionSize = 128
+                    val description = formParameters["description"]
+                        ?.also { if (it.length > maxDescriptionSize) badRequest("Request parameter description is too long (max $maxDescriptionSize characters)") }
+                    call.respond(nodeParams.randomOffer(peer.walletParams.trampolineNode.id, amount?.toMilliSatoshi(), description).first.encode())
+                }
                 get("getoffer") {
                     call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
                 }

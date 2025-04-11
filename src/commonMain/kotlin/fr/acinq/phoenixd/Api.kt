@@ -11,6 +11,7 @@ import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
+import fr.acinq.lightning.channel.ChannelCloseResponse
 import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
@@ -453,16 +454,11 @@ class Api(
                         val channelId = formParameters.getByteVector32("channelId")
                         val scriptPubKey = formParameters.getAddressAndConvertToScript("address")
                         val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
-                        val res = async {
-                            nodeParams.nodeEvents
-                                .filterIsInstance<PaymentEvents.PaymentSent>()
-                                .map { it.payment }
-                                .filterIsInstance<ChannelCloseOutgoingPayment>()
-                                .first()
+                        when (val r = peer.mutualClose(channelId, scriptPubKey, feerate)) {
+                            is ChannelCloseResponse.Success -> call.respondText(r.closingTxId.toString())
+                            is ChannelCloseResponse.Failure -> call.respondText(r.toString())
+                            else -> call.respondText("no channel available")
                         }
-                        peer.send(WrappedChannelCommand(channelId, ChannelCommand.Close.MutualClose(scriptPubKey, ClosingFeerates(feerate))))
-                        val channelClose = res.await()
-                        call.respondText(channelClose.txId.toString())
                     }
                 }
                 post("export") {

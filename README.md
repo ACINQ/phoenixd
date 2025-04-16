@@ -6,7 +6,7 @@
 # phoenixd
 
 **phoenixd** is the server equivalent of the popular [phoenix wallet](https://github.com/ACINQ/phoenix) for mobile.
-It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html) and runs natively on Linux, MacOS (x86 and ARM), and Windows (WSL).
+It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html) and runs natively on Linux (x86 and ARM), MacOS (x86 and ARM), and Windows (WSL).
 
 ## Build
 
@@ -18,6 +18,12 @@ It is written in [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatfor
 
 ```shell
 ./gradlew linuxX64DistZip
+```
+
+### Native Linux arm64
+
+```shell
+./gradlew linuxArm64DistZip
 ```
 
 ### Native MacOS x64

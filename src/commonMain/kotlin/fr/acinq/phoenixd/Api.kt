@@ -210,6 +210,9 @@ class Api(
                     val maxDescriptionSize = 128
                     val description = formParameters["description"]
                         ?.also { if (it.length > maxDescriptionSize) badRequest("Request parameter description is too long (max $maxDescriptionSize characters)") }
+                    if (amount != null && description == null) {
+                        badRequest("Must provide a description if an amount is specified")
+                    }
                     call.respond(nodeParams.randomOffer(peer.walletParams.trampolineNode.id, amount?.toMilliSatoshi(), description).first.encode())
                 }
                 get("getoffer") {

@@ -1,0 +1,17 @@
+version: "3"
+services:
+  phoenixd:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: phoenixd:latest
+    container_name: phoenixd
+    restart: unless-stopped
+    networks:
+      - default
+    expose:
+      - "9740"
+    volumes:
+      - "phoenixd_datadir:/root/.phoenix"
+volumes:
+  phoenixd_datadir:

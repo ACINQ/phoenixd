@@ -5,9 +5,15 @@ services:
     restart: unless-stopped
     networks:
       - default
+    command: "--seed-path=/run/secrets/phoenixd_seed"
     expose:
       - "9740"
     volumes:
       - "phoenixd_datadir:/phoenix/.phoenix"
+    secrets:
+      - phoenixd_seed
 volumes:
   phoenixd_datadir:
+secrets:
+  phoenixd_seed:
+    file: ~/.phoenix/seed.dat

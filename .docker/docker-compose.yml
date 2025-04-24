@@ -1,0 +1,13 @@
+services:
+  phoenixd:
+    image: acinq/phoenixd:latest
+    container_name: phoenixd
+    restart: unless-stopped
+    networks:
+      - default
+    expose:
+      - "9740"
+    volumes:
+      - "phoenixd_datadir:/phoenix/.phoenix"
+volumes:
+  phoenixd_datadir:

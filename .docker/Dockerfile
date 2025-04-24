@@ -25,7 +25,7 @@ RUN case "${TARGETPLATFORM}" in \
     esac
 
 # Slim image to minimize final image size (Alpine is smaller but not glibc-based)
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS final
+FROM debian:bookworm-slim AS final
 
 # Upgrade all packages and install dependencies
 RUN apt-get update \

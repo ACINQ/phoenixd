@@ -1,4 +1,3 @@
-version: "3"
 services:
   phoenixd:
     image: acinq/phoenixd:latest

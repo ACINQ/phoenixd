@@ -19,8 +19,8 @@ RUN git clone --recursive --single-branch --branch ${PHOENIXD_BRANCH} -c advice.
     && test `git rev-parse HEAD` = ${PHOENIXD_COMMIT_HASH} || exit 1
 
 RUN case "${TARGETPLATFORM}" in \
-        "linux/amd64") ./gradlew linkPhoenixdReleaseExecutableLinuxX64 ;; \
-        "linux/arm64") ./gradlew linkPhoenixdReleaseExecutableLinuxArm64 ;; \
+        "linux/amd64") ./gradlew linkPhoenixdReleaseExecutableLinuxX64 linkPhoenix-cliReleaseExecutableLinuxX64 ;; \
+        "linux/arm64") ./gradlew linkPhoenixdReleaseExecutableLinuxArm64 linkPhoenix-cliReleaseExecutableLinuxArm64 ;; \
         *) echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" && exit 1 ;; \
     esac
 
@@ -41,6 +41,7 @@ USER phoenix
 # Unpack the release
 WORKDIR /phoenix
 COPY --chown=phoenix:phoenix --from=build /phoenixd/build/bin/*/phoenixdReleaseExecutable/phoenixd.kexe phoenixd
+COPY --chown=phoenix:phoenix --from=build /phoenixd/build/bin/*/phoenix-cliReleaseExecutable/phoenix-cli.kexe phoenix-cli
 
 # Indicate that the container listens on port 9740
 EXPOSE 9740

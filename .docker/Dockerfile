@@ -45,8 +45,10 @@ COPY --chown=phoenix:phoenix --from=build /phoenixd/build/bin/*/phoenixdReleaseE
 # Indicate that the container listens on port 9740
 EXPOSE 9740
 
+# Create the data directory so permissions are preserved when mounted as a volume (otherwise would be mounted as root)
+RUN mkdir -p /phoenix/.phoenix
 # Expose default data directory as VOLUME
-VOLUME [ "/phoenix" ]
+VOLUME [ "/phoenix/.phoenix" ]
 
 # Run the daemon
 ENTRYPOINT ["/phoenix/phoenixd", "--agree-to-terms-of-service", "--http-bind-ip", "0.0.0.0"]

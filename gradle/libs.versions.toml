@@ -4,7 +4,7 @@ kotlinx-io = "0.6.0"
 clikt = "4.4.0"
 ktor = "3.1.2"
 sqldelight = "2.0.2" # TODO: remove 'addEnclosingTransaction' hack in AfterVersionX files when upgrading
-lightningkmp = "1.10.0"
+lightningkmp = "1.10.1"
 kermit-io = "2.0.5"
 
 # test dependencies

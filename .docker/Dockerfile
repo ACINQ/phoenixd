@@ -30,7 +30,7 @@ FROM debian:bookworm-slim AS final
 # Upgrade all packages and install dependencies
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends bash \
+    && apt-get install -y --no-install-recommends bash ca-certificates \
     && apt clean
 
 # Create a phoenix group and user

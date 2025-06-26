@@ -30,6 +30,7 @@ import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.wire.LiquidityAds
+import io.ktor.client.request.request
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
@@ -124,7 +125,7 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("incoming_payment")
-    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long): ApiType() {
+    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val requestedSat: Satoshi?, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long): ApiType() {
         constructor(payment: LightningIncomingPayment, externalId: String?) : this (
             subType = "lightning",
             paymentHash = payment.paymentHash,
@@ -133,6 +134,10 @@ sealed class ApiType {
             description = (payment as? Bolt11IncomingPayment)?.paymentRequest?.description,
             invoice = (payment as? Bolt11IncomingPayment)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
+            requestedSat = when(payment) {
+                is Bolt11IncomingPayment -> payment.paymentRequest.amount?.truncateToSatoshi()
+                is Bolt12IncomingPayment -> null
+            },
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
@@ -149,6 +154,7 @@ sealed class ApiType {
             description = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.description,
             invoice = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
+            requestedSat = null,
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             payerNote = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,

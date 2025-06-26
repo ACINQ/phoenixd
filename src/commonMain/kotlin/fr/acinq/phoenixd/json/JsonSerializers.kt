@@ -19,9 +19,6 @@ import fr.acinq.bitcoin.PublicKey
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.phoenixd.db.payments.PaymentMetadata
-import fr.acinq.phoenixd.payments.lnurl.models.Lnurl
-import fr.acinq.phoenixd.payments.lnurl.models.LnurlWithdraw
 import fr.acinq.lightning.channel.states.ChannelState
 import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.*
@@ -31,14 +28,15 @@ import fr.acinq.lightning.payment.OfferPaymentMetadata
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.lightning.wire.LiquidityAds
-import io.ktor.client.request.request
+import fr.acinq.phoenixd.db.payments.PaymentMetadata
+import fr.acinq.phoenixd.payments.lnurl.models.Lnurl
+import fr.acinq.phoenixd.payments.lnurl.models.LnurlWithdraw
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 @Serializable

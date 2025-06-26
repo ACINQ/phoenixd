@@ -29,6 +29,7 @@ import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.payment.OfferPaymentMetadata
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.lightning.wire.LiquidityAds
 import io.ktor.client.request.request
 import io.ktor.http.*
@@ -37,6 +38,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 sealed class ApiType {
@@ -125,7 +128,7 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("incoming_payment")
-    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val requestedSat: Satoshi?, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val completedAt: Long?, val createdAt: Long): ApiType() {
+    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val isExpired: Boolean, val requestedSat: Satoshi?, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val expiresAt: Long?, val completedAt: Long?, val createdAt: Long): ApiType() {
         constructor(payment: LightningIncomingPayment, externalId: String?) : this (
             subType = "lightning",
             paymentHash = payment.paymentHash,
@@ -134,14 +137,13 @@ sealed class ApiType {
             description = (payment as? Bolt11IncomingPayment)?.paymentRequest?.description,
             invoice = (payment as? Bolt11IncomingPayment)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
-            requestedSat = when(payment) {
-                is Bolt11IncomingPayment -> payment.paymentRequest.amount?.truncateToSatoshi()
-                is Bolt12IncomingPayment -> null
-            },
+            isExpired = (payment as? Bolt11IncomingPayment)?.paymentRequest?.expirySeconds?.let { currentTimestampMillis() > payment.createdAt + it.seconds.inWholeMilliseconds } ?: false,
+            requestedSat = (payment as? Bolt11IncomingPayment)?.paymentRequest?.amount?.truncateToSatoshi(),
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
             payerKey = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            expiresAt = (payment as? Bolt11IncomingPayment)?.paymentRequest?.expirySeconds?.let { payment.createdAt + it.seconds.inWholeMilliseconds },
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )
@@ -154,11 +156,13 @@ sealed class ApiType {
             description = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.description,
             invoice = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.write(),
             isPaid = payment.completedAt != null,
-            requestedSat = null,
+            isExpired = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.expirySeconds?.let { currentTimestampMillis() > payment.createdAt + it.seconds.inWholeMilliseconds } ?: false,
+            requestedSat = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.amount?.truncateToSatoshi(),
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
             payerNote = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
             payerKey = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            expiresAt = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.expirySeconds?.let { payment.createdAt + it.seconds.inWholeMilliseconds },
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )

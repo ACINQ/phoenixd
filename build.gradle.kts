@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
@@ -53,6 +54,11 @@ val arch = System.getProperty("os.arch")
 
 kotlin {
     jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+            // See https://jakewharton.com/kotlins-jdk-release-compatibility-flag/ and https://youtrack.jetbrains.com/issue/KT-49746/
+            freeCompilerArgs.add("-Xjdk-release=21")
+        }
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         binaries {
             // this distribution is only needed to generate eclair-cli scripts

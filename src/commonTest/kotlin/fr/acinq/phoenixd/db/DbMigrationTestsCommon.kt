@@ -15,6 +15,27 @@ import kotlin.test.assertEquals
 class DbMigrationTestsCommon {
 
     @Test
+    fun `read v1 db`() = runBlocking {
+        val testdir = Path(SystemTemporaryDirectory, "phoenix_tests", "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}")
+        SystemFileSystem.createDirectories(testdir)
+        SystemFileSystem.list(Path("src/commonTest/resources/sampledbs/v1")).forEach { file ->
+            SystemFileSystem.source(file).buffered().use { bytesIn ->
+                SystemFileSystem.sink(Path(testdir, file.name)).buffered().use { bytesOut ->
+                    bytesIn.transferTo(bytesOut)
+                }
+            }
+        }
+        val driver = createAppDbDriver(testdir, Chain.Mainnet, PublicKey.fromHex("0326930365cec7d84e9ae08810165ac6731fa01e8d91459f6fec2f5e8ca7e8a4f7"))
+        val database = createPhoenixDb(driver)
+
+        SqlitePaymentsDb(database)
+            .listIncomingPayments(from = 0L, to = Long.MAX_VALUE, limit = Long.MAX_VALUE, offset = 0L, listAll = true)
+            .also { assertEquals(1, it.size) }
+
+        driver.close()
+    }
+
+    @Test
     fun `read v3 db`() = runBlocking {
         val testdir = Path(SystemTemporaryDirectory, "phoenix_tests", "phoenix_testdb_${Clock.System.now().toEpochMilliseconds()}")
         SystemFileSystem.createDirectories(testdir)

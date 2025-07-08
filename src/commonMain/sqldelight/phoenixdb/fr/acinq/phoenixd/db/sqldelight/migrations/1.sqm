@@ -4,7 +4,7 @@
 -- * Made column external_id nullable
 -- * Added column webhook_url
 
-CREATE TABLE payments_metadata_backup (
+CREATE TABLE IF NOT EXISTS payments_metadata_backup (
     type INTEGER NOT NULL,
     id TEXT NOT NULL,
     external_id TEXT NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE payments_metadata_backup (
     PRIMARY KEY (type, id)
 );
 
-INSERT INTO payments_metadata_backup SELECT * FROM payments_metadata;
+INSERT INTO payments_metadata_backup SELECT type, id, external_id, created_at FROM payments_metadata;
 
 DROP TABLE payments_metadata;
 

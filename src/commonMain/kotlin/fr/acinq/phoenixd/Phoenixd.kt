@@ -109,13 +109,12 @@ class Phoenixd : CliktCommand() {
         val maxFeeCredit by option("--max-fee-credit", help = "Max fee credit, if reached payments will be rejected").choice(
             "off" to 0.sat,
             "50k" to 50_000.sat,
-            "100k" to 100_000.sat,
             "125k" to 125_000.sat,
             "250k" to 250_000.sat,
         )
             .convert { it.toMilliSatoshi() }
-            .defaultLazy("2.5% of auto-liquidity amount with a min of 100k sat") {
-                100_000.sat.max(autoLiquidity * 2.5 / 100).toMilliSatoshi()
+            .defaultLazy("2.5% of auto-liquidity amount") {
+                (autoLiquidity * 2.5 / 100).toMilliSatoshi()
             }
         private val maxRelativeFeePct by option("--max-relative-fee-percent", help = "Max relative fee for on-chain operations in percent", hidden = true)
             .int()

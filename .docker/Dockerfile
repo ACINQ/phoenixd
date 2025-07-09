@@ -3,8 +3,8 @@ FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-jammy AS build
 
 # Set necessary args and environment variables for building phoenixd
 ARG TARGETPLATFORM
-ARG PHOENIXD_BRANCH=v0.6.0
-ARG PHOENIXD_COMMIT_HASH=fa318d9cd600aff45df132b7c01cbb959e66caa4
+ARG PHOENIXD_BRANCH=v0.6.1
+ARG PHOENIXD_COMMIT_HASH=b8545c123d0a07cc71794aca4b16e914ca0cc2b4
 
 # Upgrade all packages and install dependencies
 RUN apt-get update \

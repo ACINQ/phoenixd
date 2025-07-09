@@ -7,8 +7,8 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.phoenixd.conf.EnvVars.PHOENIX_DATADIR
-import fr.acinq.phoenixd.db.migrations.v3.afterVersion3
-import fr.acinq.phoenixd.db.migrations.v4.afterVersion4
+import fr.acinq.phoenixd.db.migrations.v3.AfterVersion3
+import fr.acinq.phoenixd.db.migrations.v4.AfterVersion4
 import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.io.files.Path
 import java.util.*
@@ -35,8 +35,8 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         properties = Properties().apply { put("foreign_keys", "true") },
         schema = PhoenixDatabase.Schema,
         migrateEmptySchema = false,
-        afterVersion3(addEnclosingTransaction = true),
-        afterVersion4(addEnclosingTransaction = true)
+        AfterVersion3,
+        AfterVersion4
     )
     return driver
 }

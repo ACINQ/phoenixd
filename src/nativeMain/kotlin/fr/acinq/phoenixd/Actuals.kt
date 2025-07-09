@@ -5,8 +5,8 @@ import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.PublicKey
 import fr.acinq.phoenixd.conf.EnvVars.PHOENIX_DATADIR
-import fr.acinq.phoenixd.db.migrations.v3.afterVersion3
-import fr.acinq.phoenixd.db.migrations.v4.afterVersion4
+import fr.acinq.phoenixd.db.migrations.v3.AfterVersion3
+import fr.acinq.phoenixd.db.migrations.v4.AfterVersion4
 import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
@@ -29,7 +29,7 @@ actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDri
         name = "phoenix.$chainName.${nodeId.toHex().take(6)}.db",
         maxReaderConnections = 1,
         onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(basePath = dir.toString(), foreignKeyConstraints = true)) },
-        afterVersion3(addEnclosingTransaction = false),
-        afterVersion4(addEnclosingTransaction = false)
+        AfterVersion3,
+        AfterVersion4
     )
 }

@@ -317,7 +317,7 @@ class Phoenixd : CliktCommand() {
                     nodeParams.nodeEvents
                         .collect {
                             when {
-                                it is PaymentEvents.PaymentReceived && it.payment.amount > 0.msat -> {
+                                it is PaymentEvents.PaymentReceived -> {
                                     when (val payment = it.payment) {
                                         is LightningIncomingPayment -> {
                                             val metadata = paymentsDb.metadataQueries.get(payment.paymentHash)

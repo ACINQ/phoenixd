@@ -82,6 +82,7 @@ class SqliteIncomingPaymentsDb(private val database: PhoenixDatabase) : Incoming
         withContext(Dispatchers.Default) {
             database.paymentsIncomingQueries.list(created_at_from = fromCreatedAt, created_at_to = toCreatedAt, externalId = null, offset = 0, limit = Long.MAX_VALUE)
                 .executeAsList()
+                .map { it.data_ }
                 .filterIsInstance<Bolt11IncomingPayment>()
                 .filter { it.parts.isEmpty() && it.paymentRequest.isExpired() }
         }

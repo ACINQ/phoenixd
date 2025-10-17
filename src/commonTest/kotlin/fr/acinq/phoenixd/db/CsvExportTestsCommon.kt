@@ -6,13 +6,15 @@ import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.phoenixd.createAppDbDriver
 import fr.acinq.phoenixd.csv.WalletPaymentCsvWriter
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
 import kotlin.test.Test
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class CsvExportTestsCommon {
 
     @Test

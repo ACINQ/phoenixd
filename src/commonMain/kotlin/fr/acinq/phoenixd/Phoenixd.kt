@@ -3,6 +3,7 @@ package fr.acinq.phoenixd
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
+import co.touchlab.kermit.io.RollingFileLogWriter
 import co.touchlab.kermit.io.RollingFileLogWriterConfig
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.context
@@ -41,7 +42,6 @@ import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
 import fr.acinq.phoenixd.json.ApiType
-import fr.acinq.phoenixd.logs.RollingFileLogWriter
 import fr.acinq.phoenixd.logs.TimestampFormatter
 import fr.acinq.phoenixd.logs.stringTimestamp
 import io.ktor.http.*
@@ -295,7 +295,7 @@ class Phoenixd : CliktCommand() {
                 liquidityPolicy = MutableStateFlow(liquidityPolicy),
             )
         consoleLog(cyan("nodeid: ${nodeParams.nodeId}"))
-        consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id).first}"))
+        consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id).offer}"))
 
         val driver = createAppDbDriver(datadir, chain, nodeParams.nodeId)
         val database = createPhoenixDb(driver)

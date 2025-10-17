@@ -6,11 +6,11 @@ import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.MilliSatoshi
-import fr.acinq.phoenixd.csv.WalletPaymentCsvWriter.Type
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.utils.*
-import kotlinx.datetime.Instant
 import kotlinx.io.files.Path
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Exports a payments db items to a csv file.
@@ -62,6 +62,7 @@ class WalletPaymentCsvWriter(path: Path) : CsvWriter(path) {
         val txId: TxId?
     )
 
+    @OptIn(ExperimentalTime::class)
     private fun addRow(
         timestamp: Long,
         id: UUID,

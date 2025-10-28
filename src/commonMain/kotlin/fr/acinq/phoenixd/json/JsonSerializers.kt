@@ -32,12 +32,13 @@ import fr.acinq.phoenixd.db.payments.PaymentMetadata
 import fr.acinq.phoenixd.payments.lnurl.models.Lnurl
 import fr.acinq.phoenixd.payments.lnurl.models.LnurlWithdraw
 import io.ktor.http.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseSerializers
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 
 @Serializable
 sealed class ApiType {
@@ -89,6 +90,7 @@ sealed class ApiType {
 
     @Serializable
     sealed class ApiEvent : ApiType() {
+        @OptIn(ExperimentalTime::class)
         val timestamp: Long = Clock.System.now().toEpochMilliseconds()
     }
 
@@ -99,8 +101,8 @@ sealed class ApiType {
             amount = payment.amount.truncateToSatoshi(),
             paymentHash = payment.paymentHash,
             externalId = metadata?.externalId,
-            payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
-            payerKey = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            payerNote = (payment as? Bolt12IncomingPayment)?.metadata?.payerNote,
+            payerKey = (payment as? Bolt12IncomingPayment)?.metadata?.payerKey,
             webhookUrl = metadata?.webhookUrl
         )
     }
@@ -139,8 +141,8 @@ sealed class ApiType {
             requestedSat = (payment as? Bolt11IncomingPayment)?.paymentRequest?.amount?.truncateToSatoshi(),
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
-            payerNote = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
-            payerKey = ((payment as? Bolt12IncomingPayment)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            payerNote = (payment as? Bolt12IncomingPayment)?.metadata?.payerNote,
+            payerKey = (payment as? Bolt12IncomingPayment)?.metadata?.payerKey,
             expiresAt = (payment as? Bolt11IncomingPayment)?.paymentRequest?.expirySeconds?.let { payment.createdAt + it.seconds.inWholeMilliseconds },
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
@@ -158,8 +160,8 @@ sealed class ApiType {
             requestedSat = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.amount?.truncateToSatoshi(),
             receivedSat = payment.amount.truncateToSatoshi(),
             fees = payment.fees,
-            payerNote = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerNote,
-            payerKey = ((payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata as? OfferPaymentMetadata.V1)?.payerKey,
+            payerNote = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata?.payerNote,
+            payerKey = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Offer)?.metadata?.payerKey,
             expiresAt = (payment.origin as? LegacyPayToOpenIncomingPayment.Origin.Invoice)?.paymentRequest?.expirySeconds?.let { payment.createdAt + it.seconds.inWholeMilliseconds },
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,

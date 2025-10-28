@@ -1,11 +1,11 @@
 [versions]
-kotlin = "2.1.20"
-kotlinx-io = "0.6.0"
+kotlin = "2.2.20"
+kotlinx-io = "0.8.0"
 clikt = "4.4.0"
-ktor = "3.1.2"
+ktor = "3.3.0"
 sqldelight = "2.1.0"
-lightningkmp = "1.10.8"
-kermit-io = "2.0.5"
+lightningkmp = "1.11.0"
+kermit-io = "2.0.8"
 
 # test dependencies
 test-logback = "1.5.16"

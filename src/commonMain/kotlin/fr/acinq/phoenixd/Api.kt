@@ -164,7 +164,7 @@ class Api(
                     val balance = peer.channels.values
                         .filterIsInstance<ChannelStateWithCommitments>()
                         .filterNot { it is Closing || it is Closed }
-                        .map { it.commitments.active.first().availableBalanceForSend(it.commitments.params, it.commitments.changes) }
+                        .map { it.commitments.active.first().availableBalanceForSend(it.commitments.channelParams, it.commitments.changes) }
                         .sum().truncateToSatoshi()
                     call.respond(Balance(balance, peer.feeCreditFlow.value.truncateToSatoshi()))
                 }
@@ -213,10 +213,10 @@ class Api(
                     if (amount != null && description == null) {
                         badRequest("Must provide a description if an amount is specified")
                     }
-                    call.respond(nodeParams.randomOffer(peer.walletParams.trampolineNode.id, amount?.toMilliSatoshi(), description).first.encode())
+                    call.respond(nodeParams.randomOffer(peer.walletParams.trampolineNode.id, amount?.toMilliSatoshi(), description).offer.encode())
                 }
                 get("getoffer") {
-                    call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).first.encode())
+                    call.respond(nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).offer.encode())
                 }
                 get("getlnaddress") {
                     if (peer.channels.isEmpty()) {
@@ -310,7 +310,7 @@ class Api(
                         val offer = formParameters.getOffer("offer")
                         val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
                         val note = formParameters["message"]
-                        when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                        when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
                             is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                             is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                             is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
@@ -335,7 +335,7 @@ class Api(
                                 is Either.Right -> {
                                     // OFFER
                                     val offer = either.value
-                                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).second, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
                                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                                         is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))

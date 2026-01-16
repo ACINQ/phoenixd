@@ -83,14 +83,17 @@ kotlin {
     }
 
     fun KotlinNativeTarget.phoenixBinaries() {
+        compilerOptions {
+            // without this, release mode throws 'Index 0 out of bounds for length 0' in StaticInitializersOptimization.kt
+            // due to the use of external serializers for sealed classes in lightning-kmp
+            freeCompilerArgs.add("-Xdisable-phases=RemoveRedundantCallsToStaticInitializersPhase")
+        }
         binaries {
             executable("phoenixd") {
                 entryPoint = "fr.acinq.phoenixd.main"
-                optimized = false // without this, release mode throws 'Index 0 out of bounds for length 0' in StaticInitializersOptimization.kt
             }
             executable("phoenix-cli") {
                 entryPoint = "fr.acinq.phoenixd.cli.main"
-                optimized = false // without this, release mode throws 'Index 0 out of bounds for length 0' in StaticInitializersOptimization.kt
             }
         }
     }

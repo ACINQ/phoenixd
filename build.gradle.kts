@@ -76,6 +76,7 @@ kotlin {
             }
             // generate the phoenix-cli scripts before building the main jvm ditribution
             tasks["jvmDistZip"].dependsOn("startScriptsForJvmPhoenix-cli")
+            tasks["jvmDistTar"].dependsOn("startScriptsForJvmPhoenix-cli")
             // hide the phoenix-cli distribution task from the 'tasks' output
             tasks.filter { it.name.contains("Phoenix-cliDist") }.forEach { it.group = null }
         }

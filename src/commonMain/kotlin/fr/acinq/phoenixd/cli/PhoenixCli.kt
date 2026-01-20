@@ -38,6 +38,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newFixedThreadPoolContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
@@ -125,35 +133,39 @@ class RecoverSeedOneWrongWord : CliktCommand(name = "recoverseedonewrongword", h
             it.forEach { word -> require(MnemonicCode.englishWordlist.contains(word)) { "'$word' is not a valid word" } }
         }
 
-    @OptIn(ExperimentalAtomicApi::class)
+    @OptIn(ExperimentalAtomicApi::class, DelicateCoroutinesApi::class)
     override fun run() {
 
-        val threadPool = Executors.newFixedThreadPool(12)
-        val stopFlag = AtomicBoolean(false)
+        val dispatcher = newFixedThreadPoolContext(12, "fixed-pool")
 
-        for (i in 0 until 12) {
-            threadPool.submit {
-                val mnemonics = words.toMutableList()
-                for (word in MnemonicCode.englishWordlist) {
-                    //println("Processing word $word for pos $i")
-                    mnemonics[i] = word
-                    val mnemonics = words.toMutableList().apply { this[i] = word }
-                    val seed = MnemonicCode.toSeed(mnemonics, "").toByteVector()
-                    val master = DeterministicWallet.generate(seed)
-                    val nodeKey = master.derivePrivateKey(nodeKeyBasePath(chain))
-                    if (nodeKey.publicKey == nodeId) {
-                        println("Found!")
-                        println("seed=${mnemonics.joinToString()}")
-                        stopFlag.store(true)
-                    }
-                    if (stopFlag.load()) {
-                        break
+        runBlocking {
+            coroutineScope {
+                for (i in 0 until 12) {
+                    launch(dispatcher) {
+                        println("$i starting")
+                        val mnemonics = words.toMutableList()
+                        for (word in MnemonicCode.englishWordlist) {
+                            //println("Processing word $word for pos $i")
+                            mnemonics[i] = word
+                            val mnemonics = words.toMutableList().apply { this[i] = word }
+                            val seed = MnemonicCode.toSeed(mnemonics, "").toByteVector()
+                            val master = DeterministicWallet.generate(seed)
+                            val nodeKey = master.derivePrivateKey(nodeKeyBasePath(chain))
+                            if (nodeKey.publicKey == nodeId) {
+                                println("Found!")
+                                println("seed=${mnemonics.joinToString()}")
+                                this@coroutineScope.cancel()
+                                return@launch
+                            }
+                            ensureActive()
+                        }
+                        println("$i terminating")
                     }
                 }
             }
         }
 
-        threadPool.shutdown()
+        dispatcher.close()
 
     }
 }

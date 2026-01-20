@@ -11,6 +11,7 @@ import fr.acinq.phoenixd.BuildVersions
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) =
     PhoenixCli()
@@ -98,7 +99,6 @@ class RecoverSeedOneWrongWord : CliktCommand(name = "recoverseedonewrongword", h
             coroutineScope {
                 for (i in 0 until 12) {
                     launch(dispatcher) {
-                        println("$i starting")
                         val mnemonics = words.toMutableList()
                         for (word in MnemonicCode.englishWordlist) {
                             //println("Processing word $word for pos $i")
@@ -110,12 +110,10 @@ class RecoverSeedOneWrongWord : CliktCommand(name = "recoverseedonewrongword", h
                             if (nodeKey.publicKey == nodeId) {
                                 println("Found!")
                                 println("seed=${mnemonics.joinToString()}")
-                                this@coroutineScope.cancel()
-                                return@launch
+                                exitProcess(0)
                             }
                             ensureActive()
                         }
-                        println("$i terminating")
                     }
                 }
             }

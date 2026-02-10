@@ -135,37 +135,38 @@ class RecoverSeedOneWrongWord : CliktCommand(
 class ClaimMainLocalCommit : CliktCommand(
     name = "claimmainlocalcommit",
     help = "Manually build a claim-main output tx in the local commit case.",
-    printHelpOnEmptyArgs = true
+    printHelpOnEmptyArgs = false
 ) {
     private val chain by option("--chain", help = "Bitcoin chain to use")
         .choice(
             "mainnet" to Chain.Mainnet, "testnet" to Chain.Testnet3
         ).default(Chain.Mainnet, defaultForHelp = "mainnet")
     private val words by option("--mnemonics", help = "12 seed words, comma-separated")
-        .split(",").required()
+        .convert { it.split(",") }.prompt()
         .validate {
             require(it.size == 12) { "--mnemonics must contain exactly 12 words" }
             it.forEach { word -> require(MnemonicCode.englishWordlist.contains(word)) { "'$word' is not a valid word" } }
         }
     private val fundingKeyPath by option("--funding-key-path", help = "Funding key path, e.g. m/xxx/yyy/zzz")
         .convert { KeyPath(it) }
-        .required()
+        .prompt()
     private val remoteRevocationBasePoint by option("--revocation-basepoint", help = "Remote revocation basepoint")
         .convert { PublicKey.fromHex(it) }
-        .required()
+        .prompt()
     private val commitTx by option("--commit-tx", help = "Local commit tx in hex")
         .convert { Transaction.read(it) }
-        .required()
+        .prompt()
     private val commitmentFormat by option("--commitment-format", help = "Commitment format").choice(
         "anchor-outputs" to Transactions.CommitmentFormat.AnchorOutputs,
         "simple-taproot" to Transactions.CommitmentFormat.SimpleTaprootChannels
-    ).required()
+    ).prompt()
     private val address by option("--address", help = "Destination bitcoin address (where the funds will be sent to).")
-        .required()
+        .convert { it.trim() }
+        .prompt()
         .check { runCatching { Base58Check.decode(it) }.isSuccess || runCatching { Bech32.decodeWitnessAddress(it) }.isSuccess }
     private val feerate by option("--feerate-sat-byte", help = "Feerate for the claim transaction").int()
         .convert { FeeratePerKw(FeeratePerByte(it.sat)) }
-        .required()
+        .prompt()
 
     override fun run() {
         val lsp = LSP.from(chain)

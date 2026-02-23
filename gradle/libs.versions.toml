@@ -2,7 +2,7 @@
 kotlin = "2.2.20"
 kotlinx-io = "0.8.0"
 clikt = "4.4.0"
-ktor = "3.3.0"
+ktor = "3.4.0"
 sqldelight = "2.1.0"
 lightningkmp = "1.11.4"
 kermit-io = "2.0.8"

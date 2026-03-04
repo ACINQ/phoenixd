@@ -7,6 +7,7 @@ import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.Lightning.randomBytes32
+import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
@@ -295,7 +296,11 @@ class Api(
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("payinvoice") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = when {
+                            formParameters.contains("sendAll") && formParameters.contains("amountSat") -> error("cannot use both amountSat and sendAll request parameters")
+                            formParameters.contains("sendAll") -> 0.msat
+                            else -> formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        }
                         val invoice = formParameters.getInvoice("invoice")
                         val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
                         when (val event = peer.payInvoice(amount, invoice)) {
@@ -306,7 +311,11 @@ class Api(
                     }
                     post("payoffer") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = when {
+                            formParameters.contains("sendAll") && formParameters.contains("amountSat") -> error("cannot use both amountSat and sendAll request parameters")
+                            formParameters.contains("sendAll") -> 0.msat
+                            else -> formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        }
                         val offer = formParameters.getOffer("offer")
                         val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
                         val note = formParameters["message"]
@@ -318,7 +327,11 @@ class Api(
                     }
                     post("paylnaddress") {
                         val formParameters = call.receiveParameters()
-                        val amount = formParameters.getLong("amountSat").sat.toMilliSatoshi()
+                        val amount = when {
+                            formParameters.contains("sendAll") && formParameters.contains("amountSat") -> error("cannot use both amountSat and sendAll request parameters")
+                            formParameters.contains("sendAll") -> 0.msat
+                            else -> formParameters.getLong("amountSat").sat.toMilliSatoshi()
+                        }
                         val (username, domain) = formParameters.getEmailLikeAddress("address")
                         val note = formParameters["message"]
                         when (val res = addressResolver.resolveAddress(username, domain, amount, note)) {
@@ -359,7 +372,11 @@ class Api(
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("lnurlpay") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = when {
+                            formParameters.contains("sendAll") && formParameters.contains("amountSat") -> error("cannot use both amountSat and sendAll request parameters")
+                            formParameters.contains("sendAll") -> 0.msat
+                            else -> formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        }
                         val comment = formParameters["message"]
                         val request = formParameters.getLnurl("lnurl")
                         // early abort to avoid executing an invalid url

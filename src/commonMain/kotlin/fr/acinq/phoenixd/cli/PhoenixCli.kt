@@ -1,9 +1,6 @@
 package fr.acinq.phoenixd.cli
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.requireObject
-import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.output.MordantHelpFormatter
 import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.required
@@ -16,6 +13,9 @@ import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.utils.Either
+import fr.acinq.lightning.payment.Bolt11Invoice
+import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.wire.OfferTypes
 import fr.acinq.phoenixd.BuildVersions
 import fr.acinq.phoenixd.conf.ListValueSource
 import fr.acinq.phoenixd.conf.readConfFile
@@ -24,9 +24,6 @@ import fr.acinq.phoenixd.payments.Parser
 import fr.acinq.phoenixd.payments.lnurl.helpers.LnurlParser
 import fr.acinq.phoenixd.payments.lnurl.models.Lnurl
 import fr.acinq.phoenixd.payments.lnurl.models.LnurlAuth
-import fr.acinq.lightning.payment.Bolt11Invoice
-import fr.acinq.lightning.utils.UUID
-import fr.acinq.lightning.wire.OfferTypes
 import io.ktor.client.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
@@ -41,7 +38,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 
-fun main(args: Array<String>) =
+fun main(args: Array<String>): kotlin.Unit =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
         .subcommands(
@@ -116,7 +113,8 @@ class PhoenixCli : CliktCommand() {
     }
 }
 
-abstract class PhoenixCliCommand(val name: String, val help: String, printHelpOnEmptyArgs: Boolean = false) : CliktCommand(name = name, help = help, printHelpOnEmptyArgs = printHelpOnEmptyArgs) {
+abstract class PhoenixCliCommand(val name: String, val help: String, override val printHelpOnEmptyArgs: Boolean = false) : CliktCommand(name = name) {
+    override fun help(context: Context): String = help
     internal val commonOptions by requireObject<HttpConf>()
     abstract suspend fun httpRequest(): HttpResponse
     override fun run() {
@@ -275,13 +273,15 @@ class GetLnAddress : PhoenixCliCommand(name = "getlnaddress", help = "Return a B
 }
 
 class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
+    private val amountSat by option("--amountSat").long()
+    private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payinvoice").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
+                sendAll?.let { append("sendAll", "true") }
                 append("invoice", invoice)
             }
         )
@@ -289,14 +289,16 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
 }
 
 class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning offer", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
     private val offer by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    private val amountSat by option("--amountSat").long()
+    private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     private val message by option("--message").help { "Optional payer note" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payoffer").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
+                sendAll?.let { append("sendAll", "true") }
                 append("offer", offer)
                 message?.let { append("message", message.toString()) }
             }
@@ -305,14 +307,17 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
 }
 
 class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Lightning address (BIP353 or LNURL)", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long().required()
+    private val amountSat by option("--amountSat").long()
+    private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
     private val message by option("--message").help { "Optional payer note" }
+
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "paylnaddress").toString(),
             formParameters = parameters {
-                append("amountSat", amountSat.toString())
+                amountSat?.let { append("amountSat", amountSat.toString()) }
+                sendAll?.let { append("sendAll", "true") }
                 append("address", address)
                 message?.let { append("message", message.toString()) }
             }
@@ -346,6 +351,7 @@ class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lig
 
 class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", printHelpOnEmptyArgs = true) {
     private val amountSat by option("--amountSat").long()
+    private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     private val lnurl by option("--lnurl").required()
         .check("not a valid lnurl-pay link") {
             val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
@@ -357,6 +363,7 @@ class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", prin
             url = (commonOptions.baseUrl / "lnurlpay").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
+                sendAll?.let { append("sendAll", "true") }
                 append("lnurl", lnurl)
                 message?.let { append("message", message.toString()) }
             }

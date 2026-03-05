@@ -15,6 +15,7 @@ import com.github.ajalt.clikt.parameters.types.long
 import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoin.Bech32
 import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.Satoshi
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.phoenixd.BuildVersions
 import fr.acinq.phoenixd.conf.ListValueSource
@@ -26,6 +27,7 @@ import fr.acinq.phoenixd.payments.lnurl.models.Lnurl
 import fr.acinq.phoenixd.payments.lnurl.models.LnurlAuth
 import fr.acinq.lightning.payment.Bolt11Invoice
 import fr.acinq.lightning.utils.UUID
+import fr.acinq.lightning.utils.sat
 import fr.acinq.lightning.wire.OfferTypes
 import io.ktor.client.*
 import io.ktor.client.plugins.auth.*
@@ -73,6 +75,11 @@ fun main(args: Array<String>) =
         .main(args)
 
 data class HttpConf(val baseUrl: Url, val httpClient: HttpClient)
+
+sealed class AmountChoice {
+    data class Specific(val amountSat: Long) : AmountChoice()
+    object SendAll : AmountChoice()
+}
 
 class PhoenixCli : CliktCommand() {
     private val confFile = Path(datadir, "phoenix.conf")
@@ -275,13 +282,20 @@ class GetLnAddress : PhoenixCliCommand(name = "getlnaddress", help = "Return a B
 }
 
 class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightning invoice", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
+    private val amountChoice by mutuallyExclusiveOptions(
+        option("--amountSat").long().convert { AmountChoice.Specific(it) },
+        option("--sendAll").nullableFlag().convert { AmountChoice.SendAll }.help("Send all available balance (incompatible with --amountSat)"),
+    )
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payinvoice").toString(),
             formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
+                when(val value = amountChoice) {
+                    is AmountChoice.Specific -> append("amountSat", value.amountSat.toString())
+                    is AmountChoice.SendAll -> append("sendAdd", "true")
+                    else -> {}
+                }
                 append("invoice", invoice)
             }
         )
@@ -289,14 +303,21 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
 }
 
 class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning offer", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
     private val offer by option("--offer").required().check { OfferTypes.Offer.decode(it).isSuccess }
+    private val amountChoice by mutuallyExclusiveOptions(
+        option("--amountSat").long().convert { AmountChoice.Specific(it) },
+        option("--sendAll").nullableFlag().convert { AmountChoice.SendAll }.help("Send all available balance (incompatible with --amountSat)"),
+    )
     private val message by option("--message").help { "Optional payer note" }
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payoffer").toString(),
             formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
+                when (val value = amountChoice) {
+                    is AmountChoice.Specific -> append("amountSat", value.amountSat.toString())
+                    is AmountChoice.SendAll -> append("sendAdd", "true")
+                    else -> {}
+                }
                 append("offer", offer)
                 message?.let { append("message", message.toString()) }
             }
@@ -305,14 +326,20 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
 }
 
 class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Lightning address (BIP353 or LNURL)", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long().required()
+    private val amountChoice by mutuallyExclusiveOptions(
+        option("--amountSat").long().convert { AmountChoice.Specific(it) },
+        option("--sendAll").nullableFlag().convert { AmountChoice.SendAll }.help("Send all available balance (incompatible with --amountSat)"),
+    ).required()
     private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
     private val message by option("--message").help { "Optional payer note" }
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "paylnaddress").toString(),
             formParameters = parameters {
-                append("amountSat", amountSat.toString())
+                when (val value = amountChoice) {
+                    is AmountChoice.Specific -> append("amountSat", value.amountSat.toString())
+                    is AmountChoice.SendAll -> append("sendAdd", "true")
+                }
                 append("address", address)
                 message?.let { append("message", message.toString()) }
             }
@@ -345,7 +372,10 @@ class DecodeOffer : PhoenixCliCommand(name = "decodeoffer", help = "Decode a Lig
 }
 
 class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", printHelpOnEmptyArgs = true) {
-    private val amountSat by option("--amountSat").long()
+    private val amountChoice by mutuallyExclusiveOptions(
+        option("--amountSat").long().convert { AmountChoice.Specific(it) },
+        option("--sendAll").nullableFlag().convert { AmountChoice.SendAll }.help("Send all available balance (incompatible with --amountSat)"),
+    )
     private val lnurl by option("--lnurl").required()
         .check("not a valid lnurl-pay link") {
             val url = kotlin.runCatching { LnurlParser.extractLnurl(it) }.getOrNull()
@@ -356,7 +386,11 @@ class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", prin
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlpay").toString(),
             formParameters = parameters {
-                amountSat?.let { append("amountSat", amountSat.toString()) }
+                when (val value = amountChoice) {
+                    is AmountChoice.Specific -> append("amountSat", value.amountSat.toString())
+                    is AmountChoice.SendAll -> append("sendAdd", "true")
+                    else -> {}
+                }
                 append("lnurl", lnurl)
                 message?.let { append("message", message.toString()) }
             }

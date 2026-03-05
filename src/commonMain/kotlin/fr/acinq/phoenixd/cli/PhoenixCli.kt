@@ -1,7 +1,10 @@
 package fr.acinq.phoenixd.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.obj
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.MordantHelpFormatter
@@ -43,7 +46,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 
-fun main(args: Array<String>) =
+fun main(args: Array<String>): kotlin.Unit =
     PhoenixCli()
         .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
         .subcommands(
@@ -123,7 +126,8 @@ class PhoenixCli : CliktCommand() {
     }
 }
 
-abstract class PhoenixCliCommand(val name: String, val help: String, printHelpOnEmptyArgs: Boolean = false) : CliktCommand(name = name, help = help, printHelpOnEmptyArgs = printHelpOnEmptyArgs) {
+abstract class PhoenixCliCommand(val name: String, val help: String, override val printHelpOnEmptyArgs: Boolean = false) : CliktCommand(name = name) {
+    override fun help(context: Context): String = help
     internal val commonOptions by requireObject<HttpConf>()
     abstract suspend fun httpRequest(): HttpResponse
     override fun run() {

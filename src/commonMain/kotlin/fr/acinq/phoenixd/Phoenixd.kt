@@ -30,6 +30,7 @@ import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.blockchain.electrum.*
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
+import fr.acinq.lightning.channel.states.PersistedChannelState
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
@@ -304,7 +305,7 @@ class Phoenixd : CliktCommand() {
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)
 
-        val (blockchainClient, blockchainWatcher) = when(val mempoolUrl = mempoolSpaceUrl) {
+        val (blockchainClient, blockchainWatcher) = when (val mempoolUrl = mempoolSpaceUrl) {
             null -> {
                 consoleLog(cyan("using electrum"))
                 val client = ElectrumClient(scope, loggerFactory)
@@ -373,6 +374,24 @@ class Phoenixd : CliktCommand() {
                         }
                 }
             }
+            val swapInWallet = peer.swapInWallet
+            if (swapInWallet != null) {
+                launch {
+                    combine(swapInWallet.wallet.walletStateFlow, peer.currentTipFlow.filterNotNull(), peer.channelsFlow) { walletState, currentBlockHeight, channels ->
+                        val reservedInputs = SwapInManager.reservedWalletInputs(channels.values.filterIsInstance<PersistedChannelState>())
+                        val walletWithoutReserved = walletState.withoutReservedUtxos(reservedInputs)
+                        walletWithoutReserved.withConfirmations(
+                            currentBlockHeight = currentBlockHeight,
+                            swapInParams = peer.walletParams.swapInParams
+                        )
+                    }.drop(1)
+                        .map { wallet -> Triple(wallet.unconfirmed.balance, wallet.weaklyConfirmed.balance, wallet.deeplyConfirmed.balance) }
+                        .distinctUntilChanged()
+                        .collect { (unconfirmedBalance, weaklyConfirmedBalance, deeplyConfirmedBalance) -> consoleLog("swap-in wallet: unconfirmed=$unconfirmedBalance weaklyConfirmed=$weaklyConfirmedBalance deeplyConfirmed=$deeplyConfirmedBalance") }
+
+                }
+
+            }
             launch {
                 nodeParams.nodeEvents
                     .filterIsInstance<PaymentEvents>()
@@ -383,6 +402,9 @@ class Phoenixd : CliktCommand() {
                                     val fee = payment.parts.filterIsInstance<LightningIncomingPayment.Part.Htlc>().map { it.fundingFee?.amount ?: 0.msat }.sum().truncateToSatoshi()
                                     val type = payment.parts.joinToString { part -> part::class.simpleName.toString().lowercase() }
                                     consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
+                                }
+                                is OnChainIncomingPayment -> {
+                                    consoleLog("received on-chain payment: ${payment.amount.truncateToSatoshi()} (fee=${payment.fees})")
                                 }
                                 else -> {}
                             }
@@ -460,6 +482,9 @@ class Phoenixd : CliktCommand() {
             }
             peer.connectionState.first { it == Connection.ESTABLISHED }
         }
+
+        // Start monitoring swap-in wallet after both electrum and peer are connected
+        scope.launch { peer.startWatchSwapInWallet() }
 
         val server = embeddedServer(
             CIO,

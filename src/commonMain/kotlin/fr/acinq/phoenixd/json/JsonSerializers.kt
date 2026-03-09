@@ -24,7 +24,6 @@ import fr.acinq.lightning.channel.states.ChannelStateWithCommitments
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.json.JsonSerializers
 import fr.acinq.lightning.payment.Bolt11Invoice
-import fr.acinq.lightning.payment.OfferPaymentMetadata
 import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.lightning.wire.LiquidityAds
@@ -78,7 +77,15 @@ sealed class ApiType {
     )
 
     @Serializable
-    data class Balance(@SerialName("balanceSat") val amount: Satoshi, @SerialName("feeCreditSat") val feeCredit: Satoshi) : ApiType()
+    data class SwapInBalance(
+        @SerialName("unconfirmedBalanceSat") val unconfirmedBalance: Satoshi,
+        @SerialName("weaklyConfirmedBalanceSat") val weaklyConfirmedBalance: Satoshi,
+        @SerialName("deeplyConfirmedBalanceSat") val deeplyConfirmedBalance: Satoshi
+    ) : ApiType()
+
+
+    @Serializable
+    data class Balance(@SerialName("balanceSat") val amount: Satoshi, @SerialName("feeCreditSat") val feeCredit: Satoshi, val swapIn: SwapInBalance?) : ApiType()
 
     @Serializable
     data class LiquidityFees(@SerialName("miningFeeSat") val miningFee: Satoshi, @SerialName("serviceFeeSat") val serviceFee: Satoshi) : ApiType() {
@@ -109,7 +116,13 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("payment_sent")
-    data class PaymentSent(@SerialName("recipientAmountSat") val recipientAmount: Satoshi, @SerialName("routingFeeSat") val routingFee: Satoshi, @SerialName("paymentId") val uuid: UUID, val paymentHash: ByteVector32, val paymentPreimage: ByteVector32) : ApiType() {
+    data class PaymentSent(
+        @SerialName("recipientAmountSat") val recipientAmount: Satoshi,
+        @SerialName("routingFeeSat") val routingFee: Satoshi,
+        @SerialName("paymentId") val uuid: UUID,
+        val paymentHash: ByteVector32,
+        val paymentPreimage: ByteVector32
+    ) : ApiType() {
         constructor(event: fr.acinq.lightning.io.PaymentSent) : this(
             event.payment.recipientAmount.truncateToSatoshi(),
             event.payment.routingFee.truncateToSatoshi(),
@@ -128,8 +141,25 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("incoming_payment")
-    data class IncomingPayment(val subType: String, val paymentHash: ByteVector32, val preimage: ByteVector32, val externalId: String?, val description: String?, val invoice: String?, val isPaid: Boolean, val isExpired: Boolean, val requestedSat: Satoshi?, val receivedSat: Satoshi, val fees: MilliSatoshi, val payerNote: String?, val payerKey: PublicKey?, val expiresAt: Long?, val completedAt: Long?, val createdAt: Long): ApiType() {
-        constructor(payment: LightningIncomingPayment, externalId: String?) : this (
+    data class IncomingPayment(
+        val subType: String,
+        val paymentHash: ByteVector32,
+        val preimage: ByteVector32,
+        val externalId: String?,
+        val description: String?,
+        val invoice: String?,
+        val isPaid: Boolean,
+        val isExpired: Boolean,
+        val requestedSat: Satoshi?,
+        val receivedSat: Satoshi,
+        val fees: MilliSatoshi,
+        val payerNote: String?,
+        val payerKey: PublicKey?,
+        val expiresAt: Long?,
+        val completedAt: Long?,
+        val createdAt: Long
+    ) : ApiType() {
+        constructor(payment: LightningIncomingPayment, externalId: String?) : this(
             subType = "lightning",
             paymentHash = payment.paymentHash,
             preimage = payment.paymentPreimage,
@@ -147,8 +177,9 @@ sealed class ApiType {
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )
+
         @Suppress("DEPRECATION")
-        constructor(payment: LegacyPayToOpenIncomingPayment, externalId: String?) : this (
+        constructor(payment: LegacyPayToOpenIncomingPayment, externalId: String?) : this(
             subType = "lightning",
             paymentHash = payment.paymentHash,
             preimage = payment.paymentPreimage,
@@ -170,7 +201,19 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("outgoing_payment")
-    data class OutgoingPayment(val subType: String, val paymentId: String, val paymentHash: ByteVector32?, val preimage: ByteVector32?, val txId: TxId?, val isPaid: Boolean, val sent: Satoshi, val fees: MilliSatoshi, val invoice: String?, val completedAt: Long?, val createdAt: Long): ApiType() {
+    data class OutgoingPayment(
+        val subType: String,
+        val paymentId: String,
+        val paymentHash: ByteVector32?,
+        val preimage: ByteVector32?,
+        val txId: TxId?,
+        val isPaid: Boolean,
+        val sent: Satoshi,
+        val fees: MilliSatoshi,
+        val invoice: String?,
+        val completedAt: Long?,
+        val createdAt: Long
+    ) : ApiType() {
         constructor(payment: LightningOutgoingPayment) : this(
             subType = "lightning",
             paymentId = payment.id.toString(),
@@ -184,8 +227,9 @@ sealed class ApiType {
             completedAt = payment.completedAt,
             createdAt = payment.createdAt,
         )
+
         constructor(payment: OnChainOutgoingPayment) : this(
-            subType = when(payment) {
+            subType = when (payment) {
                 is AutomaticLiquidityPurchasePayment -> "auto_liquidity"
                 is ManualLiquidityPurchasePayment -> "manual_liquidity"
                 is SpliceOutgoingPayment -> "splice_out"
@@ -204,6 +248,9 @@ sealed class ApiType {
             createdAt = payment.createdAt,
         )
     }
+
+    @Serializable
+    data class SwapInAddress(val address: String, val index: Int) : ApiType()
 
     @Serializable
     @SerialName("lnurl_request")

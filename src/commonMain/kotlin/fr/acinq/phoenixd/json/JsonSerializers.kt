@@ -206,6 +206,15 @@ sealed class ApiType {
     }
 
     @Serializable
+    data class SwapInAddress(val address: String, val index: Int) : ApiType()
+
+    @Serializable
+    data class SwapInWalletBalance(
+        @SerialName("totalBalanceSat") val totalBalance: Satoshi,
+        @SerialName("unconfirmedBalanceSat") val unconfirmedBalance: Satoshi
+    ) : ApiType()
+
+    @Serializable
     @SerialName("lnurl_request")
     data class LnurlRequest(val url: String, val tag: String?) {
         constructor(lnurl: Lnurl) : this(

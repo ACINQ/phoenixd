@@ -55,9 +55,11 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.bytestring.encodeToByteString
 import kotlinx.io.files.Path
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -167,6 +169,19 @@ class Api(
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.channelParams, it.commitments.changes) }
                         .sum().truncateToSatoshi()
                     call.respond(Balance(balance, peer.feeCreditFlow.value.truncateToSatoshi()))
+                }
+                get("getswapinaddress") {
+                    val swapInWallet = peer.swapInWallet ?: badRequest("swap-in wallet unavailable")
+                    val (address, index) = withTimeout(5.seconds) {
+                        swapInWallet.swapInAddressFlow.filterNotNull().first()
+                    }
+                    call.respond(SwapInAddress(address, index))
+                }
+                get("swapinwalletbalance") {
+                    val swapInWallet = peer.swapInWallet ?: badRequest("swap-in wallet unavailable")
+                    val walletState = swapInWallet.wallet.walletStateFlow.value
+                    val unconfirmedBalance = walletState.utxos.filter { it.blockHeight == 0L }.map { it.amount }.sum()
+                    call.respond(SwapInWalletBalance(walletState.totalBalance, unconfirmedBalance))
                 }
                 get("estimateliquidityfees") {
                     val amount = call.parameters.getLong("amountSat").sat
@@ -458,6 +473,34 @@ class Api(
                             is ChannelFundingResponse.Success -> call.respondText(r.fundingTxId.toString())
                             is ChannelFundingResponse.Failure -> call.respondText(r.toString())
                             else -> call.respondText("no channel available")
+                        }
+                    }
+                    post("splicein") {
+                        val formParameters = call.receiveParameters()
+                        val amountSat = formParameters.getLong("amountSat").sat
+                        val feerate = FeeratePerKw(FeeratePerByte(formParameters.getLong("feerateSatByte").sat))
+
+                        val swapInWallet = peer.swapInWallet ?: badRequest("swap-in wallet unavailable")
+                        val walletState = swapInWallet.wallet.walletStateFlow.value
+                        val utxos = walletState.utxos
+                        if (utxos.isEmpty()) badRequest("no UTXOs available in swap-in wallet")
+
+                        val channel = peer.channels.values.filterIsInstance<Normal>().firstOrNull()
+                            ?: badRequest("no channel available")
+
+                        val spliceCommand = ChannelCommand.Commitment.Splice.Request(
+                            replyTo = CompletableDeferred(),
+                            spliceIn = ChannelCommand.Commitment.Splice.Request.SpliceIn(walletInputs = utxos),
+                            spliceOut = null,
+                            requestRemoteFunding = null,
+                            currentFeeCredit = peer.feeCreditFlow.value,
+                            feerate = feerate,
+                            origins = listOf()
+                        )
+                        peer.send(WrappedChannelCommand(channel.channelId, spliceCommand))
+                        when (val response = spliceCommand.replyTo.await()) {
+                            is ChannelFundingResponse.Success -> call.respondText(response.fundingTxId.toString())
+                            is ChannelFundingResponse.Failure -> call.respondText(response.toString())
                         }
                     }
                     post("closechannel") {

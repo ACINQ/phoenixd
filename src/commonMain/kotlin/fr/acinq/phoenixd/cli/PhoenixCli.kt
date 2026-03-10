@@ -65,6 +65,9 @@ fun main(args: Array<String>) =
             LnurlPay(),
             LnurlWithdraw(),
             LnurlAuth(),
+            GetSwapInAddress(),
+            GetSwapInWalletBalance(),
+            SpliceIn(),
             SendToAddress(),
             BumpFee(),
             CloseChannel(),
@@ -393,6 +396,32 @@ class LnurlAuth : PhoenixCliCommand(name = "lnurlauth", help = "Authenticate on 
             url = (commonOptions.baseUrl / "lnurlauth").toString(),
             formParameters = parameters {
                 append("lnurl", lnurl)
+            }
+        )
+    }
+}
+
+class GetSwapInAddress : PhoenixCliCommand(name = "getswapinaddress", help = "Get swap-in wallet address") {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getswapinaddress")
+    }
+}
+
+class GetSwapInWalletBalance : PhoenixCliCommand(name = "swapinwalletbalance", help = "Get swap-in wallet balance") {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "swapinwalletbalance")
+    }
+}
+
+class SpliceIn : PhoenixCliCommand(name = "splicein", help = "Splice-in funds from swap-in wallet to channel", printHelpOnEmptyArgs = true) {
+    private val amountSat by option("--amountSat").long().required()
+    private val feerateSatByte by option("--feerateSatByte").int().required()
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.submitForm(
+            url = (commonOptions.baseUrl / "splicein").toString(),
+            formParameters = parameters {
+                append("amountSat", amountSat.toString())
+                append("feerateSatByte", feerateSatByte.toString())
             }
         )
     }

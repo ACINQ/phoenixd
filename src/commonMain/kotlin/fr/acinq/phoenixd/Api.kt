@@ -1,24 +1,20 @@
 package fr.acinq.phoenixd
 
 import fr.acinq.bitcoin.*
-import fr.acinq.bitcoin.crypto.Digest
-import fr.acinq.bitcoin.crypto.hmac
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.Lightning.randomBytes32
+import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.NodeParams
-import fr.acinq.lightning.PaymentEvents
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCloseResponse
-import fr.acinq.lightning.channel.ChannelCommand
 import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
-import fr.acinq.lightning.io.WrappedChannelCommand
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.logging.info
 import fr.acinq.lightning.logging.warning
@@ -55,12 +51,9 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.io.bytestring.encodeToByteString
 import kotlinx.io.files.Path
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 
@@ -295,7 +288,7 @@ class Api(
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("payinvoice") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = formParameters.getOptionalAmount()
                         val invoice = formParameters.getInvoice("invoice")
                         val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
                         when (val event = peer.payInvoice(amount, invoice)) {
@@ -306,7 +299,7 @@ class Api(
                     }
                     post("payoffer") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = formParameters.getOptionalAmount()
                         val offer = formParameters.getOffer("offer")
                         val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
                         val note = formParameters["message"]
@@ -318,7 +311,7 @@ class Api(
                     }
                     post("paylnaddress") {
                         val formParameters = call.receiveParameters()
-                        val amount = formParameters.getLong("amountSat").sat.toMilliSatoshi()
+                        val amount = formParameters.getOptionalAmount() ?: missing("amountSat")
                         val (username, domain) = formParameters.getEmailLikeAddress("address")
                         val note = formParameters["message"]
                         when (val res = addressResolver.resolveAddress(username, domain, amount, note)) {
@@ -359,7 +352,7 @@ class Api(
                 authenticate("full-access", strategy = AuthenticationStrategy.Required) {
                     post("lnurlpay") {
                         val formParameters = call.receiveParameters()
-                        val overrideAmount = formParameters["amountSat"]?.let { it.toLongOrNull() ?: invalidType("amountSat", "integer") }?.sat?.toMilliSatoshi()
+                        val overrideAmount = formParameters.getOptionalAmount()
                         val comment = formParameters["message"]
                         val request = formParameters.getLnurl("lnurl")
                         // early abort to avoid executing an invalid url
@@ -576,5 +569,12 @@ class Api(
     private fun Parameters.getLnurlAuth(argName: String): LnurlAuth = this[argName]?.let { LnurlParser.extractLnurl(it) as LnurlAuth } ?: missing(argName)
 
     private fun Parameters.getOptionalUrl(argName: String): Url? = this[argName]?.let { runCatching { Url(it) }.getOrNull() ?: invalidType(argName, "url") }
+
+    private fun Parameters.getOptionalAmount(): MilliSatoshi? =
+        when {
+            this.contains("sendAll") && this.contains("amountSat") -> badRequest("Cannot use both amountSat and sendAll request parameters")
+            this.contains("sendAll") -> peer.maxSendableOverLightning()
+            else -> getOptionalLong("amountSat")?.sat?.toMilliSatoshi()
+        }
 
 }

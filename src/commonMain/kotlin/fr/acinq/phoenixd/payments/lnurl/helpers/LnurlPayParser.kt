@@ -12,6 +12,7 @@ import fr.acinq.lightning.payment.Bolt11Invoice
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
 
 /** Parsers specific to lnurl-pay. */
 object LnurlPayParser {
@@ -48,7 +49,7 @@ object LnurlPayParser {
     ): InvoiceToPay.SuccessAction? {
         val obj = try {
             json["successAction"]?.jsonObject // throws on Non-JsonObject (e.g. JsonNull)
-        } catch (t: Throwable) {
+        } catch (_: Throwable) {
             null
         } ?: return null
 
@@ -75,7 +76,7 @@ object LnurlPayParser {
                     throw LnurlError.Pay.BadInvoice.Malformed(origin, "success.aes.description: bad length")
                 }
                 val ciphertextStr = obj["ciphertext"]?.jsonPrimitive?.content ?: return null
-                val ciphertext = ByteVector(ciphertextStr.decodeBase64Bytes())
+                val ciphertext = ByteVector(Base64.decode(ciphertextStr))
                 if (ciphertext.size() > (4 * 1024)) {
                     throw LnurlError.Pay.BadInvoice.Malformed(origin, "success.aes.ciphertext: bad length")
                 }
@@ -83,14 +84,14 @@ object LnurlPayParser {
                 if (ivStr.length != 24) {
                     throw LnurlError.Pay.BadInvoice.Malformed(origin, "success.aes.iv: bad length")
                 }
-                val iv = ByteVector(ivStr.decodeBase64Bytes())
+                val iv = ByteVector(Base64.decode(ivStr))
                 InvoiceToPay.SuccessAction.Aes(description, ciphertext = ciphertext, iv = iv)
             }
             else -> null
         }
     }
 
-    /** Decode a serialized [Lnurl.Pay.Metadata] object. */
+    /** Decode a serialized [PaymentParameters.Metadata] object. */
     fun parseMetadata(raw: String): PaymentParameters.Metadata {
         return try {
             val array = format.decodeFromString<JsonArray>(raw)

@@ -22,6 +22,7 @@ import com.github.ajalt.mordant.terminal.prompt
 import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.Chain
 import fr.acinq.bitcoin.MnemonicCode
+import fr.acinq.lightning.Feature
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.LiquidityEvents
 import fr.acinq.lightning.NodeParams
@@ -292,10 +293,13 @@ class Phoenixd : CliktCommand() {
         )
         val keyManager = LocalKeyManager(seed.seed, chain, lsp.swapInXpub)
         val nodeParams = NodeParams(chain, loggerFactory, keyManager)
-            .copy(
-                zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),
-                liquidityPolicy = MutableStateFlow(liquidityPolicy),
-            )
+            .run {
+                copy(
+                    zeroConfPeers = setOf(lsp.walletParams.trampolineNode.id),
+                    liquidityPolicy = MutableStateFlow(liquidityPolicy),
+                    features = features.copy(activated = features.activated - Feature.WakeUpNotificationClient)
+                )
+            }
         consoleLog(cyan("nodeid: ${nodeParams.nodeId}"))
         consoleLog(cyan("offer: ${nodeParams.defaultOffer(lsp.walletParams.trampolineNode.id).offer}"))
 

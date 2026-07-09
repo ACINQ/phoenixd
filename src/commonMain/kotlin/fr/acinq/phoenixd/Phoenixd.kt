@@ -27,6 +27,7 @@ import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.LiquidityEvents
 import fr.acinq.lightning.NodeParams
 import fr.acinq.lightning.PaymentEvents
+import fr.acinq.lightning.blockchain.electrum.*
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceClient
 import fr.acinq.lightning.blockchain.mempool.MempoolSpaceWatcher
 import fr.acinq.lightning.crypto.LocalKeyManager
@@ -80,13 +81,6 @@ class Phoenixd : CliktCommand() {
     ).default(Chain.Mainnet, defaultForHelp = "mainnet")
     private val mempoolSpaceUrl by option("--mempool-space-url", help = "Custom mempool.space instance")
         .convert { Url(it) }
-        .defaultLazy {
-            when (chain) {
-                Chain.Mainnet -> MempoolSpaceClient.OfficialMempoolMainnet
-                Chain.Testnet3 -> MempoolSpaceClient.OfficialMempoolTestnet3
-                else -> error("unsupported chain")
-            }
-        }
     private val mempoolPollingInterval by option(
         "--mempool-space-polling-interval-minutes",
         help = "Polling interval for mempool.space API",
@@ -94,6 +88,8 @@ class Phoenixd : CliktCommand() {
     )
         .int().convert { it.minutes }
         .default(10.minutes)
+    private val customElectrumServer by option("--electrum-server", help = "Custom electrum server host:port (SSL)")
+        .convert { it.split(":").run { ServerAddress(host = first(), port = last().toInt(), tls = TcpSocket.TLS.TRUSTED_CERTIFICATES()) } }
 
     class LiquidityOptions : OptionGroup(name = "Liquidity Options") {
         val autoLiquidity by option("--auto-liquidity", help = "Amount automatically requested when inbound liquidity is needed").choice(
@@ -308,10 +304,23 @@ class Phoenixd : CliktCommand() {
         val channelsDb = SqliteChannelsDb(driver, database)
         val paymentsDb = SqlitePaymentsDb(database)
 
-        val mempoolSpace = MempoolSpaceClient(mempoolSpaceUrl, loggerFactory)
-        val watcher = MempoolSpaceWatcher(mempoolSpace, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
+        val (blockchainClient, blockchainWatcher) = when(val mempoolUrl = mempoolSpaceUrl) {
+            null -> {
+                consoleLog(cyan("using electrum"))
+                val client = ElectrumClient(scope, loggerFactory)
+                val watcher = ElectrumWatcher(client, scope, loggerFactory)
+                client to watcher
+            }
+            else -> {
+                consoleLog(cyan("using mempool.space"))
+                val client = MempoolSpaceClient(mempoolUrl, loggerFactory)
+                val watcher = MempoolSpaceWatcher(client, scope, loggerFactory, pollingInterval = mempoolPollingInterval)
+                client to watcher
+            }
+        }
+
         val peer = Peer(
-            nodeParams = nodeParams, walletParams = lsp.walletParams, client = mempoolSpace, watcher = watcher, db = object : Databases {
+            nodeParams = nodeParams, walletParams = lsp.walletParams, client = blockchainClient, watcher = blockchainWatcher, db = object : Databases {
                 override val channels: ChannelsDb get() = channelsDb
                 override val payments: PaymentsDb get() = paymentsDb
             }, socketBuilder = TcpSocket.Builder(), scope
@@ -349,6 +358,19 @@ class Phoenixd : CliktCommand() {
                         Connection.ESTABLISHED -> consoleLog(yellow("connected to lightning peer"))
                         is Connection.CLOSED -> consoleLog(yellow("disconnected from lightning peer"))
                     }
+                }
+            }
+            if (blockchainClient is ElectrumClient) {
+                launch {
+                    blockchainClient.connectionStatus
+                        .drop(1) // we drop the initial value which a disconnection event
+                        .collect {
+                            when (it) {
+                                is ElectrumConnectionStatus.Connecting -> consoleLog(yellow("connecting to electrum server ${it.serverAddress.host}:${it.serverAddress.port}..."))
+                                is ElectrumConnectionStatus.Connected -> consoleLog(yellow("connected to electrum server"))
+                                is ElectrumConnectionStatus.Closed -> consoleLog(yellow("disconnected from electrum server"))
+                            }
+                        }
                 }
             }
             launch {
@@ -413,6 +435,17 @@ class Phoenixd : CliktCommand() {
             }
         }
 
+        if (blockchainClient is ElectrumClient) {
+            val electrumConnectionLoop = scope.launch {
+                while (true) {
+                    val electrumServer = customElectrumServer ?: ElectrumServers.pickElectrumServer(chain)
+                    blockchainClient.connect(electrumServer, TcpSocket.Builder())
+                    blockchainClient.connectionStatus.first { it is ElectrumConnectionStatus.Closed }
+                    delay(3.seconds)
+                }
+            }
+        }
+
         val peerConnectionLoop = scope.launch {
             while (true) {
                 peer.connect(connectTimeout = 10.seconds, handshakeTimeout = 10.seconds)
@@ -422,6 +455,9 @@ class Phoenixd : CliktCommand() {
         }
 
         runBlocking {
+            if (blockchainClient is ElectrumClient) {
+                blockchainClient.connectionStatus.first { it is ElectrumConnectionStatus.Connected }
+            }
             peer.connectionState.first { it == Connection.ESTABLISHED }
         }
 

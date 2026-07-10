@@ -54,6 +54,7 @@ fun main(args: Array<String>): kotlin.Unit =
             CreateOffer(),
             GetOffer(),
             GetLnAddress(),
+            GetSwapInAddress(),
             PayInvoice(),
             PayOffer(),
             PayLnAddress(),
@@ -402,6 +403,12 @@ class LnurlAuth : PhoenixCliCommand(name = "lnurlauth", help = "Authenticate on 
                 append("lnurl", lnurl)
             }
         )
+    }
+}
+
+class GetSwapInAddress : PhoenixCliCommand(name = "getswapinaddress", help = "Get swap-in wallet address") {
+    override suspend fun httpRequest() = commonOptions.httpClient.use {
+        it.get(url = commonOptions.baseUrl / "getswapinaddress")
     }
 }
 

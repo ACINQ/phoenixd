@@ -7,6 +7,8 @@ import fr.acinq.bitcoin.utils.toEither
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.blockchain.electrum.SwapInManager
+import fr.acinq.lightning.blockchain.electrum.balance
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
 import fr.acinq.lightning.blockchain.fee.FeeratePerKw
 import fr.acinq.lightning.channel.ChannelCloseResponse
@@ -55,6 +57,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
+import kotlin.collections.filterIsInstance
 import kotlin.time.Duration.Companion.seconds
 
 class Api(
@@ -154,12 +157,27 @@ class Api(
                     call.respond(info)
                 }
                 get("getbalance") {
-                    val balance = peer.channels.values
+                    val channels = peer.channels.values
+                    val balance = channels
                         .filterIsInstance<ChannelStateWithCommitments>()
                         .filterNot { it is Closing || it is Closed }
                         .map { it.commitments.active.first().availableBalanceForSend(it.commitments.channelParams, it.commitments.changes) }
                         .sum().truncateToSatoshi()
-                    call.respond(Balance(balance, peer.feeCreditFlow.value.truncateToSatoshi()))
+                    val swapInBalance = peer.swapInWallet?.wallet?.walletStateFlow?.value?.let { walletState ->
+                        val reservedInputs = SwapInManager.reservedWalletInputs(channels.filterIsInstance<PersistedChannelState>())
+                        val walletWithoutReserved = walletState.withoutReservedUtxos(reservedInputs)
+                        val swapInWallet = walletWithoutReserved.withConfirmations(
+                            currentBlockHeight = peer.currentTipFlow.value ?: 0,
+                            swapInParams = peer.walletParams.swapInParams
+                        )
+                        SwapInBalance(
+                            unconfirmedBalance = swapInWallet.unconfirmed.balance,
+                            weaklyConfirmedBalance = swapInWallet.weaklyConfirmed.balance,
+                            deeplyConfirmedBalance = swapInWallet.deeplyConfirmed.balance
+                        )
+                    }
+
+                    call.respond(Balance(balance, peer.feeCreditFlow.value.truncateToSatoshi(), swapInBalance))
                 }
                 get("estimateliquidityfees") {
                     val amount = call.parameters.getLong("amountSat").sat
@@ -218,6 +236,11 @@ class Api(
                         val address = peer.requestAddress("en")
                         call.respond("₿$address")
                     }
+                }
+                get("getswapinaddress") {
+                    val swapInWallet = peer.swapInWallet ?: badRequest("swap-in wallet unavailable")
+                    val (address, index) = swapInWallet.swapInAddressFlow.filterNotNull().first()
+                    call.respond(SwapInAddress(address, index))
                 }
                 get("payments/incoming") {
                     val payments: List<ApiType> = paymentDb.listIncomingPayments(

@@ -406,7 +406,7 @@ class Phoenixd : CliktCommand() {
                                     consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
                                 }
                                 is OnChainIncomingPayment -> {
-                                    consoleLog("received on-chain payment: ${payment.amount.truncateToSatoshi()} (fee=${payment.fees})")
+                                    consoleLog("received on-chain payment: ${payment.amount.truncateToSatoshi()} (fee=${payment.fees.truncateToSatoshi()})")
                                 }
                                 else -> {}
                             }

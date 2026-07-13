@@ -352,8 +352,9 @@ class Phoenixd : CliktCommand() {
 
         val listeners = scope.launch {
             launch {
-                // drop initial CLOSED event
-                peer.connectionState.dropWhile { it is Connection.CLOSED }.collect {
+                peer.connectionState
+                    .dropWhile { it is Connection.CLOSED } // drop initial CLOSED event
+                    .collect {
                     when (it) {
                         Connection.ESTABLISHING -> consoleLog(yellow("connecting to lightning peer..."))
                         Connection.ESTABLISHED -> consoleLog(yellow("connected to lightning peer"))
@@ -364,7 +365,7 @@ class Phoenixd : CliktCommand() {
             if (blockchainClient is ElectrumClient) {
                 launch {
                     blockchainClient.connectionStatus
-                        .drop(1) // we drop the initial value which a disconnection event
+                        .dropWhile { it is ElectrumConnectionStatus.Closed } // drop initial CLOSED event
                         .collect {
                             when (it) {
                                 is ElectrumConnectionStatus.Connecting -> consoleLog(yellow("connecting to electrum server ${it.serverAddress.host}:${it.serverAddress.port}..."))
@@ -384,7 +385,8 @@ class Phoenixd : CliktCommand() {
                             currentBlockHeight = currentBlockHeight,
                             swapInParams = peer.walletParams.swapInParams
                         )
-                    }.drop(1)
+                    }
+                        .dropWhile { it == WalletState(emptyMap()) } // drop the initial event
                         .map { wallet -> Triple(wallet.unconfirmed.balance, wallet.weaklyConfirmed.balance, wallet.deeplyConfirmed.balance) }
                         .distinctUntilChanged()
                         .collect { (unconfirmedBalance, weaklyConfirmedBalance, deeplyConfirmedBalance) -> consoleLog("swap-in wallet: unconfirmed=$unconfirmedBalance weaklyConfirmed=$weaklyConfirmedBalance deeplyConfirmed=$deeplyConfirmedBalance") }
@@ -404,7 +406,7 @@ class Phoenixd : CliktCommand() {
                                     consoleLog("received lightning payment: ${payment.amount.truncateToSatoshi()} ($type${if (fee > 0.sat) " fee=$fee" else ""})")
                                 }
                                 is OnChainIncomingPayment -> {
-                                    consoleLog("received on-chain payment: ${payment.amount.truncateToSatoshi()} (fee=${payment.fees})")
+                                    consoleLog("received on-chain payment: ${payment.amount.truncateToSatoshi()} (fee=${payment.fees.truncateToSatoshi()})")
                                 }
                                 else -> {}
                             }
@@ -452,7 +454,7 @@ class Phoenixd : CliktCommand() {
             }
             launch {
                 peer.feeCreditFlow
-                    .drop(1) // we drop the initial value which is 0 msat
+                    .dropWhile { it == 0.msat } // we drop the initial value which is 0 msat
                     .collect { feeCredit -> consoleLog("fee credit: ${feeCredit.truncateToSatoshi()}") }
             }
         }

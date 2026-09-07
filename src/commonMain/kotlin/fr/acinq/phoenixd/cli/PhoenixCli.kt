@@ -277,12 +277,16 @@ class PayInvoice : PhoenixCliCommand(name = "payinvoice", help = "Pay a Lightnin
     private val invoice by option("--invoice").required().check { Bolt11Invoice.read(it).isSuccess }
     private val amountSat by option("--amountSat").long()
     private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
+    private val trampolineFeeBaseSat by option("--trampolineFeeBaseSat").long()
+    private val trampolineFeeProportional by option("--trampolineFeeProportional").long()
+    private val trampolineFeeCltvExpiryDelta by option("--trampolineFeeCltvExpiryDelta").long()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payinvoice").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 sendAll?.let { append("sendAll", "true") }
+                appendTrampolineFeeOverride(trampolineFeeBaseSat, trampolineFeeProportional, trampolineFeeCltvExpiryDelta)
                 append("invoice", invoice)
             }
         )
@@ -294,12 +298,16 @@ class PayOffer : PhoenixCliCommand(name = "payoffer", help = "Pay a Lightning of
     private val amountSat by option("--amountSat").long()
     private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     private val message by option("--message").help { "Optional payer note" }
+    private val trampolineFeeBaseSat by option("--trampolineFeeBaseSat").long()
+    private val trampolineFeeProportional by option("--trampolineFeeProportional").long()
+    private val trampolineFeeCltvExpiryDelta by option("--trampolineFeeCltvExpiryDelta").long()
     override suspend fun httpRequest() = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "payoffer").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 sendAll?.let { append("sendAll", "true") }
+                appendTrampolineFeeOverride(trampolineFeeBaseSat, trampolineFeeProportional, trampolineFeeCltvExpiryDelta)
                 append("offer", offer)
                 message?.let { append("message", message.toString()) }
             }
@@ -312,6 +320,9 @@ class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Ligh
     private val sendAll by option("--sendAll").nullableFlag().help("Send all available balance (incompatible with --amountSat)")
     private val address by option("--address").required().check { Parser.parseEmailLikeAddress(it) != null }
     private val message by option("--message").help { "Optional payer note" }
+    private val trampolineFeeBaseSat by option("--trampolineFeeBaseSat").long()
+    private val trampolineFeeProportional by option("--trampolineFeeProportional").long()
+    private val trampolineFeeCltvExpiryDelta by option("--trampolineFeeCltvExpiryDelta").long()
 
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
@@ -319,6 +330,7 @@ class PayLnAddress : PhoenixCliCommand(name = "paylnaddress", help = "Pay a Ligh
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 sendAll?.let { append("sendAll", "true") }
+                appendTrampolineFeeOverride(trampolineFeeBaseSat, trampolineFeeProportional, trampolineFeeCltvExpiryDelta)
                 append("address", address)
                 message?.let { append("message", message.toString()) }
             }
@@ -359,12 +371,16 @@ class LnurlPay : PhoenixCliCommand(name = "lnurlpay", help = "Pay a LNURL", prin
             url is Lnurl.Request && (url.tag == Lnurl.Tag.Pay || url.tag == null)
         }
     private val message by option("--message").help { "Optional comment" }
+    private val trampolineFeeBaseSat by option("--trampolineFeeBaseSat").long()
+    private val trampolineFeeProportional by option("--trampolineFeeProportional").long()
+    private val trampolineFeeCltvExpiryDelta by option("--trampolineFeeCltvExpiryDelta").long()
     override suspend fun httpRequest(): HttpResponse = commonOptions.httpClient.use {
         it.submitForm(
             url = (commonOptions.baseUrl / "lnurlpay").toString(),
             formParameters = parameters {
                 amountSat?.let { append("amountSat", amountSat.toString()) }
                 sendAll?.let { append("sendAll", "true") }
+                appendTrampolineFeeOverride(trampolineFeeBaseSat, trampolineFeeProportional, trampolineFeeCltvExpiryDelta)
                 append("lnurl", lnurl)
                 message?.let { append("message", message.toString()) }
             }
@@ -471,5 +487,11 @@ class ExportCsv : PhoenixCliCommand(name = "exportcsv", help = "Export transacti
 }
 
 operator fun Url.div(path: String) = Url(URLBuilder(this).appendPathSegments(path))
+
+private fun ParametersBuilder.appendTrampolineFeeOverride(feeBaseSat: Long?, feeProportional: Long?, cltvExpiryDelta: Long?) {
+    feeBaseSat?.let { append("trampolineFeeBaseSat", it.toString()) }
+    feeProportional?.let { append("trampolineFeeProportional", it.toString()) }
+    cltvExpiryDelta?.let { append("trampolineFeeCltvExpiryDelta", it.toString()) }
+}
 
 fun String.toByteVector32(): ByteVector32 = kotlin.runCatching { ByteVector32.fromValidHex(this) }.recover { error("'$this' is not a valid 32-bytes hex string") }.getOrThrow()

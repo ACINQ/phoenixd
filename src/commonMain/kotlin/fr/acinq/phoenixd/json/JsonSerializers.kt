@@ -43,19 +43,6 @@ import kotlin.time.ExperimentalTime
 
 internal fun paymentFailureName(failure: Any): String = failure::class.simpleName ?: failure.toString().substringBefore("(").substringAfterLast(".")
 
-internal fun paymentFailureCategory(failure: String): String = when (failure) {
-    "InvalidPaymentAmount", "InvalidPaymentId", "FeaturesNotSupported", "AlreadyPaid" -> "local_validation"
-    "InsufficientBalance", "NoAvailableChannels", "NotEnoughFunds" -> "local_balance"
-    "ChannelClosing", "ChannelOpening", "ChannelNotConnected", "ChannelIsClosing", "ChannelIsSplicing" -> "local_channel"
-    "NotEnoughFees", "FeeInsufficient", "TrampolineFeeInsufficient" -> "fee"
-    "PaymentExpiryTooBig", "ExpiryTooSoon", "TrampolineExpiryTooSoon", "IncorrectCltvExpiry", "FinalIncorrectCltvExpiry" -> "cltv"
-    "RecipientLiquidityIssue", "TemporaryChannelFailure", "AmountBelowMinimum", "TemporaryNodeFailure" -> "liquidity"
-    "RecipientUnreachable", "RecipientIsOffline", "RecipientRejectedPayment", "IncorrectOrUnknownPaymentDetails", "UnknownPaymentHash", "FinalIncorrectHtlcAmount" -> "recipient"
-    "UnknownNextPeer", "TemporaryRemoteFailure", "PermanentChannelFailure", "PermanentNodeFailure", "RequiredNodeFeatureMissing", "RequiredChannelFeatureMissing", "InvalidOnionPayload" -> "remote"
-    "RetryExhausted", "PaymentTimeout", "WalletRestarted", "TooManyPendingPayments" -> "retry"
-    else -> "unknown"
-}
-
 private fun paymentFailureDetails(failure: LightningOutgoingPayment.Part.Status.Failed.Failure): String? {
     val details = failure.toString()
     return details.takeIf { it != paymentFailureName(failure) }
@@ -169,20 +156,17 @@ sealed class ApiType {
     @Serializable
     data class PaymentFailureDetails(
         val finalFailure: String,
-        val category: String,
         val attemptCount: Int,
         val failures: List<PaymentFailureAttempt>
     ) {
         constructor(failure: OutgoingPaymentFailure) : this(
             finalFailure = paymentFailureName(failure.reason),
-            category = paymentFailureCategory(paymentFailureName(failure.reason)),
             attemptCount = failure.failures.size,
             failures = failure.failures.map { PaymentFailureAttempt(it) }
         )
 
         constructor(finalFailure: FinalFailure, failures: List<LightningOutgoingPayment.Part.Status.Failed>) : this(
             finalFailure = paymentFailureName(finalFailure),
-            category = paymentFailureCategory(paymentFailureName(finalFailure)),
             attemptCount = failures.size,
             failures = failures.map { PaymentFailureAttempt(it) }
         )
@@ -191,12 +175,10 @@ sealed class ApiType {
     @Serializable
     data class PaymentFailureAttempt(
         val failure: String,
-        val category: String,
         val details: String?
     ) {
         constructor(failure: LightningOutgoingPayment.Part.Status.Failed) : this(
             failure = paymentFailureName(failure.failure),
-            category = paymentFailureCategory(paymentFailureName(failure.failure)),
             details = paymentFailureDetails(failure.failure)
         )
     }

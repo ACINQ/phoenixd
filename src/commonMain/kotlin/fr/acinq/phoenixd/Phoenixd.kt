@@ -129,10 +129,7 @@ class Phoenixd : CliktCommand() {
     inner class HttpOptions : OptionGroup(name = "Http Options") {
         val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
         val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-        private val httpPasswordFromFile by option(
-            "--http-password-file",
-            help = "Read the password for the http api (full access) from a file, takes precedence over --http-password"
-        ).passwordFile()
+        private val httpPasswordFromFile by option("--http-password-file", help = "Read the password for the http api (full access) from a file, takes precedence over --http-password").passwordFile()
         val httpPassword by option("--http-password", help = "Password for the http api (full access)")
             .transformAll { values ->
                 httpPasswordFromFile ?: values.lastOrNull() ?: run {
@@ -145,10 +142,7 @@ class Phoenixd : CliktCommand() {
                     value
                 }
             }
-        private val httpPasswordLimitedAccessFromFile by option(
-            "--http-password-limited-access-file",
-            help = "Read the password for the http api (limited access) from a file, takes precedence over --http-password-limited-access"
-        ).passwordFile()
+        private val httpPasswordLimitedAccessFromFile by option("--http-password-limited-access-file", help = "Read the password for the http api (limited access) from a file, takes precedence over --http-password-limited-access").passwordFile()
         val httpPasswordLimitedAccess by option(
             "--http-password-limited-access",
             help = "Password for the http api (limited access)"

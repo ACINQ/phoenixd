@@ -78,10 +78,7 @@ class PhoenixCli : CliktCommand() {
 
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPasswordFromFile by option(
-        "--http-password-file",
-        help = "Read the password for the http api from a file, takes precedence over --http-password"
-    ).passwordFile()
+    private val httpPasswordFromFile by option("--http-password-file", help = "Read the password for the http api from a file, takes precedence over --http-password").passwordFile()
     private val httpPassword by option("--http-password", help = "Password for the http api (default: reads from $confFile)")
         .transformAll { values -> httpPasswordFromFile ?: values.lastOrNull() ?: throw MissingOption(option) }
 

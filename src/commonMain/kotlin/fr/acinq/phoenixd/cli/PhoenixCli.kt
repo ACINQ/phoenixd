@@ -18,6 +18,7 @@ import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.wire.OfferTypes
 import fr.acinq.phoenixd.BuildVersions
 import fr.acinq.phoenixd.conf.ListValueSource
+import fr.acinq.phoenixd.conf.passwordFile
 import fr.acinq.phoenixd.conf.readConfFile
 import fr.acinq.phoenixd.datadir
 import fr.acinq.phoenixd.payments.Parser
@@ -77,7 +78,12 @@ class PhoenixCli : CliktCommand() {
 
     private val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
     private val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
-    private val httpPassword by option("--http-password", help = "Password for the http api (default: reads from $confFile)").required()
+    private val httpPasswordFromFile by option(
+        "--http-password-file",
+        help = "Read the password for the http api from a file, takes precedence over --http-password"
+    ).passwordFile()
+    private val httpPassword by option("--http-password", help = "Password for the http api (default: reads from $confFile)")
+        .transformAll { values -> httpPasswordFromFile ?: values.lastOrNull() ?: throw MissingOption(option) }
 
     init {
         context {

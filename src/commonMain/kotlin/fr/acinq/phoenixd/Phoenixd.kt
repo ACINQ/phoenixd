@@ -43,6 +43,7 @@ import fr.acinq.phoenixd.conf.LSP
 import fr.acinq.phoenixd.conf.ListValueSource
 import fr.acinq.phoenixd.conf.PhoenixSeed
 import fr.acinq.phoenixd.conf.getOrGenerateSeed
+import fr.acinq.phoenixd.conf.passwordFile
 import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
@@ -128,28 +129,40 @@ class Phoenixd : CliktCommand() {
     inner class HttpOptions : OptionGroup(name = "Http Options") {
         val httpBindIp by option("--http-bind-ip", help = "Bind ip for the http api").default("127.0.0.1")
         val httpBindPort by option("--http-bind-port", help = "Bind port for the http api").int().default(9740)
+        private val httpPasswordFromFile by option(
+            "--http-password-file",
+            help = "Read the password for the http api (full access) from a file, takes precedence over --http-password"
+        ).passwordFile()
         val httpPassword by option("--http-password", help = "Password for the http api (full access)")
-            .defaultLazy {
-                // if we are here then no value is defined in phoenix.conf
-                this@Phoenixd.terminal.print(yellow("Generating default api password..."))
-                val value = randomBytes32().toHex()
-                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
-                    .use { it.writeString("\nhttp-password=$value") }
-                this@Phoenixd.terminal.println(white("done"))
-                value
+            .transformAll { values ->
+                httpPasswordFromFile ?: values.lastOrNull() ?: run {
+                    // if we are here then no value is defined in phoenix.conf
+                    this@Phoenixd.terminal.print(yellow("Generating default api password..."))
+                    val value = randomBytes32().toHex()
+                    SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                        .use { it.writeString("\nhttp-password=$value") }
+                    this@Phoenixd.terminal.println(white("done"))
+                    value
+                }
             }
+        private val httpPasswordLimitedAccessFromFile by option(
+            "--http-password-limited-access-file",
+            help = "Read the password for the http api (limited access) from a file, takes precedence over --http-password-limited-access"
+        ).passwordFile()
         val httpPasswordLimitedAccess by option(
             "--http-password-limited-access",
             help = "Password for the http api (limited access)"
         )
-            .defaultLazy {
-                // if we are here then no value is defined in phoenix.conf
-                this@Phoenixd.terminal.print(yellow("Generating limited access api password..."))
-                val value = randomBytes32().toHex()
-                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
-                    .use { it.writeString("\nhttp-password-limited-access=$value") }
-                this@Phoenixd.terminal.println(white("done"))
-                value
+            .transformAll { values ->
+                httpPasswordLimitedAccessFromFile ?: values.lastOrNull() ?: run {
+                    // if we are here then no value is defined in phoenix.conf
+                    this@Phoenixd.terminal.print(yellow("Generating limited access api password..."))
+                    val value = randomBytes32().toHex()
+                    SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                        .use { it.writeString("\nhttp-password-limited-access=$value") }
+                    this@Phoenixd.terminal.println(white("done"))
+                    value
+                }
             }
         val webHookUrls by option(
             "--webhook",

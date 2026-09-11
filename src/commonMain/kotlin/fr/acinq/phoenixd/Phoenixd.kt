@@ -422,8 +422,8 @@ class Phoenixd : CliktCommand() {
                                     is LightningOutgoingPayment -> when (val status = payment.status) {
                                         is LightningOutgoingPayment.Status.Failed -> {
                                             val failures = payment.parts.mapNotNull { part -> part.status as? LightningOutgoingPayment.Part.Status.Failed }
-                                            val failure = ApiType.PaymentFailureDetails(status.reason, failures)
-                                            consoleLog("failed lightning payment: ${payment.recipientAmount.truncateToSatoshi()} (paymentHash=${payment.paymentHash} finalFailure=${failure.finalFailure} attemptCount=${failure.attemptCount}${failure.failures.lastOrNull()?.let { " lastFailure=${it.failure}" } ?: ""})")
+                                            val lastFailure = failures.lastOrNull()?.failure
+                                            consoleLog("failed lightning payment: ${payment.recipientAmount.truncateToSatoshi()} (paymentHash=${payment.paymentHash} failure=${status.reason::class.simpleName} category=${status.reason.category} attemptCount=${failures.size}${lastFailure?.let { " lastFailure=${it::class.simpleName} lastCategory=${it.category}" } ?: ""})")
                                         }
                                         else -> {}
                                     }

@@ -48,3 +48,8 @@ DeleteMe*.scala
 
 # unzipped jvm packages
 phoenixd-*-jvm
+
+# claude files
+claude-root
+claude.Dockerfile
+claude.yml

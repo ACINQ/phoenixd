@@ -4,9 +4,11 @@ import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.Try
 import fr.acinq.bitcoin.utils.toEither
+import fr.acinq.lightning.CltvExpiryDelta
 import fr.acinq.lightning.Lightning.randomBytes32
 import fr.acinq.lightning.MilliSatoshi
 import fr.acinq.lightning.NodeParams
+import fr.acinq.lightning.TrampolineFees
 import fr.acinq.lightning.blockchain.electrum.SwapInManager
 import fr.acinq.lightning.blockchain.electrum.balance
 import fr.acinq.lightning.blockchain.fee.FeeratePerByte
@@ -17,6 +19,7 @@ import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
 import fr.acinq.lightning.io.Peer
+import fr.acinq.lightning.io.SendPaymentResult
 import fr.acinq.lightning.logging.LoggerFactory
 import fr.acinq.lightning.logging.info
 import fr.acinq.lightning.logging.warning
@@ -59,6 +62,17 @@ import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.collections.filterIsInstance
 import kotlin.time.Duration.Companion.seconds
+
+internal fun buildTrampolineFeesOverride(feeBaseSat: Long?, feeProportional: Long?, cltvExpiryDelta: Long?, defaultCltvExpiryDelta: CltvExpiryDelta): TrampolineFees? {
+    if (feeBaseSat == null && feeProportional == null && cltvExpiryDelta == null) return null
+    require(feeBaseSat != null) { "trampolineFeeBaseSat is required when overriding trampoline fees" }
+    require(feeProportional != null) { "trampolineFeeProportional is required when overriding trampoline fees" }
+    require(feeBaseSat >= 0) { "trampolineFeeBaseSat must be positive or zero" }
+    require(feeProportional >= 0) { "trampolineFeeProportional must be positive or zero" }
+    val cltvExpiryDeltaValue = cltvExpiryDelta ?: defaultCltvExpiryDelta.toLong()
+    require(cltvExpiryDeltaValue > 0 && cltvExpiryDeltaValue <= Int.MAX_VALUE) { "trampolineFeeCltvExpiryDelta must be a positive integer" }
+    return TrampolineFees(feeBaseSat.sat, feeProportional, CltvExpiryDelta(cltvExpiryDeltaValue.toInt()))
+}
 
 class Api(
     private val nodeParams: NodeParams,
@@ -312,9 +326,10 @@ class Api(
                     post("payinvoice") {
                         val formParameters = call.receiveParameters()
                         val overrideAmount = formParameters.getOptionalAmount()
+                        val trampolineFeesOverride = formParameters.getTrampolineFeesOverride()
                         val invoice = formParameters.getInvoice("invoice")
                         val amount = (overrideAmount ?: invoice.amount) ?: missing("amountSat")
-                        when (val event = peer.payInvoice(amount, invoice)) {
+                        when (val event = payInvoice(amount, invoice, trampolineFeesOverride)) {
                             is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                             is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                             is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
@@ -323,10 +338,11 @@ class Api(
                     post("payoffer") {
                         val formParameters = call.receiveParameters()
                         val overrideAmount = formParameters.getOptionalAmount()
+                        val trampolineFeesOverride = formParameters.getTrampolineFeesOverride()
                         val offer = formParameters.getOffer("offer")
                         val amount = (overrideAmount ?: offer.amount) ?: missing("amountSat")
                         val note = formParameters["message"]
-                        when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                        when (val event = payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds, trampolineFeesOverride = trampolineFeesOverride)) {
                             is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                             is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                             is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
@@ -335,6 +351,7 @@ class Api(
                     post("paylnaddress") {
                         val formParameters = call.receiveParameters()
                         val amount = formParameters.getOptionalAmount() ?: missing("amountSat")
+                        val trampolineFeesOverride = formParameters.getTrampolineFeesOverride()
                         val (username, domain) = formParameters.getEmailLikeAddress("address")
                         val note = formParameters["message"]
                         when (val res = addressResolver.resolveAddress(username, domain, amount, note)) {
@@ -342,7 +359,7 @@ class Api(
                                 is Either.Left -> {
                                     // LNURL
                                     val lnurlInvoice = either.value
-                                    when (val event = peer.payInvoice(amount, lnurlInvoice.invoice)) {
+                                    when (val event = payInvoice(amount, lnurlInvoice.invoice, trampolineFeesOverride)) {
                                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                                         is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
@@ -351,7 +368,7 @@ class Api(
                                 is Either.Right -> {
                                     // OFFER
                                     val offer = either.value
-                                    when (val event = peer.payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds)) {
+                                    when (val event = payOffer(amount, offer, payerKey = nodeParams.defaultOffer(peer.walletParams.trampolineNode.id).privateKey, payerNote = note, fetchInvoiceTimeout = 30.seconds, trampolineFeesOverride = trampolineFeesOverride)) {
                                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                                         is fr.acinq.lightning.io.OfferNotPaid -> call.respond(PaymentFailed(event))
@@ -376,6 +393,7 @@ class Api(
                     post("lnurlpay") {
                         val formParameters = call.receiveParameters()
                         val overrideAmount = formParameters.getOptionalAmount()
+                        val trampolineFeesOverride = formParameters.getTrampolineFeesOverride()
                         val comment = formParameters["message"]
                         val request = formParameters.getLnurl("lnurl")
                         // early abort to avoid executing an invalid url
@@ -391,7 +409,7 @@ class Api(
                                 is LnurlPay.PaymentParameters -> {
                                     val amount = (overrideAmount ?: lnurl.minSendable)
                                     val invoice = lnurlHandler.getLnurlPayInvoice(lnurl, amount, comment)
-                                    when (val event = peer.payInvoice(amount, invoice.invoice)) {
+                                    when (val event = payInvoice(amount, invoice.invoice, trampolineFeesOverride)) {
                                         is fr.acinq.lightning.io.PaymentSent -> call.respond(PaymentSent(event))
                                         is fr.acinq.lightning.io.PaymentNotSent -> call.respond(PaymentFailed(event))
                                         is fr.acinq.lightning.io.OfferNotPaid -> error("unreachable code")
@@ -567,6 +585,12 @@ class Api(
 
     private fun badRequest(message: String): Nothing = throw BadRequestException(message)
 
+    private suspend fun payInvoice(amount: MilliSatoshi, invoice: Bolt11Invoice, trampolineFeesOverride: TrampolineFees?): SendPaymentResult =
+        peer.payInvoice(amount, invoice, trampolineFeesOverride?.let { listOf(it) })
+
+    private suspend fun payOffer(amount: MilliSatoshi, offer: OfferTypes.Offer, payerKey: PrivateKey, payerNote: String?, fetchInvoiceTimeout: kotlin.time.Duration, trampolineFeesOverride: TrampolineFees?): SendPaymentResult =
+        peer.payOffer(amount, offer, payerKey, payerNote, fetchInvoiceTimeout, trampolineFeesOverride?.let { listOf(it) })
+
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 
     private fun Parameters.getByteVector32(argName: String): ByteVector32 = getString(argName).let { hex -> kotlin.runCatching { ByteVector32.fromValidHex(hex) }.getOrNull() ?: invalidType(argName, "hex32") }
@@ -584,6 +608,17 @@ class Api(
     private fun Parameters.getLong(argName: String): Long = ((this[argName] ?: missing(argName)).toLongOrNull()) ?: invalidType(argName, "integer")
 
     private fun Parameters.getOptionalLong(argName: String): Long? = this[argName]?.let { it.toLongOrNull() ?: invalidType(argName, "integer") }
+
+    private fun Parameters.getTrampolineFeesOverride(): TrampolineFees? = try {
+        buildTrampolineFeesOverride(
+            feeBaseSat = getOptionalLong("trampolineFeeBaseSat"),
+            feeProportional = getOptionalLong("trampolineFeeProportional"),
+            cltvExpiryDelta = getOptionalLong("trampolineFeeCltvExpiryDelta"),
+            defaultCltvExpiryDelta = peer.walletParams.trampolineFees.first().cltvExpiryDelta
+        )
+    } catch (e: IllegalArgumentException) {
+        badRequest(e.message ?: "invalid trampoline fee override")
+    }
 
     private fun Parameters.getEmailLikeAddress(argName: String): Pair<String, String> = this[argName]?.let { Parser.parseEmailLikeAddress(it) } ?: invalidType(argName, "username@domain")
 

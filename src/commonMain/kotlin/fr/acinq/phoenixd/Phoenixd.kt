@@ -419,6 +419,14 @@ class Phoenixd : CliktCommand() {
                             }
                             is PaymentEvents.PaymentSent ->
                                 when (val payment = it.payment) {
+                                    is LightningOutgoingPayment -> when (val status = payment.status) {
+                                        is LightningOutgoingPayment.Status.Failed -> {
+                                            val failures = payment.parts.mapNotNull { part -> part.status as? LightningOutgoingPayment.Part.Status.Failed }
+                                            val lastFailure = failures.lastOrNull()?.failure
+                                            consoleLog("failed lightning payment: ${payment.recipientAmount.truncateToSatoshi()} (paymentHash=${payment.paymentHash} failure=${status.reason::class.simpleName} category=${status.reason.category} attemptCount=${failures.size}${lastFailure?.let { " lastFailure=${it::class.simpleName} lastCategory=${it.category}" } ?: ""})")
+                                        }
+                                        else -> {}
+                                    }
                                     is AutomaticLiquidityPurchasePayment -> {
                                         val totalFee = payment.fees.truncateToSatoshi()
                                         val purchaseDetails = payment.liquidityPurchaseDetails

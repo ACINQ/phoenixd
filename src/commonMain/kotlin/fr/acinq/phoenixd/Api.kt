@@ -18,8 +18,6 @@ import fr.acinq.lightning.channel.ChannelFundingResponse
 import fr.acinq.lightning.channel.states.*
 import fr.acinq.lightning.crypto.LocalKeyManager
 import fr.acinq.lightning.db.*
-import fr.acinq.lightning.io.PayInvoice as LightningPayInvoice
-import fr.acinq.lightning.io.PayOffer as LightningPayOffer
 import fr.acinq.lightning.io.Peer
 import fr.acinq.lightning.io.SendPaymentResult
 import fr.acinq.lightning.logging.LoggerFactory
@@ -58,8 +56,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
@@ -589,35 +585,11 @@ class Api(
 
     private fun badRequest(message: String): Nothing = throw BadRequestException(message)
 
-    private suspend fun payInvoice(amount: MilliSatoshi, invoice: Bolt11Invoice, trampolineFeesOverride: TrampolineFees?): SendPaymentResult {
-        if (trampolineFeesOverride == null) return peer.payInvoice(amount, invoice)
-        val paymentId = UUID.randomUUID()
-        return coroutineScope {
-            val result = async {
-                peer.eventsFlow
-                    .filterIsInstance<SendPaymentResult>()
-                    .filter { it.request.paymentId == paymentId }
-                    .first()
-            }
-            peer.send(LightningPayInvoice(paymentId, amount, LightningOutgoingPayment.Details.Normal(invoice), listOf(trampolineFeesOverride)))
-            result.await()
-        }
-    }
+    private suspend fun payInvoice(amount: MilliSatoshi, invoice: Bolt11Invoice, trampolineFeesOverride: TrampolineFees?): SendPaymentResult =
+        peer.payInvoice(amount, invoice, trampolineFeesOverride?.let { listOf(it) })
 
-    private suspend fun payOffer(amount: MilliSatoshi, offer: OfferTypes.Offer, payerKey: PrivateKey, payerNote: String?, fetchInvoiceTimeout: kotlin.time.Duration, trampolineFeesOverride: TrampolineFees?): SendPaymentResult {
-        if (trampolineFeesOverride == null) return peer.payOffer(amount, offer, payerKey, payerNote, fetchInvoiceTimeout)
-        val paymentId = UUID.randomUUID()
-        return coroutineScope {
-            val result = async {
-                peer.eventsFlow
-                    .filterIsInstance<SendPaymentResult>()
-                    .filter { it.request.paymentId == paymentId }
-                    .first()
-            }
-            peer.send(LightningPayOffer(paymentId, payerKey, payerNote, amount, offer, fetchInvoiceTimeout, listOf(trampolineFeesOverride)))
-            result.await()
-        }
-    }
+    private suspend fun payOffer(amount: MilliSatoshi, offer: OfferTypes.Offer, payerKey: PrivateKey, payerNote: String?, fetchInvoiceTimeout: kotlin.time.Duration, trampolineFeesOverride: TrampolineFees?): SendPaymentResult =
+        peer.payOffer(amount, offer, payerKey, payerNote, fetchInvoiceTimeout, trampolineFeesOverride?.let { listOf(it) })
 
     private fun Parameters.getString(argName: String): String = (this[argName] ?: missing(argName))
 

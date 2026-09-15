@@ -36,13 +36,13 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
 
     val metadataQueries = PaymentsMetadataQueries(database)
 
-    override suspend fun getInboundLiquidityPurchase(txId: TxId): LiquidityAds.LiquidityTransactionDetails? {
+    override suspend fun getInboundLiquidityPurchase(txId: TxId): LiquidityAds.LiquidityTransactionDetails? = withContext(Dispatchers.Default) {
         val payment = buildList {
             addAll(database.paymentsIncomingQueries.listByTxId(txId).executeAsList())
             addAll(database.paymentsOutgoingQueries.listByTxId(txId).executeAsList())
         }.firstOrNull()
         @Suppress("DEPRECATION")
-        return when (payment) {
+        when (payment) {
             is LightningIncomingPayment -> payment.liquidityPurchaseDetails
             is OnChainIncomingPayment -> payment.liquidityPurchaseDetails
             is LegacyPayToOpenIncomingPayment -> null
@@ -53,7 +53,7 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
         }
     }
 
-    override suspend fun setLocked(txId: TxId) {
+    override suspend fun setLocked(txId: TxId) = withContext(Dispatchers.Default) {
         database.transaction {
             val lockedAt = currentTimestampMillis()
             database.onChainTransactionsQueries.setLocked(tx_id = txId, locked_at = lockedAt)

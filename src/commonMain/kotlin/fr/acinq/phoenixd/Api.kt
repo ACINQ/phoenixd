@@ -288,7 +288,11 @@ class Api(
                 }
                 get("payments/outgoing/{uuid}") {
                     val uuid = call.parameters.getUUID("uuid")
-                    val payment: ApiType? = paymentDb.getLightningOutgoingPayment(uuid)?.let { ApiType.OutgoingPayment(it) }
+                    val payment: ApiType? = when (val payment = paymentDb.getOutgoingPayment(uuid)) {
+                        is LightningOutgoingPayment -> ApiType.OutgoingPayment(payment)
+                        is OnChainOutgoingPayment -> ApiType.OutgoingPayment(payment)
+                        null -> null
+                    }
                     payment
                         ?.let { call.respond(it) }
                         ?: call.respond(HttpStatusCode.NoContent)

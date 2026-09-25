@@ -20,6 +20,7 @@ import app.cash.sqldelight.db.QueryResult
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.TxId
 import fr.acinq.lightning.db.*
+import fr.acinq.lightning.utils.UUID
 import fr.acinq.lightning.utils.currentTimestampMillis
 import fr.acinq.lightning.wire.LiquidityAds
 import fr.acinq.phoenixd.db.payments.PaymentsMetadataQueries
@@ -82,6 +83,11 @@ class SqlitePaymentsDb(val database: PhoenixDatabase) :
                 database.paymentsOutgoingQueries.update(id = payment1.id, data = payment1, completed_at = payment1.completedAt, succeeded_at = payment1.succeededAt)
             }
         }
+    }
+
+    /** Returns an outgoing payment of any type (Lightning or on-chain), unlike [getLightningOutgoingPayment]. */
+    suspend fun getOutgoingPayment(id: UUID): OutgoingPayment? = withContext(Dispatchers.Default) {
+        database.paymentsOutgoingQueries.get(id).executeAsOneOrNull()
     }
 
     /** Will return either [LightningIncomingPayment] or [LegacyPayToOpenIncomingPayment] (useful for backward compatibility). */

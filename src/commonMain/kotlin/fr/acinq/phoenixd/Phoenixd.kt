@@ -164,15 +164,18 @@ class Phoenixd : CliktCommand() {
         )
             .convert { Url(it) }
             .multiple()
+        private val webHookSecretFromFile by option("--webhook-secret-file", help = "Read the secret used to authenticate webhook calls from a file, takes precedence over --webhook-secret").passwordFile()
         val webHookSecret by option("--webhook-secret", help = "Secret used to authenticate webhook calls")
-            .defaultLazy {
-                // if we are here then no value is defined in phoenix.conf
-                this@Phoenixd.terminal.print(yellow("Generating webhook secret..."))
-                val value = randomBytes32().toHex()
-                SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
-                    .use { it.writeString("\nwebhook-secret=$value") }
-                this@Phoenixd.terminal.println(white("done"))
-                value
+            .transformAll { values ->
+                webHookSecretFromFile ?: values.lastOrNull() ?: run {
+                    // if we are here then no value is defined in phoenix.conf
+                    this@Phoenixd.terminal.print(yellow("Generating webhook secret..."))
+                    val value = randomBytes32().toHex()
+                    SystemFileSystem.sink(this@Phoenixd.confFile, append = true).buffered()
+                        .use { it.writeString("\nwebhook-secret=$value") }
+                    this@Phoenixd.terminal.println(white("done"))
+                    value
+                }
             }
     }
     private val httpOptions by HttpOptions()

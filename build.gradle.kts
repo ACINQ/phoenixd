@@ -74,6 +74,15 @@ kotlin {
                     include("*")
                 }.into("bin")
             }
+            // like Bitcoin Core, phoenixd creates files that are only accessible by the current user
+            // the jvm can't set its own umask so we do it in the start script (see setPrivateUmask)
+            tasks.withType<CreateStartScripts>().matching { it.applicationName == "phoenixd" }.configureEach {
+                doLast {
+                    unixScript.writeText(
+                        unixScript.readText().replaceFirst("\n", "\numask 077\n")
+                    )
+                }
+            }
             // generate the phoenix-cli scripts before building the main jvm ditribution
             tasks["jvmDistZip"].dependsOn("startScriptsForJvmPhoenix-cli")
             tasks["jvmDistTar"].dependsOn("startScriptsForJvmPhoenix-cli")

@@ -11,9 +11,22 @@ import fr.acinq.phoenixd.db.migrations.v3.AfterVersion3
 import fr.acinq.phoenixd.db.migrations.v4.AfterVersion4
 import fr.acinq.phoenixd.db.sqldelight.PhoenixDatabase
 import kotlinx.io.files.Path
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.*
 
 actual val datadir: Path = System.getenv()[PHOENIX_DATADIR]?.let { Path(it) } ?: Path(Path(System.getProperty("user.home")), ".phoenix")
+
+// the jvm can't set the umask of its own process, this is done in the start script (see build.gradle.kts)
+actual fun setPrivateUmask() {}
+
+actual fun setPermissions(path: Path, mode: Int) {
+    if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+        val permissions = "rwxrwxrwx".mapIndexed { i, c -> if (mode and (1 shl (8 - i)) != 0) c else '-' }.joinToString("")
+        runCatching { Files.setPosixFilePermissions(java.nio.file.Path.of(path.toString()), PosixFilePermissions.fromString(permissions)) }
+    }
+}
 
 actual fun createAppDbDriver(dir: Path, chain: Chain, nodeId: PublicKey): SqlDriver {
     val chainName = when (chain) {

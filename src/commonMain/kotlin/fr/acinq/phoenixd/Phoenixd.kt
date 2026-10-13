@@ -44,6 +44,7 @@ import fr.acinq.phoenixd.conf.ListValueSource
 import fr.acinq.phoenixd.conf.PhoenixSeed
 import fr.acinq.phoenixd.conf.getOrGenerateSeed
 import fr.acinq.phoenixd.conf.passwordFile
+import fr.acinq.phoenixd.conf.restrictFilePermissions
 import fr.acinq.phoenixd.db.SqliteChannelsDb
 import fr.acinq.phoenixd.db.SqlitePaymentsDb
 import fr.acinq.phoenixd.db.createPhoenixDb
@@ -66,9 +67,12 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 
-fun main(args: Array<String>) = Phoenixd()
-    .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
-    .main(args)
+fun main(args: Array<String>) {
+    restrictFilePermissions(datadir)
+    Phoenixd()
+        .versionOption(BuildVersions.phoenixdVersion, names = setOf("--version", "-v"))
+        .main(args)
+}
 
 class Phoenixd : CliktCommand() {
     private val confFile = Path(datadir, "phoenix.conf")

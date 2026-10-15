@@ -134,9 +134,19 @@ sealed class ApiType {
 
     @Serializable
     @SerialName("payment_failed")
-    data class PaymentFailed(val paymentHash: ByteVector32?, val offerId: ByteVector32?, val reason: String) : ApiType() {
-        constructor(event: fr.acinq.lightning.io.PaymentNotSent) : this(paymentHash = event.request.paymentHash, offerId = null, reason = event.reason.explain().fold({ it.toString() }, { it.toString() }))
-        constructor(event: fr.acinq.lightning.io.OfferNotPaid) : this(paymentHash = null, offerId = event.request.offer.offerId, event.reason.toString())
+    data class PaymentFailed(val paymentHash: ByteVector32?, val offerId: ByteVector32?, val reason: String, val failure: PaymentFailureDetails? = null) : ApiType() {
+        constructor(event: fr.acinq.lightning.io.PaymentNotSent) : this(
+            paymentHash = event.request.paymentHash,
+            offerId = null,
+            reason = event.reason.explain().fold({ it.toString() }, { it.toString() }),
+            failure = PaymentFailureDetails(event.reason)
+        )
+        constructor(event: fr.acinq.lightning.io.OfferNotPaid) : this(
+            paymentHash = null,
+            offerId = event.request.offer.offerId,
+            reason = event.reason.toString(),
+            failure = PaymentFailureDetails(event.reason)
+        )
     }
 
     @Serializable
